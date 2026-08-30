@@ -366,6 +366,11 @@ function printTable(rows) {
         row.checkVsBaseline === null
           ? "-"
           : `${round(row.checkVsBaseline, 2)}x`,
+
+      "check/rich":
+        row.checkVsRichContract === null
+          ? "-"
+          : `${round(row.checkVsRichContract, 2)}x`,
     })),
   );
 
