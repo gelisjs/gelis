@@ -446,8 +446,8 @@ function generateRichContract(size) {
   );
 }
 
-function generateClient(size) {
-  const directory = caseDir("client", size);
+function generateClient(size, scenario, probeMode) {
+  const directory = caseDir(scenario, size);
 
   const modules = [];
   const routeLocations = [];
@@ -491,7 +491,9 @@ function generateClient(size) {
 
   index.push("})", "", "type Client = GelisClient<typeof api>", "");
 
-  for (const { moduleName, routeName } of routeLocations) {
+  const probeLocations = selectClientProbes(routeLocations, probeMode);
+
+  for (const { moduleName, routeName } of probeLocations) {
     const suffix = `${moduleName}_${routeName}`;
 
     const method = `Method_${suffix}`;
@@ -549,6 +551,40 @@ function generateClient(size) {
 
     `${index.join("\n")}\n`,
   );
+}
+
+function selectClientProbes(routes, mode) {
+  if (mode === "all") {
+    return routes;
+  }
+
+  if (mode === "module") {
+    return routes.slice(0, ROUTES_PER_FILE);
+  }
+
+  if (mode === "sparse") {
+    const count = Math.min(10, routes.length);
+
+    if (count === routes.length) {
+      return routes;
+    }
+
+    const lastIndex = routes.length - 1;
+
+    return Array.from(
+      {
+        length: count,
+      },
+
+      (_, index) => {
+        const position = Math.round((index * lastIndex) / (count - 1));
+
+        return routes[position];
+      },
+    );
+  }
+
+  throw new Error(`Unknown client probe mode: ${mode}`);
 }
 
 console.log(`Generated type benchmarks for: ` + `${SIZES.join(", ")} routes`);
