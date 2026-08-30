@@ -232,4 +232,22 @@ describe("Gelis runtime", () => {
       app.get("/users/:userId", () => null);
     }).toThrow("Duplicate route");
   });
+
+  test("supports async handlers", async () => {
+    const app = new Gelis();
+
+    app.get(
+      "/async",
+
+      async () => ({
+        ok: true,
+      }),
+    );
+
+    const response = await app.fetch(new Request("http://gelis.test/async"));
+
+    expect(await response.json()).toEqual({
+      ok: true,
+    });
+  });
 });
