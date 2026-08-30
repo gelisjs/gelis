@@ -277,4 +277,44 @@ describe("Gelis runtime", () => {
 
     expect(await response.text()).toBe("root");
   });
+
+  test("normalizes null as JSON", async () => {
+    const app = new Gelis();
+
+    app.get("/null", () => null);
+
+    const response = await app.fetch(new Request("http://gelis.test/null"));
+
+    expect(response.status).toBe(200);
+
+    expect(await response.json()).toBeNull();
+  });
+
+  test("supports text reply.status", async () => {
+    const Text = {} as StandardSchemaV1<string>;
+
+    const app = new Gelis();
+
+    app.get(
+      "/created",
+
+      {
+        responses: {
+          201: Text,
+        },
+      },
+
+      ({ reply }) => reply.status(201, "created"),
+    );
+
+    const response = await app.fetch(new Request("http://gelis.test/created"));
+
+    expect(response.status).toBe(201);
+
+    expect(await response.text()).toBe("created");
+
+    expect(response.headers.get("content-type")).toBe(
+      "text/plain; charset=utf-8",
+    );
+  });
 });
