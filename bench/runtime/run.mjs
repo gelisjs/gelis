@@ -46,13 +46,13 @@ for (const size of SIZES) {
 
   benchmarkRows.push(runDispatchCase("dynamic", size));
 
-  benchmarkRows.push(await runFetchCase("static", "raw", size));
+  benchmarkRows.push(runFetchCase("static", "raw", size));
 
-  benchmarkRows.push(await runFetchCase("dynamic", "raw", size));
+  benchmarkRows.push(runFetchCase("dynamic", "raw", size));
 
-  benchmarkRows.push(await runFetchCase("static", "json", size));
+  benchmarkRows.push(runFetchCase("static", "json", size));
 
-  benchmarkRows.push(await runFetchCase("dynamic", "json", size));
+  benchmarkRows.push(runFetchCase("dynamic", "json", size));
 }
 
 const metadata = {
@@ -271,19 +271,27 @@ function buildApp(kind, responseKind, size) {
   return app;
 }
 
-async function runFetchCase(kind, responseKind, size) {
+function runFetchCase(kind, responseKind, size) {
   const app = buildApp(kind, responseKind, size);
 
   const pathname = targetPath(kind, size);
 
   const request = new Request(`http://gelis.test${pathname}`);
 
-  return benchmarkAsync(
-    `fetch-${kind}-${responseKind}`,
+  const probe = app.fetch(request);
+
+  if (probe !== null && typeof probe === "object" && "then" in probe) {
+    throw new Error("Sync fetch benchmark unexpectedly returned a Promise");
+  }
+
+  sink = probe;
+
+  return benchmarkSync(
+    `fetch-direct-${kind}-${responseKind}`,
     size,
 
-    async () => {
-      sink = await app.fetch(request);
+    () => {
+      sink = app.fetch(request);
     },
   );
 }
