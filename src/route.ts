@@ -27,30 +27,9 @@ export type ResponseSchemaMap = Readonly<Record<number, StandardSchemaV1>>;
 
 export interface RouteOptions {
   readonly query?: StandardSchemaV1;
-
   readonly body?: StandardSchemaV1;
-
   readonly responses?: ResponseSchemaMap;
 }
-
-export interface RouteContext<
-  Path extends string,
-  Query = never,
-  Body = never,
-> {
-  params: InferPathParams<Path>;
-
-  query: Query;
-
-  body: Body;
-}
-
-export type RouteHandler<
-  Path extends string,
-  Query = never,
-  Body = never,
-  Result = unknown,
-> = (context: RouteContext<Path, Query, Body>) => Result;
 
 type SchemaInput<Schema> = Schema extends StandardSchemaV1
   ? StandardSchemaV1.InferInput<Schema>
@@ -59,6 +38,55 @@ type SchemaInput<Schema> = Schema extends StandardSchemaV1
 type SchemaOutput<Schema> = Schema extends StandardSchemaV1
   ? StandardSchemaV1.InferOutput<Schema>
   : never;
+
+export type InferResponseSchemas<Schemas extends ResponseSchemaMap> = {
+  -readonly [Status in keyof Schemas]: SchemaOutput<Schemas[Status]>;
+};
+
+type DeclaredRouteResponsesFor<Options extends RouteOptions> = Options extends {
+  readonly responses: infer Responses extends ResponseSchemaMap;
+}
+  ? InferResponseSchemas<Responses>
+  : Record<never, never>;
+
+type ReplyStatus<Responses extends RouteResponses> = Extract<
+  keyof Responses,
+  number
+>;
+
+interface ReplyResult<Status extends number, Body> {
+  readonly status: Status;
+  readonly body: Body;
+
+  readonly "~gelisReply"?: true;
+}
+
+interface Reply<Responses extends RouteResponses> {
+  status<const Status extends ReplyStatus<Responses>>(
+    status: Status,
+    body: Responses[Status],
+  ): ReplyResult<Status, Responses[Status]>;
+}
+
+export interface RouteContext<
+  Path extends string,
+  Query = never,
+  Body = never,
+  Responses extends RouteResponses = Record<never, never>,
+> {
+  params: InferPathParams<Path>;
+  query: Query;
+  body: Body;
+
+  reply: Reply<Responses>;
+}
+
+export type RouteHandler<
+  Path extends string,
+  Query = never,
+  Body = never,
+  Result = unknown,
+> = (context: RouteContext<Path, Query, Body>) => Result;
 
 export type RouteRequestFor<
   Path extends string,
@@ -91,12 +119,9 @@ export type RouteHandlerContextFor<
     readonly body: infer Body;
   }
     ? SchemaOutput<Body>
-    : never
+    : never,
+  DeclaredRouteResponsesFor<Options>
 >;
-
-export type InferResponseSchemas<Schemas extends ResponseSchemaMap> = {
-  -readonly [Status in keyof Schemas]: SchemaOutput<Schemas[Status]>;
-};
 
 export type RouteResponsesFor<
   Options extends RouteOptions,
@@ -118,12 +143,10 @@ export interface RouteRef<
   Responses extends RouteResponses = RouteResponses,
 > {
   readonly method: Method;
-
   readonly path: Path;
 
   readonly "~gelis"?: {
     readonly request: Request;
-
     readonly responses: Responses;
   };
 }
@@ -141,11 +164,8 @@ export type RouteContractOf<Route> = Route extends {
 }
   ? {
       method: Method;
-
       path: Path;
-
       request: Request;
-
       responses: Responses;
     }
   : never;
