@@ -6,21 +6,52 @@ import type { ValidRoutePath } from "./types/path";
 
 export type ModuleRoutes = Readonly<Record<string, AnyRouteRef>>;
 
-export interface ModuleRef<Prefix extends string, Routes extends ModuleRoutes> {
+type AnyModulePublicRoutes = Readonly<Record<string, unknown>>;
+
+type ModulePublicRoutes<Routes extends ModuleRoutes> = {
+  -readonly [Name in keyof Routes]: RouteContractOf<Routes[Name]>;
+};
+
+declare const moduleRefBrand: unique symbol;
+
+interface ModuleRefInternal<
+  Prefix extends string,
+  Routes extends ModuleRoutes,
+  PublicRoutes extends AnyModulePublicRoutes,
+> {
   readonly prefix: Prefix;
   readonly routes: Routes;
+
+  readonly [moduleRefBrand]: {
+    readonly publicRoutes: PublicRoutes;
+  };
 }
 
-export type AnyModuleRef = ModuleRef<string, ModuleRoutes>;
+export type ModuleRef<
+  Prefix extends string,
+  Routes extends ModuleRoutes,
+> = ModuleRefInternal<Prefix, Routes, ModulePublicRoutes<Routes>>;
+
+export type AnyModuleRef = ModuleRefInternal<
+  string,
+  ModuleRoutes,
+  AnyModulePublicRoutes
+>;
+
+export type ModulePublicContractOf<Module> =
+  Module extends ModuleRefInternal<string, ModuleRoutes, infer PublicRoutes>
+    ? PublicRoutes
+    : never;
 
 export type ModuleContractOf<Module> =
-  Module extends ModuleRef<infer Prefix, infer Routes>
+  Module extends ModuleRefInternal<
+    infer Prefix,
+    ModuleRoutes,
+    infer PublicRoutes
+  >
     ? {
         prefix: Prefix;
-
-        routes: {
-          -readonly [Name in keyof Routes]: RouteContractOf<Routes[Name]>;
-        };
+        routes: PublicRoutes;
       }
     : never;
 
@@ -34,8 +65,12 @@ export function defineModule<
 ): ModuleRef<Prefix, Routes> {
   const route = new RouteBuilder(prefix);
 
+  const routes = define(route);
+
+  // The brand is type-only.
+  // Runtime modules intentionally stay compact.
   return {
     prefix,
-    routes: define(route),
-  };
+    routes,
+  } as unknown as ModuleRef<Prefix, Routes>;
 }
