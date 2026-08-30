@@ -1,0 +1,25 @@
+{
+  "name": "gelis",
+  "version": "0.0.0",
+  "description": "A lightweight, inference-first TypeScript backend framework designed for runtime speed and TypeScript scalability.",
+  "license": "MIT",
+  "type": "module",
+  "private": true,
+  "packageManager": "bun@1.4.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/gelisjs/gelis.git"
+  },
+  "bugs": {
+    "url": "https://github.com/gelisjs/gelis/issues"
+  },
+  "homepage": "https://github.com/gelisjs/gelis#readme",
+  "scripts": {
+    "check": "bun run typecheck && bun run test:types",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test:types": "tsc -p test/types/tsconfig.json --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "7.0.2"
+  }
+}
