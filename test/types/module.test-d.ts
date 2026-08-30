@@ -141,8 +141,8 @@ type AfterMount = typeof app;
 
 type StableRoot = Expect<Equal<BeforeMount, AfterMount>>;
 
-// @ts-expect-error module entries must be Gelis RouteRefs
 defineModule("/invalid", () => ({
+  // @ts-expect-error module entries must be Gelis RouteRefs
   nope: {
     method: "GET",
     path: "/invalid",
