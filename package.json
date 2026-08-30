@@ -15,9 +15,11 @@
   },
   "homepage": "https://github.com/gelisjs/gelis#readme",
   "scripts": {
-    "check": "bun run typecheck && bun run test:types",
+    "check": "bun run typecheck && bun run test:types && bun run typecheck:runtime-tests && bun run test:runtime",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test:types": "tsc -p test/types/tsconfig.json --noEmit",
+    "typecheck:runtime-tests": "tsc -p test/runtime/tsconfig.json --noEmit",
+    "test:runtime": "bun test test/runtime",
     "bench:types:generate": "bun bench/types/generate.mjs",
     "bench:types:quick": "bun bench/types/run.mjs --runs=1 --sizes=100,500",
     "bench:types": "bun bench/types/run.mjs"
