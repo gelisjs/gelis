@@ -2,6 +2,10 @@ import type { RuntimeReply } from "./types";
 
 const replyResultBrand = Symbol("gelis.reply.result");
 
+const TEXT_HEADERS = {
+  "content-type": "text/plain; charset=utf-8",
+};
+
 interface RuntimeReplyResult {
   readonly [replyResultBrand]: true;
 
@@ -26,51 +30,58 @@ export function normalizeResponse(value: unknown): Response {
     return value;
   }
 
-  if (isReplyResult(value)) {
-    return normalizeBody(value.body, value.status);
-  }
-
-  return normalizeBody(value, undefined);
-}
-
-function normalizeBody(value: unknown, status: number | undefined): Response {
-  const responseStatus = status ?? 200;
-
-  if (isBodylessStatus(responseStatus)) {
-    return new Response(null, {
-      status: responseStatus,
-    });
-  }
-
   if (value === undefined) {
     return new Response(null, {
-      status: status ?? 204,
-    });
-  }
-
-  if (value instanceof Response) {
-    if (status === undefined) {
-      return value;
-    }
-
-    return new Response(value.body, {
-      status,
-      headers: value.headers,
+      status: 204,
     });
   }
 
   if (typeof value === "string") {
     return new Response(value, {
-      status: responseStatus,
-
-      headers: {
-        "content-type": "text/plain; charset=utf-8",
-      },
+      headers: TEXT_HEADERS,
     });
   }
 
-  return Response.json(value, {
-    status: responseStatus,
+  if (isReplyResult(value)) {
+    return normalizeReplyResult(value);
+  }
+
+  return Response.json(value);
+}
+
+function normalizeReplyResult(result: RuntimeReplyResult): Response {
+  const { status, body } = result;
+
+  if (isBodylessStatus(status)) {
+    return new Response(null, {
+      status,
+    });
+  }
+
+  if (body === undefined) {
+    return new Response(null, {
+      status,
+    });
+  }
+
+  if (body instanceof Response) {
+    return new Response(body.body, {
+      status,
+
+      headers: body.headers,
+    });
+  }
+
+  if (typeof body === "string") {
+    return new Response(body, {
+      status,
+
+      headers: TEXT_HEADERS,
+    });
+  }
+
+  return Response.json(body, {
+    status,
   });
 }
 
