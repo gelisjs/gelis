@@ -11,6 +11,8 @@ export interface ModuleRef<Prefix extends string, Routes extends ModuleRoutes> {
   readonly routes: Routes;
 }
 
+export type AnyModuleRef = ModuleRef<string, ModuleRoutes>;
+
 export type ModuleContractOf<Module> =
   Module extends ModuleRef<infer Prefix, infer Routes>
     ? {
