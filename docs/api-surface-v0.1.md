@@ -148,9 +148,6 @@ schema output
 handler
 ```
 
-This allows schemas that coerce or normalize values without making the
-typed client pretend it sends the already-transformed representation.
-
 Response schemas expose their normalized output type in the public route
 contract.
 
@@ -202,36 +199,6 @@ When a route declares explicit response contracts, `reply.status()`
 is restricted to the declared status codes and each status code is
 paired with its declared response body type.
 
-Example:
-
-```ts
-app.post(
-  "/users",
-  {
-    responses: {
-      201: User,
-      409: Conflict,
-    },
-  },
-  ({ reply }) => {
-    return reply.status(201, user);
-  },
-);
-```
-
-The following must be rejected by TypeScript when `404` is not declared:
-
-```ts
-reply.status(404, value);
-```
-
-The following must also be rejected when the body does not match the
-contract declared for `409`:
-
-```ts
-reply.status(409, user);
-```
-
 For the initial prototype, routes without an explicit `responses` map
 do not receive a typed status set. They should use a direct return for
 the default response or a raw Web Standard `Response` escape hatch.
@@ -239,26 +206,125 @@ the default response or a raw Web Standard `Response` escape hatch.
 This prevents runtime status behavior from diverging silently from the
 public route contract.
 
-The exact runtime representation returned by `reply.status()` remains
-an implementation detail during the type-system prototype.
+## Internal route builder
 
-## Middleware
+Root applications and modules share the same internal route declaration
+primitive.
 
-Middleware uses onion-style execution.
+Conceptually:
 
-Thrown errors propagate through parent middleware before reaching
-the global error handler.
+```text
+RouteBuilder<''>
+    ↓
+Gelis
+
+RouteBuilder<'/users'>
+    ↓
+users module router
+```
+
+This is an implementation primitive, not part of the intended public API.
+
+The root application keeps an empty prefix. A module router joins its
+module prefix with each local route path before path-parameter inference
+and public contract generation.
 
 ## Modules
 
-Modules expose compact named route contracts.
+Modules are independently defined bounded route scopes.
 
 ```ts
 export const users = defineModule("/users", (route) => ({
   list: route.get("/", listUsers),
+
   find: route.get("/:id", getUser),
+
+  create: route.post(
+    "/",
+    {
+      body: CreateUser,
+      responses: {
+        201: User,
+      },
+    },
+    createUser,
+  ),
 }));
 ```
+
+The object returned by the module callback defines the module's public
+named route surface:
+
+```text
+users
+├── list
+├── find
+└── create
+```
+
+A local module route path is normalized to its full public route path.
+
+For example:
+
+```text
+module prefix: /users
+local path:    /:id
+public path:   /users/:id
+```
+
+Path parameters are inferred from the complete public path, including
+parameters declared in a module prefix if such prefixes are used.
+
+`defineModule()` must reject arbitrary values in the returned route map.
+Public module entries must be Gelis route references.
+
+### Module contract boundary
+
+A module may contain arbitrary implementation details around its route
+handlers, but the public module type retains only compact route
+contracts.
+
+Conceptually:
+
+```text
+handlers
+services
+repositories
+implementation details
+        │
+        X
+        │
+        ▼
+ModuleRef
+├── prefix
+└── named RouteRefs
+```
+
+`ModuleContractOf<typeof module>` exposes normalized public contracts
+for the module's named routes.
+
+Mounting a module:
+
+```ts
+const app = new Gelis();
+
+app.mount(users);
+```
+
+must not mutate or accumulate the root `Gelis` type.
+
+In type-system terms:
+
+```text
+typeof app before mount
+=
+typeof app after mount
+=
+Gelis
+```
+
+Module contracts therefore scale independently from the root
+application generic graph.
 
 ## Public API contract
 
@@ -296,7 +362,7 @@ typeof app;
 - response-validation default
 - body helper syntax
 - cookies core vs optional package
-- exact module API
+- exact public contract composition API
 - client result API
 - WebSocket API
 - plugin capability model
