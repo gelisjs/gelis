@@ -17,7 +17,10 @@
   "scripts": {
     "check": "bun run typecheck && bun run test:types",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test:types": "tsc -p test/types/tsconfig.json --noEmit"
+    "test:types": "tsc -p test/types/tsconfig.json --noEmit",
+    "bench:types:generate": "bun bench/types/generate.mjs",
+    "bench:types:quick": "bun bench/types/run.mjs --runs=1 --sizes=100,500",
+    "bench:types": "bun bench/types/run.mjs"
   },
   "devDependencies": {
     "typescript": "7.0.2"
