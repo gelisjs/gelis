@@ -95,6 +95,68 @@ together.
 
 Route paths must begin with `/`.
 
+## RouteRef public contract
+
+`RouteRef` is a compact public contract token.
+
+It carries normalized public information such as:
+
+```text
+method
+path
+request params
+request query input
+request body input
+response status/output map
+```
+
+It must not contain or expose the handler function type, repository
+types, service types, database types, or other backend implementation
+details.
+
+A route with the same public contract must produce the same public
+`RouteRef` type even when its handler implementation is internally
+different.
+
+For routes without an explicit response schema, Gelis may infer the
+default `200` response type from the handler return value. Only the
+normalized return type becomes part of the route contract; the handler
+function itself does not.
+
+## Schema input and validated output
+
+Gelis uses the Standard Schema distinction between schema input and
+schema output.
+
+For request schemas:
+
+- the public route/client contract uses the schema **input** type;
+- the route handler receives the schema **output** type after validation
+  and transformation.
+
+Conceptually:
+
+```text
+client payload
+    ↓
+schema input
+    ↓
+validation / transformation
+    ↓
+schema output
+    ↓
+handler
+```
+
+This allows schemas that coerce or normalize values without making the
+typed client pretend it sends the already-transformed representation.
+
+Response schemas expose their normalized output type in the public route
+contract.
+
+Validation capability and JSON Schema/OpenAPI serialization capability
+remain separate concepts.
+
 ## Context
 
 The intended context includes:
