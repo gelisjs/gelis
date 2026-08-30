@@ -1,6 +1,6 @@
 import { cpus } from "node:os";
 
-import { normalizeResponse } from "../../src/runtime/response.ts";
+import { normalizeResponse, runtimeReply } from "../../src/runtime/response.ts";
 
 const SAMPLES = 7;
 const TARGET_MS = 80;
@@ -19,6 +19,8 @@ const jsonPayload = {
   id: "123",
   ok: true,
 };
+
+const replyJson = runtimeReply.status(201, jsonPayload);
 
 const serializedJson = JSON.stringify(jsonPayload);
 
@@ -80,7 +82,6 @@ const cases = [
         },
 
         query: undefined,
-
         body: undefined,
 
         reply: context.reply,
@@ -114,10 +115,37 @@ const cases = [
     async: false,
 
     operation() {
-      sink = normalizeResponse({
-        id: "123",
-        ok: true,
-      });
+      sink = normalizeResponse(jsonPayload);
+    },
+  },
+
+  {
+    name: "normalize-string",
+
+    async: false,
+
+    operation() {
+      sink = normalizeResponse("hello");
+    },
+  },
+
+  {
+    name: "normalize-undefined",
+
+    async: false,
+
+    operation() {
+      sink = normalizeResponse(undefined);
+    },
+  },
+
+  {
+    name: "normalize-reply-json",
+
+    async: false,
+
+    operation() {
+      sink = normalizeResponse(replyJson);
     },
   },
 
@@ -201,7 +229,11 @@ const cases = [
     operation() {
       const result = syncHandler(context);
 
-      if (result !== null && typeof result === "object" && "then" in result) {
+      if (
+        result !== null &&
+        (typeof result === "object" || typeof result === "function") &&
+        "then" in result
+      ) {
         sink = true;
       } else {
         sink = result;
@@ -253,7 +285,7 @@ function pathnameFromAbsoluteUrl(value) {
 
   const authorityStart = scheme + 3;
 
-  let pathStart = value.indexOf("/", authorityStart);
+  const pathStart = value.indexOf("/", authorityStart);
 
   const queryStart = value.indexOf("?", authorityStart);
 
