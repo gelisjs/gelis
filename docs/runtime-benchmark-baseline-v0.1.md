@@ -1,6 +1,6 @@
 # Gelis Runtime Benchmark Baseline v0.1
 
-**Status:** Baseline 1 — portable runtime  
+**Status:** Baseline 2 — pathname and synchronous-handler fast paths  
 **Date:** 2026-08-31
 
 ## Environment
@@ -11,119 +11,154 @@
 - Memory: 24398 MB
 - Samples: 7
 
-## Route registration
+## Correctness gate
+
+The optimized runtime passed:
+
+- core TypeScript check;
+- type-system tests;
+- runtime-test TypeScript check;
+- 15 runtime tests;
+- 0 runtime test failures.
+
+The runtime tests include static and dynamic matching, static-route precedence,
+dynamic fallback, module mounting, 404 handling, response normalization,
+typed `reply.status()`, duplicate-route detection, asynchronous handlers,
+query-string matching, and root URL matching.
+
+## Component profiling before optimization
+
+| Component                                | ns/op |
+| ---------------------------------------- | ----: |
+| `new URL(url).pathname`                  |   165 |
+| fast absolute-URL pathname scan          |    42 |
+| context creation                         |    17 |
+| synchronous handler                      |     4 |
+| raw-response normalization               |     5 |
+| JSON normalization                       |   478 |
+| await synchronous handler                |   135 |
+| await asynchronous handler               |   138 |
+| promise-like check on synchronous result |     7 |
+
+The profile identified pathname parsing and unconditional `await` as the first
+high-value optimization targets.
+
+## Optimizations applied
+
+### Absolute URL pathname fast path
+
+Normal absolute HTTP(S) request URLs use a direct pathname scan instead of
+constructing a new `URL` object.
+
+A standards-based `URL` fallback remains available for unsupported URL shapes.
+
+### Synchronous handler fast path
+
+`app.fetch()` no longer unconditionally awaits every route handler.
+
+Synchronous handlers normalize their result immediately. Promise-like results
+take the asynchronous continuation path.
+
+The public call pattern remains compatible with:
+
+```ts
+const response = await app.fetch(request);
+```
+
+because `await` accepts both `Response` and `Promise<Response>`.
+
+## Route registration after optimization
 
 | Kind    | Routes | Median ms | Routes/ms |
 | ------- | -----: | --------: | --------: |
-| static  |      1 |     0.002 |       476 |
-| dynamic |      1 |     0.003 |       312 |
-| static  |    100 |     0.068 |     1,462 |
-| dynamic |    100 |     0.099 |     1,013 |
-| static  |  1,000 |     0.343 |     2,916 |
-| dynamic |  1,000 |     0.552 |     1,813 |
-| static  |  5,000 |     1.796 |     2,783 |
-| dynamic |  5,000 |     2.641 |     1,893 |
+| static  |      1 |     0.002 |       500 |
+| dynamic |      1 |     0.003 |       323 |
+| static  |    100 |     0.080 |     1,256 |
+| dynamic |    100 |     0.107 |       933 |
+| static  |  1,000 |     0.303 |     3,305 |
+| dynamic |  1,000 |     0.466 |     2,148 |
+| static  |  5,000 |     1.635 |     3,059 |
+| dynamic |  5,000 |     2.602 |     1,922 |
 
-## Runtime dispatch
+## Runtime dispatch after optimization
 
 | Scenario           | Routes | ns/op |      ops/s |
 | ------------------ | -----: | ----: | ---------: |
-| router-static      |      1 |    14 | 71,784,648 |
-| router-dynamic     |      1 |   201 |  4,977,842 |
-| dispatch-static    |      1 |    31 | 31,987,002 |
-| dispatch-dynamic   |      1 |   209 |  4,776,910 |
-| fetch-static-raw   |      1 |   486 |  2,058,471 |
-| fetch-dynamic-raw  |      1 |   712 |  1,403,708 |
-| fetch-static-json  |      1 | 1,065 |    938,613 |
-| fetch-dynamic-json |      1 | 1,428 |    700,261 |
-| router-static      |    100 |    35 | 28,745,827 |
-| router-dynamic     |    100 |   239 |  4,188,438 |
-| dispatch-static    |    100 |    42 | 24,042,267 |
-| dispatch-dynamic   |    100 |   320 |  3,126,184 |
-| fetch-static-raw   |    100 |   705 |  1,419,062 |
-| fetch-dynamic-raw  |    100 |   894 |  1,118,976 |
-| fetch-static-json  |    100 | 1,126 |    887,781 |
-| fetch-dynamic-json |    100 | 1,467 |    681,871 |
-| router-static      |  1,000 |    34 | 29,685,053 |
-| router-dynamic     |  1,000 |   285 |  3,504,505 |
-| dispatch-static    |  1,000 |    49 | 20,261,919 |
-| dispatch-dynamic   |  1,000 |   308 |  3,249,362 |
-| fetch-static-raw   |  1,000 |   529 |  1,890,066 |
-| fetch-dynamic-raw  |  1,000 |   858 |  1,166,053 |
-| fetch-static-json  |  1,000 | 1,118 |    894,801 |
-| fetch-dynamic-json |  1,000 | 1,608 |    621,786 |
-| router-static      |  5,000 |    32 | 31,509,931 |
-| router-dynamic     |  5,000 |   289 |  3,459,012 |
-| dispatch-static    |  5,000 |    44 | 22,843,890 |
-| dispatch-dynamic   |  5,000 |   319 |  3,135,036 |
-| fetch-static-raw   |  5,000 |   582 |  1,717,795 |
-| fetch-dynamic-raw  |  5,000 |   935 |  1,069,101 |
-| fetch-static-json  |  5,000 | 1,172 |    853,567 |
-| fetch-dynamic-json |  5,000 | 1,685 |    593,550 |
+| router-static      |      1 |    14 | 70,000,653 |
+| router-dynamic     |      1 |   199 |  5,020,212 |
+| dispatch-static    |      1 |    33 | 30,497,444 |
+| dispatch-dynamic   |      1 |   208 |  4,817,456 |
+| fetch-static-raw   |      1 |   290 |  3,452,049 |
+| fetch-dynamic-raw  |      1 |   489 |  2,044,017 |
+| fetch-static-json  |      1 |   787 |  1,270,706 |
+| fetch-dynamic-json |      1 | 1,076 |    929,418 |
+| router-static      |    100 |    34 | 29,159,353 |
+| router-dynamic     |    100 |   233 |  4,293,212 |
+| dispatch-static    |    100 |    35 | 28,701,496 |
+| dispatch-dynamic   |    100 |   252 |  3,974,000 |
+| fetch-static-raw   |    100 |   312 |  3,204,866 |
+| fetch-dynamic-raw  |    100 |   531 |  1,882,735 |
+| fetch-static-json  |    100 |   835 |  1,196,904 |
+| fetch-dynamic-json |    100 | 1,152 |    868,019 |
+| router-static      |  1,000 |    33 | 30,407,068 |
+| router-dynamic     |  1,000 |   269 |  3,719,673 |
+| dispatch-static    |  1,000 |    46 | 21,526,082 |
+| dispatch-dynamic   |  1,000 |   290 |  3,446,656 |
+| fetch-static-raw   |  1,000 |   312 |  3,202,773 |
+| fetch-dynamic-raw  |  1,000 |   590 |  1,695,122 |
+| fetch-static-json  |  1,000 |   848 |  1,179,151 |
+| fetch-dynamic-json |  1,000 | 1,204 |    830,530 |
+| router-static      |  5,000 |    37 | 27,292,230 |
+| router-dynamic     |  5,000 |   283 |  3,538,067 |
+| dispatch-static    |  5,000 |    47 | 21,444,910 |
+| dispatch-dynamic   |  5,000 |   301 |  3,324,483 |
+| fetch-static-raw   |  5,000 |   329 |  3,035,999 |
+| fetch-dynamic-raw  |  5,000 |   629 |  1,589,836 |
+| fetch-static-json  |  5,000 |   896 |  1,115,488 |
+| fetch-dynamic-json |  5,000 | 1,281 |    780,777 |
 
-## Findings
+## Before/after at 5,000 routes
 
-### Route-table scaling
+| Scenario           | Baseline 1 ns/op | Baseline 2 ns/op | Improvement |
+| ------------------ | ---------------: | ---------------: | ----------: |
+| static raw fetch   |              582 |              329 | 43.5% lower |
+| dynamic raw fetch  |              935 |              629 | 32.7% lower |
+| static JSON fetch  |            1,172 |              896 | 23.5% lower |
+| dynamic JSON fetch |            1,685 |            1,281 | 24.0% lower |
 
-Static lookup remains effectively constant as the route table grows. At 5,000 routes, exact matching is still approximately 32 ns/op.
+The router numbers remained broadly stable, supporting the conclusion that the
+improvement came from the fetch-path optimizations rather than changes in route
+matching.
 
-Dynamic matching also remains bounded by route shape rather than total route count. It grows from approximately 201 ns/op at one route to 289 ns/op at 5,000 routes.
+## Current hotspot order
 
-There is no evidence of linear scanning across registered routes.
+Measured or inferred high-value costs now include:
 
-### Registration
+1. JSON response construction/serialization;
+2. dynamic route matching;
+3. pathname extraction;
+4. context allocation;
+5. static route matching;
+6. raw response normalization.
 
-Registration remains inexpensive:
+The pathname and synchronous-handler costs have already been materially reduced.
 
-- 5,000 static routes: 1.796 ms;
-- 5,000 dynamic routes: 2.641 ms.
+## Next decision
 
-Registration cost is not currently a runtime optimization priority.
+Keep the current static `Map` implementation.
 
-### Dispatch
+Before modifying the dynamic trie, benchmark a direct path-segment scanner
+against the current `slice + split + recursive trie` matcher in isolation.
 
-Handler dispatch adds little cost over route matching:
+Only replace the current dynamic matcher if the candidate produces a meaningful
+repeatable gain while preserving:
 
-- 5,000 static: 32 ns router → 44 ns dispatch;
-- 5,000 dynamic: 289 ns router → 319 ns dispatch.
+- static-segment precedence;
+- fallback from a dead static branch to a parameter branch;
+- required named parameters;
+- percent-decoded parameter values;
+- duplicate-pattern detection;
+- 5,000-route scaling.
 
-The handler invocation/context layer is therefore not the dominant cost in the current microbenchmark.
-
-### Full `app.fetch()`
-
-Portable `app.fetch()` is materially more expensive than direct dispatch:
-
-- 5,000 static raw: 582 ns;
-- 5,000 dynamic raw: 935 ns.
-
-The current fetch path includes URL construction/pathname extraction, route matching, context construction, async/await handling, and response normalization.
-
-This boundary is the highest-priority optimization target before changing the routing algorithm.
-
-### JSON normalization
-
-JSON response creation adds substantial cost:
-
-- 5,000 static raw: 582 ns;
-- 5,000 static JSON: 1,172 ns;
-- 5,000 dynamic raw: 935 ns;
-- 5,000 dynamic JSON: 1,685 ns.
-
-Serialization and `Response` allocation are expected costs, but they should be isolated from framework dispatch when evaluating router performance.
-
-## Decision
-
-Keep the current static `Map` + dynamic trie architecture.
-
-Do not optimize route registration yet.
-
-Before adding middleware or validation, isolate and benchmark these fetch-path components:
-
-1. `new URL(request.url).pathname`;
-2. faster pathname extraction from an already-valid absolute request URL;
-3. synchronous handler fast path versus unconditional `async`/`await`;
-4. runtime context allocation;
-5. response passthrough;
-6. JSON normalization.
-
-Only optimizations that are verified by benchmark and preserve correctness should be merged.
+After the portable router is optimized, establish a same-machine Bun HTTP
+comparison against current Hono and Elysia using identical routes and payloads.
