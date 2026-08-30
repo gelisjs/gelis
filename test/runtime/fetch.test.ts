@@ -53,7 +53,6 @@ describe("Gelis runtime", () => {
 
       ({ params }) => ({
         kind: "dynamic",
-
         id: params.id,
       }),
     );
@@ -89,7 +88,6 @@ describe("Gelis runtime", () => {
 
       ({ params }) => ({
         route: "fallback",
-
         scope: params.scope,
       }),
     );
@@ -98,7 +96,6 @@ describe("Gelis runtime", () => {
 
     expect(await response.json()).toEqual({
       route: "fallback",
-
       scope: "a",
     });
   });
@@ -249,5 +246,35 @@ describe("Gelis runtime", () => {
     expect(await response.json()).toEqual({
       ok: true,
     });
+  });
+
+  test("ignores query string when matching", async () => {
+    const app = new Gelis();
+
+    app.get(
+      "/users/:id",
+
+      ({ params }) => ({
+        id: params.id,
+      }),
+    );
+
+    const response = await app.fetch(
+      new Request("http://gelis.test/users/123?tab=profile"),
+    );
+
+    expect(await response.json()).toEqual({
+      id: "123",
+    });
+  });
+
+  test("matches root URL", async () => {
+    const app = new Gelis();
+
+    app.get("/", () => "root");
+
+    const response = await app.fetch(new Request("http://gelis.test"));
+
+    expect(await response.text()).toBe("root");
   });
 });
