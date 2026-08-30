@@ -8,346 +8,189 @@ Exact syntax may change after the type-system prototype is measured.
 
 The root application type remains stable.
 
-```ts
-const app = new Gelis();
-
-app.get("/health", () => ({
-  status: "ok",
-}));
-
-app.get("/users/:id", getUser);
-```
-
-Route registration returns a compact `RouteRef`.
-
-It must not accumulate every route into the root `Gelis` generic type.
+Route registration returns compact `RouteRef` tokens and does not
+accumulate every route into the root `Gelis` generic type.
 
 ## Runtime boundary
 
-Core will be Web Standards based.
-
-```ts
-const response = await app.fetch(request);
-```
-
-Runtime startup belongs to adapters such as:
-
-```ts
-import { serve } from "@gelis/bun";
-```
+Core is Web Standards based. Runtime startup belongs to adapters such as
+`@gelis/bun`.
 
 ## Routes
 
-Simple route:
-
-```ts
-app.get("/hello", () => ({
-  message: "hello",
-}));
-```
-
-Contract route:
-
-```ts
-app.post(
-  "/users",
-  {
-    body: CreateUser,
-    responses: {
-      201: User,
-      409: Conflict,
-    },
-  },
-  ({ body, reply }) => {
-    return reply.status(201, createUser(body));
-  },
-);
-```
-
+Routes may be declared in a simple form or with an explicit contract.
 Contract/options come before the handler.
 
 ### Route path syntax
 
-Gelis v0.1 initially supports static path segments and required
-named parameters.
-
-Supported:
-
-```text
-/
-/users
-/users/:id
-/teams/:teamId/users/:userId
-```
-
-Deliberately unsupported during the initial design:
-
-```text
-/users/:id?
-/files/*
-```
-
-Optional parameters are represented as separate explicit routes.
-
-Wildcard/catch-all syntax will be designed together with the runtime
-router so its matching semantics and typed contract are defined
-together.
+Gelis v0.1 initially supports static path segments and required named
+parameters. Optional parameters and wildcard/catch-all syntax remain
+deliberately unsupported until their runtime matching semantics are
+designed together with the router.
 
 Route paths must begin with `/`.
 
 ## RouteRef public contract
 
-`RouteRef` is a compact public contract token.
+`RouteRef` is a compact public contract token carrying normalized public
+information:
 
-It carries normalized public information such as:
+- method
+- full path
+- request params
+- request query input
+- request body input
+- response status/output map
 
-```text
-method
-path
-request params
-request query input
-request body input
-response status/output map
-```
-
-It must not contain or expose the handler function type, repository
-types, service types, database types, or other backend implementation
-details.
-
-A route with the same public contract must produce the same public
-`RouteRef` type even when its handler implementation is internally
-different.
-
-For routes without an explicit response schema, Gelis may infer the
-default `200` response type from the handler return value. Only the
-normalized return type becomes part of the route contract; the handler
-function itself does not.
+It must not expose handler, service, repository, database, or other
+backend implementation types.
 
 ## Schema input and validated output
 
-Gelis uses the Standard Schema distinction between schema input and
+Gelis follows the Standard Schema distinction between schema input and
 schema output.
 
 For request schemas:
 
-- the public route/client contract uses the schema **input** type;
-- the route handler receives the schema **output** type after validation
-  and transformation.
+- public/client contracts use schema input types;
+- handlers receive schema output types after validation/transformation.
 
-Conceptually:
-
-```text
-client payload
-    ↓
-schema input
-    ↓
-validation / transformation
-    ↓
-schema output
-    ↓
-handler
-```
-
-Response schemas expose their normalized output type in the public route
-contract.
+Response schemas expose normalized output types in route contracts.
 
 Validation capability and JSON Schema/OpenAPI serialization capability
-remain separate concepts.
-
-## Context
-
-The intended context includes:
-
-```ts
-ctx.request;
-ctx.params;
-ctx.query;
-ctx.headers;
-ctx.cookies;
-ctx.locals;
-ctx.reply;
-```
-
-Raw Web Standards must always remain available.
-
-## Body parsing
-
-POST does not automatically mean body parsing.
-
-Body parsing happens only when the route declares a body contract
-or application code explicitly reads the raw Request body.
+remain separate.
 
 ## Responses
 
-Simple values may be returned directly.
+Simple values may be returned directly. Raw Web Standard `Response`
+objects remain an escape hatch.
 
-Raw `Response` passes through unchanged.
+When explicit response contracts exist, `reply.status()` is restricted
+to declared status codes and the body type associated with each status.
 
-Non-default HTTP responses use a small reply API.
-
-```ts
-reply.status(code, body)
-reply.json(body, status?)
-reply.text(text, status?)
-reply.empty(status)
-reply.redirect(url, status?)
-```
-
-### Typed status responses
-
-When a route declares explicit response contracts, `reply.status()`
-is restricted to the declared status codes and each status code is
-paired with its declared response body type.
-
-For the initial prototype, routes without an explicit `responses` map
-do not receive a typed status set. They should use a direct return for
-the default response or a raw Web Standard `Response` escape hatch.
-
-This prevents runtime status behavior from diverging silently from the
-public route contract.
+Routes without an explicit `responses` map do not receive a typed status
+set during the initial prototype.
 
 ## Internal route builder
 
-Root applications and modules share the same internal route declaration
+Root applications and modules share an internal `RouteBuilder<Prefix>`
 primitive.
 
-Conceptually:
+The root uses an empty prefix. Module route builders join their module
+prefix with local route paths before path-param inference and contract
+generation.
 
-```text
-RouteBuilder<''>
-    ↓
-Gelis
-
-RouteBuilder<'/users'>
-    ↓
-users module router
-```
-
-This is an implementation primitive, not part of the intended public API.
-
-The root application keeps an empty prefix. A module router joins its
-module prefix with each local route path before path-parameter inference
-and public contract generation.
+`RouteBuilder` is an implementation primitive and is not part of the
+intended public API.
 
 ## Modules
 
-Modules are independently defined bounded route scopes.
-
-```ts
-export const users = defineModule("/users", (route) => ({
-  list: route.get("/", listUsers),
-
-  find: route.get("/:id", getUser),
-
-  create: route.post(
-    "/",
-    {
-      body: CreateUser,
-      responses: {
-        201: User,
-      },
-    },
-    createUser,
-  ),
-}));
-```
+Modules are independent bounded route scopes created with
+`defineModule()`.
 
 The object returned by the module callback defines the module's public
-named route surface:
+named route surface.
 
-```text
-users
-├── list
-├── find
-└── create
-```
+Local module route paths are normalized to full public route paths.
+Parameters declared in both module prefixes and local route paths are
+inferred together.
 
-A local module route path is normalized to its full public route path.
+`ModuleContractOf<typeof module>` exposes only normalized named route
+contracts. Module implementation details do not cross this boundary.
 
-For example:
+Mounting modules with `app.mount(module)` must not change or accumulate
+the root `Gelis` type.
 
-```text
-module prefix: /users
-local path:    /:id
-public path:   /users/:id
-```
+## Public API contracts
 
-Path parameters are inferred from the complete public path, including
-parameters declared in a module prefix if such prefixes are used.
+`defineContract()` creates the explicit public API boundary used by
+future typed-client and OpenAPI tooling.
 
-`defineModule()` must reject arbitrary values in the returned route map.
-Public module entries must be Gelis route references.
-
-### Module contract boundary
-
-A module may contain arbitrary implementation details around its route
-handlers, but the public module type retains only compact route
-contracts.
-
-Conceptually:
-
-```text
-handlers
-services
-repositories
-implementation details
-        │
-        X
-        │
-        ▼
-ModuleRef
-├── prefix
-└── named RouteRefs
-```
-
-`ModuleContractOf<typeof module>` exposes normalized public contracts
-for the module's named routes.
-
-Mounting a module:
+Example shape:
 
 ```ts
-const app = new Gelis();
+const health = app.get("/health", () => ({
+  status: "ok",
+}));
 
-app.mount(users);
-```
+const users = defineModule("/users", (route) => ({
+  list: route.get("/", listUsers),
+  find: route.get("/:id", getUser),
+}));
 
-must not mutate or accumulate the root `Gelis` type.
-
-In type-system terms:
-
-```text
-typeof app before mount
-=
-typeof app after mount
-=
-Gelis
-```
-
-Module contracts therefore scale independently from the root
-application generic graph.
-
-## Public API contract
-
-Client and tooling types are explicit.
-
-```ts
 export const api = defineContract({
-  users,
   health,
+  users,
 });
 
 export type Api = typeof api;
 ```
 
-They do not use:
+`defineContract()` accepts only Gelis standalone `RouteRef` values and
+Gelis modules.
+
+The normalized contract view is available through:
 
 ```ts
-typeof app;
+type PublicApi = ApiContractOf<typeof api>;
+```
+
+Its shape is intentionally compact:
+
+```text
+PublicApi
+├── health
+│   └── route contract
+└── users
+    ├── list
+    │   └── route contract
+    └── find
+        └── route contract
+```
+
+Module prefixes are not repeated in this normalized API view because
+each contained route already carries its complete public path.
+
+The contract does not contain:
+
+- the root `Gelis` application type;
+- handler function types;
+- repositories;
+- services;
+- database types;
+- runtime adapters;
+- unrelated middleware implementation types.
+
+The intended client boundary remains:
+
+```ts
+import type { Api } from "@server/api";
+
+const client = createClient<Api>({
+  baseUrl: "https://api.example.com",
+});
+```
+
+The client consumes the compact `ApiContractRef` type rather than
+`typeof app`.
+
+This preserves a strict separation:
+
+```text
+backend implementation
+        ↓
+RouteRef / ModuleRef
+        ↓
+defineContract()
+        ↓
+public API contract
+        ↓
+typed client / OpenAPI / tooling
 ```
 
 ## Deliberately absent from core v0.1
 
-- decorators
+- decorators/controllers
 - dependency injection
 - ORM
 - built-in schema DSL
@@ -362,8 +205,8 @@ typeof app;
 - response-validation default
 - body helper syntax
 - cookies core vs optional package
-- exact public contract composition API
-- client result API
+- typed-client result API
 - WebSocket API
 - plugin capability model
 - response transformation semantics for schemas whose input and output differ
+- duplicate public route detection across modules/contracts
