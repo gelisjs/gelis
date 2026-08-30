@@ -22,7 +22,9 @@
     "test:runtime": "bun test test/runtime",
     "bench:types:generate": "bun bench/types/generate.mjs",
     "bench:types:quick": "bun bench/types/run.mjs --runs=1 --sizes=100,500",
-    "bench:types": "bun bench/types/run.mjs"
+    "bench:types": "bun bench/types/run.mjs",
+    "bench:runtime:quick": "bun bench/runtime/run.mjs --quick",
+    "bench:runtime": "bun bench/runtime/run.mjs"
   },
   "devDependencies": {
     "@types/bun": "^1.4.0",
