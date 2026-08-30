@@ -4,6 +4,8 @@ import type { AnyRouteRef, RouteContractOf } from "./route";
 
 import type { ValidRoutePath } from "./types/path";
 
+import type { RuntimeRouteRecord } from "./runtime/types";
+
 export type ModuleRoutes = Readonly<Record<string, AnyRouteRef>>;
 
 type AnyModulePublicRoutes = Readonly<Record<string, unknown>>;
@@ -14,17 +16,24 @@ type ModulePublicRoutes<Routes extends ModuleRoutes> = {
 
 declare const moduleRefBrand: unique symbol;
 
+const moduleRuntimeRoutes = Symbol("gelis.module.routes");
+
 interface ModuleRefInternal<
   Prefix extends string,
   Routes extends ModuleRoutes,
   PublicRoutes extends AnyModulePublicRoutes,
 > {
   readonly prefix: Prefix;
+
   readonly routes: Routes;
 
   readonly [moduleRefBrand]: {
     readonly publicRoutes: PublicRoutes;
   };
+}
+
+interface RuntimeModule {
+  readonly [moduleRuntimeRoutes]: readonly RuntimeRouteRecord[];
 }
 
 export type ModuleRef<
@@ -51,6 +60,7 @@ export type ModuleContractOf<Module> =
   >
     ? {
         prefix: Prefix;
+
         routes: PublicRoutes;
       }
     : never;
@@ -63,14 +73,28 @@ export function defineModule<
 
   define: (route: RouteBuilder<Prefix>) => Routes,
 ): ModuleRef<Prefix, Routes> {
-  const route = new RouteBuilder(prefix);
+  const runtimeRoutes: RuntimeRouteRecord[] = [];
+
+  const route = new RouteBuilder(
+    prefix,
+
+    (runtimeRoute) => {
+      runtimeRoutes.push(runtimeRoute);
+    },
+  );
 
   const routes = define(route);
 
-  // The brand is type-only.
-  // Runtime modules intentionally stay compact.
   return {
     prefix,
     routes,
+
+    [moduleRuntimeRoutes]: runtimeRoutes,
   } as unknown as ModuleRef<Prefix, Routes>;
+}
+
+export function getModuleRuntimeRoutes(
+  module: AnyModuleRef,
+): readonly RuntimeRouteRecord[] {
+  return (module as unknown as RuntimeModule)[moduleRuntimeRoutes];
 }
