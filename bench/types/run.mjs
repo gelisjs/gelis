@@ -25,7 +25,7 @@ const RESULTS_DIR = resolve(HERE, "results");
 
 const DEFAULT_SIZES = [100, 500, 1000, 5000];
 
-const SCENARIOS = ["baseline", "routes", "contract"];
+const SCENARIOS = ["baseline", "routes", "contract", "rich-contract"];
 
 const SIZES = readSizesArgument(DEFAULT_SIZES);
 
