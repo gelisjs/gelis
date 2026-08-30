@@ -74,6 +74,8 @@ export interface RouteContext<
   Body = never,
   Responses extends RouteResponses = Record<never, never>,
 > {
+  request: Request;
+
   params: InferPathParams<Path>;
   query: Query;
   body: Body;
