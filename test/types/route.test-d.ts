@@ -1,6 +1,7 @@
 import { Gelis } from "../../src";
 
-import type { RouteRef } from "../../src";
+import type { RouteContractOf } from "../../src";
+
 import type { Equal, Expect } from "./assert";
 
 const app = new Gelis();
@@ -13,12 +14,35 @@ const getUser = app.get("/users/:id", ({ params }) => {
   };
 });
 
-type RouteContract = Expect<
-  Equal<typeof getUser, RouteRef<"GET", "/users/:id">>
+type Contract = RouteContractOf<typeof getUser>;
+
+type Method = Expect<Equal<Contract["method"], "GET">>;
+
+type Path = Expect<Equal<Contract["path"], "/users/:id">>;
+
+type Params = Expect<
+  Equal<
+    Contract["request"]["params"],
+    {
+      id: string;
+    }
+  >
+>;
+
+type Response = Expect<
+  Equal<
+    Contract["responses"],
+    {
+      200: {
+        id: string;
+      };
+    }
+  >
 >;
 
 app.get("/teams/:teamId/users/:userId", ({ params }) => {
   const teamId: string = params.teamId;
+
   const userId: string = params.userId;
 
   return {
@@ -28,7 +52,8 @@ app.get("/teams/:teamId/users/:userId", ({ params }) => {
 });
 
 app.get("/health", ({ params }) => {
-  // @ts-expect-error health has no id parameter
+  // @ts-expect-error
+  // health has no id parameter
   params.id;
 
   return {
@@ -36,4 +61,4 @@ app.get("/health", ({ params }) => {
   };
 });
 
-export type { RouteContract };
+export type { Method, Params, Path, Response };
