@@ -25,7 +25,8 @@
     "bench:types": "bun bench/types/run.mjs",
     "bench:runtime:quick": "bun bench/runtime/run.mjs --quick",
     "bench:runtime": "bun bench/runtime/run.mjs",
-    "bench:runtime:components": "bun bench/runtime/components.mjs"
+    "bench:runtime:components": "bun bench/runtime/components.mjs",
+    "bench:runtime:router": "bun bench/runtime/router-components.mjs"
   },
   "devDependencies": {
     "@types/bun": "^1.4.0",
