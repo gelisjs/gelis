@@ -25,7 +25,15 @@ const RESULTS_DIR = resolve(HERE, "results");
 
 const DEFAULT_SIZES = [100, 500, 1000, 5000];
 
-const SCENARIOS = ["baseline", "routes", "contract", "rich-contract", "client"];
+const SCENARIOS = [
+  "baseline",
+  "routes",
+  "contract",
+  "rich-contract",
+  "client-sparse",
+  "client-module",
+  "client",
+];
 
 const SIZES = readSizesArgument(DEFAULT_SIZES);
 
@@ -76,8 +84,10 @@ for (const row of rows) {
     ? row.checkTime / baseline.checkTime
     : null;
 
+  const isClientScenario = row.scenario.startsWith("client");
+
   row.checkVsRichContract =
-    row.scenario === "client" && richContract?.checkTime
+    isClientScenario && richContract?.checkTime
       ? row.checkTime / richContract.checkTime
       : null;
 }
