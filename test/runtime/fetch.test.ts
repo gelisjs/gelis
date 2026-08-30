@@ -317,4 +317,42 @@ describe("Gelis runtime", () => {
       "text/plain; charset=utf-8",
     );
   });
+
+  test("decodes dynamic params", async () => {
+    const app = new Gelis();
+
+    app.get(
+      "/users/:id",
+
+      ({ params }) => ({
+        id: params.id,
+      }),
+    );
+
+    const response = await app.fetch(
+      new Request("http://gelis.test/users/hello%20world"),
+    );
+
+    expect(await response.json()).toEqual({
+      id: "hello world",
+    });
+  });
+
+  test("does not ignore trailing path segments", async () => {
+    const app = new Gelis();
+
+    app.get(
+      "/users/:id",
+
+      ({ params }) => ({
+        id: params.id,
+      }),
+    );
+
+    const response = await app.fetch(
+      new Request("http://gelis.test/users/123/extra"),
+    );
+
+    expect(response.status).toBe(404);
+  });
 });
