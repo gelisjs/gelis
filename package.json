@@ -27,9 +27,10 @@
     "bench:runtime": "bun bench/runtime/run.mjs",
     "bench:runtime:components": "bun bench/runtime/components.mjs",
     "bench:runtime:router": "bun bench/runtime/router-components.mjs",
-    "bench:http": "bun bench/http/run.mjs"
+    "bench:http:autocannon": "bun bench/http/run.mjs"
   },
   "devDependencies": {
+    "@types/autocannon": "^7.12.7",
     "@types/bun": "^1.4.0",
     "autocannon": "^8.0.0",
     "elysia": "^1.4.30",
