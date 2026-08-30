@@ -24,7 +24,8 @@
     "bench:types:quick": "bun bench/types/run.mjs --runs=1 --sizes=100,500",
     "bench:types": "bun bench/types/run.mjs",
     "bench:runtime:quick": "bun bench/runtime/run.mjs --quick",
-    "bench:runtime": "bun bench/runtime/run.mjs"
+    "bench:runtime": "bun bench/runtime/run.mjs",
+    "bench:runtime:components": "bun bench/runtime/components.mjs"
   },
   "devDependencies": {
     "@types/bun": "^1.4.0",
