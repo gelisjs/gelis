@@ -11,6 +11,11 @@ import type {
 
 import type { InferPathParams, ValidRoutePath } from "./types/path";
 
+import type {
+  RuntimeRouteHandler,
+  RuntimeRouteRegister,
+} from "./runtime/types";
+
 export type JoinRoutePath<
   Prefix extends string,
   Path extends string,
@@ -22,11 +27,21 @@ export type JoinRoutePath<
       ? Prefix
       : `${Prefix}${Path}`;
 
+const noopRegister: RuntimeRouteRegister = () => {};
+
 export class RouteBuilder<Prefix extends string = ""> {
   readonly #prefix: Prefix;
 
-  constructor(prefix: Prefix) {
+  readonly #register: RuntimeRouteRegister;
+
+  constructor(
+    prefix: Prefix,
+
+    register: RuntimeRouteRegister = noopRegister,
+  ) {
     this.#prefix = prefix;
+
+    this.#register = register;
   }
 
   get<const Path extends string, Result>(
@@ -57,11 +72,14 @@ export class RouteBuilder<Prefix extends string = ""> {
     RouteResponsesFor<Options, Result>
   >;
 
-  get(path: string, _optionsOrHandler: unknown, _handler?: unknown): unknown {
-    return {
-      method: "GET",
-      path: this.resolve(path),
-    };
+  get(
+    path: string,
+
+    optionsOrHandler: unknown,
+
+    handler?: unknown,
+  ): unknown {
+    return this.registerRoute("GET", path, optionsOrHandler, handler);
   }
 
   post<const Path extends string, Result>(
@@ -92,11 +110,14 @@ export class RouteBuilder<Prefix extends string = ""> {
     RouteResponsesFor<Options, Result>
   >;
 
-  post(path: string, _optionsOrHandler: unknown, _handler?: unknown): unknown {
-    return {
-      method: "POST",
-      path: this.resolve(path),
-    };
+  post(
+    path: string,
+
+    optionsOrHandler: unknown,
+
+    handler?: unknown,
+  ): unknown {
+    return this.registerRoute("POST", path, optionsOrHandler, handler);
   }
 
   route<const Method extends HttpMethod, const Path extends string, Result>(
@@ -114,10 +135,74 @@ export class RouteBuilder<Prefix extends string = ""> {
     }
   >;
 
-  route(method: HttpMethod, path: string, _handler: unknown): unknown {
+  route(
+    method: HttpMethod,
+
+    path: string,
+
+    handler: unknown,
+  ): unknown {
+    return this.registerRuntimeRoute(
+      method,
+      path,
+
+      handler as RuntimeRouteHandler,
+
+      undefined,
+    );
+  }
+
+  private registerRoute(
+    method: HttpMethod,
+
+    path: string,
+
+    optionsOrHandler: unknown,
+
+    handler: unknown,
+  ): unknown {
+    if (handler === undefined) {
+      return this.registerRuntimeRoute(
+        method,
+        path,
+
+        optionsOrHandler as RuntimeRouteHandler,
+
+        undefined,
+      );
+    }
+
+    return this.registerRuntimeRoute(
+      method,
+      path,
+
+      handler as RuntimeRouteHandler,
+
+      optionsOrHandler as RouteOptions,
+    );
+  }
+
+  private registerRuntimeRoute(
+    method: HttpMethod,
+
+    path: string,
+
+    handler: RuntimeRouteHandler,
+
+    options: RouteOptions | undefined,
+  ): unknown {
+    const fullPath = this.resolve(path);
+
+    this.#register({
+      method,
+      path: fullPath,
+      handler,
+      options,
+    });
+
     return {
       method,
-      path: this.resolve(path),
+      path: fullPath,
     };
   }
 
