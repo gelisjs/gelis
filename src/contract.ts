@@ -39,6 +39,11 @@ export type ApiContractOf<Contract> =
     ? Public
     : never;
 
+export type AnyApiContractRef = ApiContractRefInternal<
+  ContractEntries,
+  AnyPublicContract
+>;
+
 export function defineContract<const Entries extends ContractEntries>(
   entries: Entries,
 ): ApiContractRef<Entries> {

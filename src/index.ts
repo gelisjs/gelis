@@ -16,6 +16,10 @@ export type {
 
 export type { ModuleContractOf, ModuleRef } from "./module";
 
-export type { ApiContractOf, ApiContractRef } from "./contract";
+export type {
+  ApiContractOf,
+  ApiContractRef,
+  AnyApiContractRef,
+} from "./contract";
 
 export type { InferPathParams } from "./types/path";
