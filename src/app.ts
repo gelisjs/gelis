@@ -1,3 +1,5 @@
+import { pathnameFromUrl } from "./runtime/url";
+
 import { RouteBuilder } from "./route-builder";
 
 import { getModuleRuntimeRoutes } from "./module";
@@ -35,8 +37,8 @@ export class Gelis extends RouteBuilder<""> {
     }
   }
 
-  async fetch(request: Request): Promise<Response> {
-    const pathname = new URL(request.url).pathname;
+  fetch(request: Request): Response | Promise<Response> {
+    const pathname = pathnameFromUrl(request.url);
 
     const matched = this.#router.match(request.method, pathname);
 
@@ -57,7 +59,7 @@ export class Gelis extends RouteBuilder<""> {
       );
     }
 
-    const result = await route.handler({
+    const result = route.handler({
       request,
       params,
 
@@ -68,6 +70,27 @@ export class Gelis extends RouteBuilder<""> {
       reply: runtimeReply,
     });
 
+    if (isPromiseLike(result)) {
+      return Promise.resolve(result).then(normalizeResponse);
+    }
+
     return normalizeResponse(result);
   }
+}
+
+function isPromiseLike(value: unknown): value is PromiseLike<unknown> {
+  if (
+    value === null ||
+    (typeof value !== "object" && typeof value !== "function")
+  ) {
+    return false;
+  }
+
+  return (
+    typeof (
+      value as {
+        then?: unknown;
+      }
+    ).then === "function"
+  );
 }
