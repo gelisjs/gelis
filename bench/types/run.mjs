@@ -67,9 +67,19 @@ for (const row of rows) {
       candidate.scenario === "baseline" && candidate.routes === row.routes,
   );
 
+  const richContract = rows.find(
+    (candidate) =>
+      candidate.scenario === "rich-contract" && candidate.routes === row.routes,
+  );
+
   row.checkVsBaseline = baseline?.checkTime
     ? row.checkTime / baseline.checkTime
     : null;
+
+  row.checkVsRichContract =
+    row.scenario === "client" && richContract?.checkTime
+      ? row.checkTime / richContract.checkTime
+      : null;
 }
 
 const metadata = {
