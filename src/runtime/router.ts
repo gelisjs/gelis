@@ -113,11 +113,13 @@ export class Router {
       };
     }
 
-    const segments = splitPath(pathname);
+    const captures: number[] = [];
 
-    const captures: string[] = [];
-
-    const dynamicRoute = matchDynamic(table.dynamicRoot, segments, 0, captures);
+    const dynamicRoute = matchDynamicPath(
+      table.dynamicRoot,
+      pathname,
+      captures,
+    );
 
     if (!dynamicRoute) {
       return undefined;
@@ -128,11 +130,15 @@ export class Router {
     for (let index = 0; index < dynamicRoute.paramNames.length; index++) {
       const name = dynamicRoute.paramNames[index];
 
-      const value = captures[index];
+      const start = captures[index * 2];
 
-      if (name === undefined || value === undefined) {
+      const end = captures[index * 2 + 1];
+
+      if (name === undefined || start === undefined || end === undefined) {
         continue;
       }
+
+      const value = pathname.slice(start, end);
 
       params[name] = decodeParam(value);
     }
@@ -173,50 +179,67 @@ function createDynamicNode(): DynamicNode {
   };
 }
 
-function matchDynamic(
+function matchDynamicPath(
+  root: DynamicNode,
+
+  pathname: string,
+
+  captures: number[],
+): DynamicRoute | undefined {
+  if (pathname === "/") {
+    return root.route;
+  }
+
+  return matchDynamicNode(root, pathname, 1, captures);
+}
+
+function matchDynamicNode(
   node: DynamicNode,
 
-  segments: readonly string[],
+  pathname: string,
 
-  index: number,
+  start: number,
 
-  captures: string[],
+  captures: number[],
 ): DynamicRoute | undefined {
-  if (index === segments.length) {
-    return node.route;
+  let end = pathname.indexOf("/", start);
+
+  const isLast = end === -1;
+
+  if (isLast) {
+    end = pathname.length;
   }
 
-  const segment = segments[index];
+  const next = end + 1;
 
-  if (segment === undefined) {
-    return undefined;
-  }
+  if (node.staticChildren) {
+    const segment = pathname.slice(start, end);
 
-  const staticChild = node.staticChildren?.get(segment);
+    const staticChild = node.staticChildren.get(segment);
 
-  if (staticChild) {
-    const matched = matchDynamic(staticChild, segments, index + 1, captures);
+    if (staticChild) {
+      const matched = isLast
+        ? staticChild.route
+        : matchDynamicNode(staticChild, pathname, next, captures);
 
-    if (matched) {
-      return matched;
+      if (matched) {
+        return matched;
+      }
     }
   }
 
   if (node.paramChild) {
-    captures.push(segment);
+    captures.push(start, end);
 
-    const matched = matchDynamic(
-      node.paramChild,
-      segments,
-      index + 1,
-      captures,
-    );
+    const matched = isLast
+      ? node.paramChild.route
+      : matchDynamicNode(node.paramChild, pathname, next, captures);
 
     if (matched) {
       return matched;
     }
 
-    captures.pop();
+    captures.length -= 2;
   }
 
   return undefined;
