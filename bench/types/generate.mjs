@@ -20,6 +20,7 @@ for (const size of SIZES) {
   generateRoutes(size);
   generateContract(size);
   generateRichContract(size);
+  generateClient(size);
 }
 
 function caseDir(name, size) {
@@ -429,6 +430,111 @@ function generateRichContract(size) {
       `  Api['${moduleName}']['${routeName}']['responses'],`,
       `]`,
       `void (null as unknown as ${probe})`,
+      "",
+    );
+  }
+
+  writeFileSync(
+    new URL("index.ts", directory),
+
+    `${index.join("\n")}\n`,
+  );
+}
+
+function generateClient(size) {
+  const directory = caseDir("client", size);
+
+  const modules = [];
+  const routeLocations = [];
+
+  for (const [moduleIndex, { start, end }] of chunks(size).entries()) {
+    const moduleName = `module${moduleIndex}`;
+
+    const fileName = `module-${String(moduleIndex).padStart(3, "0")}`;
+
+    modules.push({
+      moduleName,
+      fileName,
+    });
+
+    for (let i = start; i < end; i++) {
+      routeLocations.push({
+        moduleName,
+        routeName: `r${i - start}`,
+      });
+    }
+  }
+
+  const index = [
+    "import { defineContract } from '../../../../src'",
+
+    "import type { GelisClient } from '../../../../prototype/client'",
+  ];
+
+  for (const { moduleName, fileName } of modules) {
+    index.push(
+      `import { ${moduleName} } ` +
+        `from '../rich-contract-${size}/${fileName}'`,
+    );
+  }
+
+  index.push("", "const api = defineContract({");
+
+  for (const { moduleName } of modules) {
+    index.push(`  ${moduleName},`);
+  }
+
+  index.push("})", "", "type Client = GelisClient<typeof api>", "");
+
+  for (const { moduleName, routeName } of routeLocations) {
+    const suffix = `${moduleName}_${routeName}`;
+
+    const method = `Method_${suffix}`;
+
+    const request = `Request_${suffix}`;
+
+    const result = `Result_${suffix}`;
+
+    const success = `Success_${suffix}`;
+
+    const conflict = `Conflict_${suffix}`;
+
+    const invalid = `Invalid_${suffix}`;
+
+    const probe = `Probe_${suffix}`;
+
+    index.push(
+      `type ${method} = ` + `Client['${moduleName}']['${routeName}']`,
+
+      `type ${request} = ` + `Parameters<${method}>[0]`,
+
+      `type ${result} = ` + `Awaited<ReturnType<${method}>>`,
+
+      `type ${success} = ` + `Extract<${result}, { status: 200 }>`,
+
+      `type ${conflict} = ` + `Extract<${result}, { status: 409 }>`,
+
+      `type ${invalid} = ` + `Extract<${result}, { status: 422 }>`,
+
+      `type ${probe} = [`,
+
+      `  ${request}['params'],`,
+      `  ${request}['query'],`,
+      `  ${request}['body'],`,
+
+      `  ${result}['status'],`,
+
+      `  ${success}['data'],`,
+      `  ${conflict}['data'],`,
+      `  ${invalid}['data'],`,
+
+      `  ${result}['headers'],`,
+      `  ${result}['response'],`,
+
+      `]`,
+
+      `void (null as unknown as ${probe})`,
+
       "",
     );
   }
