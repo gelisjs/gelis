@@ -196,6 +196,52 @@ reply.empty(status)
 reply.redirect(url, status?)
 ```
 
+### Typed status responses
+
+When a route declares explicit response contracts, `reply.status()`
+is restricted to the declared status codes and each status code is
+paired with its declared response body type.
+
+Example:
+
+```ts
+app.post(
+  "/users",
+  {
+    responses: {
+      201: User,
+      409: Conflict,
+    },
+  },
+  ({ reply }) => {
+    return reply.status(201, user);
+  },
+);
+```
+
+The following must be rejected by TypeScript when `404` is not declared:
+
+```ts
+reply.status(404, value);
+```
+
+The following must also be rejected when the body does not match the
+contract declared for `409`:
+
+```ts
+reply.status(409, user);
+```
+
+For the initial prototype, routes without an explicit `responses` map
+do not receive a typed status set. They should use a direct return for
+the default response or a raw Web Standard `Response` escape hatch.
+
+This prevents runtime status behavior from diverging silently from the
+public route contract.
+
+The exact runtime representation returned by `reply.status()` remains
+an implementation detail during the type-system prototype.
+
 ## Middleware
 
 Middleware uses onion-style execution.
@@ -254,3 +300,4 @@ typeof app;
 - client result API
 - WebSocket API
 - plugin capability model
+- response transformation semantics for schemas whose input and output differ
