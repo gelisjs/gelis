@@ -402,6 +402,7 @@ function toCsv(rows) {
     "checkTime",
     "totalTime",
     "checkVsBaseline",
+    "checkVsRichContract",
   ];
 
   const lines = [columns.join(",")];
