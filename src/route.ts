@@ -134,38 +134,42 @@ export type RouteResponsesFor<
       200: Awaited<Result>;
     };
 
+declare const routeRefBrand: unique symbol;
+
 export interface RouteRef<
   Method extends HttpMethod,
   Path extends string,
-  Request extends RouteRequestContract = RouteRequestContract<
-    InferPathParams<Path>
-  >,
+  Request extends RouteRequestContract<unknown, unknown, unknown> =
+    RouteRequestContract<InferPathParams<Path>>,
   Responses extends RouteResponses = RouteResponses,
 > {
   readonly method: Method;
   readonly path: Path;
 
-  readonly "~gelis"?: {
+  readonly [routeRefBrand]: {
     readonly request: Request;
     readonly responses: Responses;
   };
 }
 
-export type RouteContractOf<Route> = Route extends {
-  readonly method: infer Method;
+export type AnyRouteRef = RouteRef<
+  HttpMethod,
+  string,
+  RouteRequestContract<unknown, unknown, unknown>,
+  RouteResponses
+>;
 
-  readonly path: infer Path;
-
-  readonly "~gelis"?: {
-    readonly request: infer Request;
-
-    readonly responses: infer Responses;
-  };
-}
-  ? {
-      method: Method;
-      path: Path;
-      request: Request;
-      responses: Responses;
-    }
-  : never;
+export type RouteContractOf<Route> =
+  Route extends RouteRef<
+    infer Method,
+    infer Path,
+    infer Request,
+    infer Responses
+  >
+    ? {
+        method: Method;
+        path: Path;
+        request: Request;
+        responses: Responses;
+      }
+    : never;
