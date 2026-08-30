@@ -1,0 +1,40 @@
+{
+  "github.copilot.chat.commitMessageGeneration.instructions": [
+    {
+      "text": "Generate commit messages in English using Conventional Commits format: <type>(<scope>): <description>."
+    },
+    {
+      "text": "Allowed types: feat, fix, refactor, perf, test, docs, build, ci, chore."
+    },
+    {
+      "text": "Use an appropriate scope when it adds useful context. Preferred Gelis scopes include core, route, types, schema, contract, module, middleware, response, adapter, client, openapi, bench, test, docs, ci, and deps."
+    },
+    {
+      "text": "Omit the scope when no clear scope applies. Do not invent a scope just to fill the format."
+    },
+    {
+      "text": "Write the subject in imperative mood, concise and lowercase where natural. Do not end the subject with a period."
+    },
+    {
+      "text": "Keep the first line ideally at or below 72 characters."
+    },
+    {
+      "text": "Describe only the actual staged changes. Do not invent implementation details, motivations, fixes, or behavior that are not evident from the diff."
+    },
+    {
+      "text": "Prefer feat only for new user-facing framework capabilities. Use refactor for internal structural changes without behavior changes and perf only for changes specifically intended to improve performance."
+    },
+    {
+      "text": "Use test for type tests, runtime tests, benchmark fixtures, and test infrastructure when testing is the primary change."
+    },
+    {
+      "text": "Use build for package, TypeScript, bundling, or build-system changes; ci for workflow changes; chore for repository maintenance that does not fit another type."
+    },
+    {
+      "text": "For breaking changes, use ! after the type or scope, for example feat(core)!: change route registration API. Include a BREAKING CHANGE footer when a commit body is generated."
+    },
+    {
+      "text": "Do not use emojis."
+    }
+  ]
+}
