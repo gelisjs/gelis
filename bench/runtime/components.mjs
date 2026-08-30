@@ -15,6 +15,17 @@ const rawResponse = new Response(null, {
   status: 204,
 });
 
+const jsonPayload = {
+  id: "123",
+  ok: true,
+};
+
+const serializedJson = JSON.stringify(jsonPayload);
+
+const JSON_HEADERS = Object.freeze({
+  "content-type": "application/json",
+});
+
 const syncHandler = () => rawResponse;
 
 const asyncHandler = async () => rawResponse;
@@ -107,6 +118,58 @@ const cases = [
         id: "123",
         ok: true,
       });
+    },
+  },
+
+  {
+    name: "json-stringify",
+
+    async: false,
+
+    operation() {
+      sink = JSON.stringify(jsonPayload);
+    },
+  },
+
+  {
+    name: "response-json-direct",
+
+    async: false,
+
+    operation() {
+      sink = Response.json(jsonPayload);
+    },
+  },
+
+  {
+    name: "response-json-manual",
+
+    async: false,
+
+    operation() {
+      sink = new Response(
+        JSON.stringify(jsonPayload),
+
+        {
+          headers: JSON_HEADERS,
+        },
+      );
+    },
+  },
+
+  {
+    name: "response-json-pre-serialized",
+
+    async: false,
+
+    operation() {
+      sink = new Response(
+        serializedJson,
+
+        {
+          headers: JSON_HEADERS,
+        },
+      );
     },
   },
 
