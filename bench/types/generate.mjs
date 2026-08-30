@@ -20,7 +20,12 @@ for (const size of SIZES) {
   generateRoutes(size);
   generateContract(size);
   generateRichContract(size);
-  generateClient(size);
+
+  generateClient(size, "client-sparse", "sparse");
+
+  generateClient(size, "client-module", "module");
+
+  generateClient(size, "client", "all");
 }
 
 function caseDir(name, size) {
