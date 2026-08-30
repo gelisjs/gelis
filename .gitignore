@@ -8,6 +8,7 @@ coverage/
 
 # generated type benchmarks
 bench/types/generated/
+bench/types/results/
 
 # environment
 .env
