@@ -12,16 +12,23 @@ const ROOT = resolve(HERE, "../..");
 
 const RESULTS_DIR = resolve(HERE, "results");
 
+const GENERATED_DIR = resolve(HERE, "generated");
+
 const PORT = 3100;
+
 const ROUTES = 5000;
 
-const SAMPLES = 3;
+const SAMPLES = 7;
 
 const CONNECTIONS = 50;
+
+const WARMUP_CONNECTIONS = 10;
 
 const WARMUP_DURATION = "2s";
 
 const DURATION = "10s";
+
+const PREWARM_BATCH_SIZE = 100;
 
 const frameworks = [
   {
@@ -87,25 +94,59 @@ mkdirSync(RESULTS_DIR, {
   recursive: true,
 });
 
+mkdirSync(GENERATED_DIR, {
+  recursive: true,
+});
+
 await ensureOha();
+
+const urlSets = generateUrlSets();
 
 const rawResults = [];
 
-for (const benchmarkCase of cases) {
+for (let caseIndex = 0; caseIndex < cases.length; caseIndex++) {
+  const benchmarkCase = cases[caseIndex];
+
+  if (!benchmarkCase) {
+    continue;
+  }
+
+  const urlSet = urlSets[benchmarkCase.routeKind];
+
+  if (!urlSet) {
+    throw new Error(`Missing URL set for ${benchmarkCase.routeKind}`);
+  }
+
   for (let sample = 0; sample < SAMPLES; sample++) {
-    const order = rotate(frameworks, sample);
+    const order = rotate(frameworks, sample + caseIndex);
 
     for (const framework of order) {
-      const result = await runFramework(framework, benchmarkCase, sample);
+      const result = await runFramework(
+        framework,
+        benchmarkCase,
+        urlSet,
+        sample,
+      );
 
       rawResults.push(result);
+
+      console.log(
+        [
+          framework.name,
+          `${benchmarkCase.routeKind}-${benchmarkCase.bodyKind}`,
+          `sample ${sample + 1}/${SAMPLES}`,
+          `${Math.round(result.requestsPerSecond).toLocaleString(
+            "en-US",
+          )} req/s`,
+        ].join(" | "),
+      );
     }
   }
 }
 
 const rows = aggregate(rawResults);
 
-console.log("\nGelis HTTP benchmark — oha");
+console.log("\nGelis HTTP benchmark — oha mixed routes");
 
 console.log(`Runtime:     bun ${Bun.version}`);
 
@@ -113,15 +154,17 @@ console.log(`oha:         ${await getOhaVersion()}`);
 
 console.log(`CPU:         ${cpus()[0]?.model ?? "unknown"}`);
 
+console.log(`Hono:        ${packageVersion("hono")}`);
+
+console.log(`Elysia:      ${packageVersion("elysia")}`);
+
 console.log(`Routes:      ${ROUTES}`);
 
 console.log(`Connections: ${CONNECTIONS}`);
 
-console.log(`Samples:     ${SAMPLES}\n`);
+console.log(`Samples:     ${SAMPLES}`);
 
-console.log(`Hono:        ${packageVersion("hono")}`);
-
-console.log(`Elysia:      ${packageVersion("elysia")}`);
+console.log("Workload:    mixed-all\n");
 
 console.table(
   rows.map((row) => ({
@@ -129,7 +172,13 @@ console.table(
 
     case: `${row.routeKind}-${row.bodyKind}`,
 
-    "req/s": Math.round(row.requestsPerSecond).toLocaleString("en-US"),
+    "req/s median": formatInteger(row.requestsMedian),
+
+    "req/s min": formatInteger(row.requestsMin),
+
+    "req/s max": formatInteger(row.requestsMax),
+
+    "cv %": round(row.requestsCv * 100, 2),
 
     "p50 ms": round(row.p50, 3),
 
@@ -145,6 +194,8 @@ const output = {
   metadata: {
     generatedAt: new Date().toISOString(),
 
+    workload: "mixed-all",
+
     bun: Bun.version,
 
     oha: await getOhaVersion(),
@@ -156,6 +207,10 @@ const output = {
     samples: SAMPLES,
 
     connections: CONNECTIONS,
+
+    warmupConnections: WARMUP_CONNECTIONS,
+
+    warmupDuration: WARMUP_DURATION,
 
     duration: DURATION,
 
@@ -172,21 +227,55 @@ const output = {
 };
 
 writeFileSync(
-  resolve(RESULTS_DIR, "latest-oha.json"),
+  resolve(RESULTS_DIR, "latest-oha-mixed.json"),
 
   `${JSON.stringify(output, null, 2)}\n`,
 );
 
-console.log("\nRaw results: " + "bench/http/results/latest-oha.json");
+console.log("\nRaw results: " + "bench/http/results/latest-oha-mixed.json");
 
-async function runFramework(framework, benchmarkCase, sample) {
-  const target =
-    benchmarkCase.routeKind === "static"
-      ? `/r/${ROUTES - 1}`
-      : `/r/${ROUTES - 1}/target`;
+function generateUrlSets() {
+  const staticUrls = [];
+  const dynamicUrls = [];
 
-  const url = `http://127.0.0.1:${PORT}${target}`;
+  for (let index = 0; index < ROUTES; index++) {
+    staticUrls.push(`http://127.0.0.1:${PORT}/r/${index}`);
 
+    dynamicUrls.push(`http://127.0.0.1:${PORT}/r/${index}/target-${index}`);
+  }
+
+  const staticFile = resolve(GENERATED_DIR, "static-urls.txt");
+
+  const dynamicFile = resolve(GENERATED_DIR, "dynamic-urls.txt");
+
+  writeUrlFile(staticFile, staticUrls);
+
+  writeUrlFile(dynamicFile, dynamicUrls);
+
+  return {
+    static: {
+      urls: staticUrls,
+
+      file: staticFile,
+
+      readinessUrl: staticUrls[0],
+    },
+
+    dynamic: {
+      urls: dynamicUrls,
+
+      file: dynamicFile,
+
+      readinessUrl: dynamicUrls[0],
+    },
+  };
+}
+
+function writeUrlFile(path, urls) {
+  writeFileSync(path, `${urls.join("\n")}\n`);
+}
+
+async function runFramework(framework, benchmarkCase, urlSet, sample) {
   const server = Bun.spawn(
     [process.execPath, framework.file],
 
@@ -213,17 +302,29 @@ async function runFramework(framework, benchmarkCase, sample) {
   );
 
   try {
-    await waitForServer(url);
+    await waitForServer(urlSet.readinessUrl);
 
-    await runOha(url, WARMUP_DURATION, 10);
+    /*
+     * Touch every route once before measuring.
+     *
+     * This makes the comparison a steady-state
+     * routing benchmark instead of accidentally
+     * measuring first-request/JIT compilation.
+     */
+    await prewarmAllRoutes(urlSet.urls);
 
-    const result = await runOha(url, DURATION, CONNECTIONS);
+    /*
+     * Short load warmup after every route has
+     * already been exercised.
+     */
+    await runOha(urlSet.file, WARMUP_DURATION, WARMUP_CONNECTIONS);
 
-    const successRate =
-      result.metrics?.success_rate ?? result.summary.successRate;
+    const result = await runOha(urlSet.file, DURATION, CONNECTIONS);
+
+    const successRate = getSuccessRate(result);
 
     if (successRate !== 1) {
-      throw new Error(`${framework.name} success rate: ` + `${successRate}`);
+      throw new Error(`${framework.name} success rate: ${successRate}`);
     }
 
     return {
@@ -235,17 +336,13 @@ async function runFramework(framework, benchmarkCase, sample) {
 
       sample,
 
-      requestsPerSecond:
-        result.metrics?.requests_per_sec ?? result.summary.requestsPerSec,
+      requestsPerSecond: getRequestsPerSecond(result),
 
-      p50:
-        result.metrics?.latency_ms?.p50 ?? result.latencyPercentiles.p50 * 1000,
+      p50: getLatencyPercentile(result, "p50"),
 
-      p95:
-        result.metrics?.latency_ms?.p95 ?? result.latencyPercentiles.p95 * 1000,
+      p95: getLatencyPercentile(result, "p95"),
 
-      p99:
-        result.metrics?.latency_ms?.p99 ?? result.latencyPercentiles.p99 * 1000,
+      p99: getLatencyPercentile(result, "p99"),
 
       successRate,
     };
@@ -258,8 +355,26 @@ async function runFramework(framework, benchmarkCase, sample) {
   }
 }
 
-async function runOha(url, duration, connections) {
-  const process = Bun.spawn(
+async function prewarmAllRoutes(urls) {
+  for (let start = 0; start < urls.length; start += PREWARM_BATCH_SIZE) {
+    const batch = urls.slice(start, start + PREWARM_BATCH_SIZE);
+
+    await Promise.all(
+      batch.map(async (url) => {
+        const response = await fetch(url);
+
+        if (!response.ok) {
+          throw new Error(`Prewarm failed: ${url} -> ${response.status}`);
+        }
+
+        await response.arrayBuffer();
+      }),
+    );
+  }
+}
+
+async function runOha(urlFile, duration, connections) {
+  const child = Bun.spawn(
     [
       "oha",
 
@@ -268,13 +383,17 @@ async function runOha(url, duration, connections) {
       "--output-format",
       "json",
 
+      "--wait-ongoing-requests-after-deadline",
+
+      "--urls-from-file",
+
       "-z",
       duration,
 
       "-c",
       String(connections),
 
-      url,
+      urlFile,
     ],
 
     {
@@ -286,11 +405,11 @@ async function runOha(url, duration, connections) {
     },
   );
 
-  const stdout = await new Response(process.stdout).text();
+  const stdout = await new Response(child.stdout).text();
 
-  const stderr = await new Response(process.stderr).text();
+  const stderr = await new Response(child.stderr).text();
 
-  const exitCode = await process.exited;
+  const exitCode = await child.exited;
 
   if (exitCode !== 0) {
     throw new Error(`oha exited with ${exitCode}\n${stderr}`);
@@ -345,6 +464,12 @@ function aggregate(results) {
   for (const group of groups.values()) {
     const first = group[0];
 
+    if (!first) {
+      continue;
+    }
+
+    const requestRates = group.map((result) => result.requestsPerSecond);
+
     rows.push({
       framework: first.framework,
 
@@ -352,9 +477,13 @@ function aggregate(results) {
 
       bodyKind: first.bodyKind,
 
-      requestsPerSecond: median(
-        group.map((result) => result.requestsPerSecond),
-      ),
+      requestsMedian: median(requestRates),
+
+      requestsMin: Math.min(...requestRates),
+
+      requestsMax: Math.max(...requestRates),
+
+      requestsCv: coefficientOfVariation(requestRates),
 
       p50: median(group.map((result) => result.p50)),
 
@@ -363,10 +492,80 @@ function aggregate(results) {
       p99: median(group.map((result) => result.p99)),
 
       successRate: median(group.map((result) => result.successRate)),
+
+      samples: requestRates,
     });
   }
 
   return rows;
+}
+
+function getRequestsPerSecond(result) {
+  const value =
+    result.metrics?.requests_per_sec ?? result.summary?.requestsPerSec;
+
+  if (typeof value !== "number") {
+    throw new Error("Unable to read oha requests/sec");
+  }
+
+  return value;
+}
+
+function getSuccessRate(result) {
+  const value = result.metrics?.success_rate ?? result.summary?.successRate;
+
+  if (typeof value !== "number") {
+    throw new Error("Unable to read oha success rate");
+  }
+
+  return value;
+}
+
+function getLatencyPercentile(result, percentile) {
+  const metricValue = result.metrics?.latency_ms?.[percentile];
+
+  if (typeof metricValue === "number") {
+    return metricValue;
+  }
+
+  const legacyValue = result.latencyPercentiles?.[percentile];
+
+  if (typeof legacyValue === "number") {
+    return legacyValue * 1000;
+  }
+
+  throw new Error(`Unable to read oha ${percentile}`);
+}
+
+function coefficientOfVariation(values) {
+  const average = mean(values);
+
+  if (average === 0) {
+    return 0;
+  }
+
+  const variance =
+    values.reduce(
+      (total, value) => {
+        const difference = value - average;
+
+        return total + difference * difference;
+      },
+
+      0,
+    ) / values.length;
+
+  return Math.sqrt(variance) / average;
+}
+
+function mean(values) {
+  return (
+    values.reduce(
+      (total, value) => total + value,
+
+      0,
+    ) / values.length
+  );
 }
 
 function rotate(values, offset) {
@@ -388,7 +587,7 @@ function median(values) {
 }
 
 async function ensureOha() {
-  const process = Bun.spawn(
+  const child = Bun.spawn(
     ["oha", "--version"],
 
     {
@@ -398,7 +597,7 @@ async function ensureOha() {
     },
   );
 
-  const exitCode = await process.exited;
+  const exitCode = await child.exited;
 
   if (exitCode !== 0) {
     throw new Error("oha is not installed or not in PATH");
@@ -406,7 +605,7 @@ async function ensureOha() {
 }
 
 async function getOhaVersion() {
-  const process = Bun.spawn(
+  const child = Bun.spawn(
     ["oha", "--version"],
 
     {
@@ -416,9 +615,9 @@ async function getOhaVersion() {
     },
   );
 
-  const output = await new Response(process.stdout).text();
+  const output = await new Response(child.stdout).text();
 
-  await process.exited;
+  await child.exited;
 
   return output.trim();
 }
@@ -443,4 +642,8 @@ function round(value, digits) {
   const factor = 10 ** digits;
 
   return Math.round(value * factor) / factor;
+}
+
+function formatInteger(value) {
+  return Math.round(value).toLocaleString("en-US");
 }
