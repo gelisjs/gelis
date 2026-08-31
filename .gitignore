@@ -11,6 +11,7 @@ bench/types/generated/
 bench/types/results/
 bench/runtime/results/
 bench/http/results/
+bench/http/generated/
 
 # environment
 .env
