@@ -15,7 +15,7 @@
   },
   "homepage": "https://github.com/gelisjs/gelis#readme",
   "scripts": {
-    "check": "bun run typecheck && bun run test:types && bun run typecheck:runtime-tests && bun run test:runtime",
+    "check": "bun run typecheck && bun run test:types && bun run typecheck:runtime-tests && bun run typecheck:bun-adapter && bun run test:runtime",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test:types": "tsc -p test/types/tsconfig.json --noEmit",
     "typecheck:runtime-tests": "tsc -p test/runtime/tsconfig.json --noEmit",
