@@ -8,11 +8,14 @@ const ROUTE_KIND = process.env.ROUTE_KIND ?? "static";
 
 const BODY_KIND = process.env.BODY_KIND ?? "json";
 
+const PRECOMPILE = process.env.PRECOMPILE === "true";
+
 type BenchmarkParams = {
   id: string;
 };
 
 const app = new Elysia({
+  precompile: PRECOMPILE,
   serve: {
     hostname: "127.0.0.1",
 

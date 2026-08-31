@@ -40,6 +40,20 @@ const frameworks = [
     name: "elysia",
 
     file: resolve(HERE, "servers/elysia.ts"),
+
+    env: {
+      PRECOMPILE: "false",
+    },
+  },
+
+  {
+    name: "elysia-precompile",
+
+    file: resolve(HERE, "servers/elysia.ts"),
+
+    env: {
+      PRECOMPILE: "true",
+    },
   },
 ];
 
@@ -104,6 +118,10 @@ console.log(`Routes:      ${ROUTES}`);
 console.log(`Connections: ${CONNECTIONS}`);
 
 console.log(`Samples:     ${SAMPLES}\n`);
+
+console.log(`Hono:        ${packageVersion("hono")}`);
+
+console.log(`Elysia:      ${packageVersion("elysia")}`);
 
 console.table(
   rows.map((row) => ({
@@ -177,6 +195,7 @@ async function runFramework(framework, benchmarkCase, sample) {
 
       env: {
         ...process.env,
+        ...framework.env,
 
         PORT: String(PORT),
 
