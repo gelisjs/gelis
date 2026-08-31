@@ -101,11 +101,24 @@ export type RouteBeforeHandle<
   context: RouteContext<Path, Query, Body, Responses>,
 ) => unknown | PromiseLike<unknown>;
 
+export type RouteAfterHandle<
+  Path extends string,
+  Query = never,
+  Body = never,
+  Responses extends RouteResponses = Record<never, never>,
+  Result = unknown,
+> = (
+  context: RouteContext<Path, Query, Body, Responses>,
+
+  result: Awaited<Result>,
+) => void | PromiseLike<void>;
+
 export type RouteOptionsFor<
   Path extends string,
   QuerySchema extends StandardSchemaV1 | undefined = undefined,
   BodySchema extends StandardSchemaV1 | undefined = undefined,
   Responses extends ResponseSchemaMap | undefined = undefined,
+  Result = unknown,
 > = {
   readonly query?: QuerySchema;
   readonly body?: BodySchema;
@@ -118,6 +131,16 @@ export type RouteOptionsFor<
     Responses extends ResponseSchemaMap
       ? InferResponseSchemas<Responses>
       : Record<never, never>
+  >;
+
+  readonly afterHandle?: RouteAfterHandle<
+    Path,
+    SchemaOutput<QuerySchema>,
+    SchemaOutput<BodySchema>,
+    Responses extends ResponseSchemaMap
+      ? InferResponseSchemas<Responses>
+      : Record<never, never>,
+    Result
   >;
 };
 
