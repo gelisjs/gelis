@@ -1,19 +1,29 @@
 import type {
   HttpMethod,
+  ResponseSchemaMap,
   RouteHandler,
   RouteHandlerContextFor,
   RouteOptions,
+  RouteOptionsFor,
   RouteRef,
   RouteRequestContract,
   RouteRequestFor,
   RouteResponsesFor,
 } from "./route";
 
+import type { StandardSchemaV1 } from "./schema";
+
 import { createRuntimeInputPlan } from "./runtime/input";
+
+import {
+  RUNTIME_ROUTE_BEFORE_HANDLE,
+  RUNTIME_ROUTE_INPUT,
+} from "./runtime/types";
 
 import type { InferPathParams, ValidRoutePath } from "./types/path";
 
 import type {
+  RuntimeBeforeHandle,
   RuntimeRouteHandler,
   RuntimeRouteRegister,
 } from "./runtime/types";
@@ -30,6 +40,10 @@ export type JoinRoutePath<
       : `${Prefix}${Path}`;
 
 const noopRegister: RuntimeRouteRegister = () => {};
+
+type RuntimeRouteOptions = RouteOptions & {
+  readonly beforeHandle?: RuntimeBeforeHandle;
+};
 
 export class RouteBuilder<Prefix extends string = ""> {
   readonly #prefix: Prefix;
@@ -59,19 +73,39 @@ export class RouteBuilder<Prefix extends string = ""> {
     }
   >;
 
-  get<const Path extends string, const Options extends RouteOptions, Result>(
+  get<
+    const Path extends string,
+    const Query extends StandardSchemaV1 | undefined = undefined,
+    const Body extends StandardSchemaV1 | undefined = undefined,
+    const Responses extends ResponseSchemaMap | undefined = undefined,
+    Result = unknown,
+  >(
     path: Path & ValidRoutePath<Path>,
 
-    options: Options,
+    options: RouteOptionsFor<
+      JoinRoutePath<Prefix, Path>,
+      Query,
+      Body,
+      Responses
+    >,
 
     handler: (
-      context: RouteHandlerContextFor<JoinRoutePath<Prefix, Path>, Options>,
+      context: RouteHandlerContextFor<
+        JoinRoutePath<Prefix, Path>,
+        RouteOptionsFor<JoinRoutePath<Prefix, Path>, Query, Body, Responses>
+      >,
     ) => Result,
   ): RouteRef<
     "GET",
     JoinRoutePath<Prefix, Path>,
-    RouteRequestFor<JoinRoutePath<Prefix, Path>, Options>,
-    RouteResponsesFor<Options, Result>
+    RouteRequestFor<
+      JoinRoutePath<Prefix, Path>,
+      RouteOptionsFor<JoinRoutePath<Prefix, Path>, Query, Body, Responses>
+    >,
+    RouteResponsesFor<
+      RouteOptionsFor<JoinRoutePath<Prefix, Path>, Query, Body, Responses>,
+      Result
+    >
   >;
 
   get(
@@ -97,19 +131,39 @@ export class RouteBuilder<Prefix extends string = ""> {
     }
   >;
 
-  post<const Path extends string, const Options extends RouteOptions, Result>(
+  post<
+    const Path extends string,
+    const Query extends StandardSchemaV1 | undefined = undefined,
+    const Body extends StandardSchemaV1 | undefined = undefined,
+    const Responses extends ResponseSchemaMap | undefined = undefined,
+    Result = unknown,
+  >(
     path: Path & ValidRoutePath<Path>,
 
-    options: Options,
+    options: RouteOptionsFor<
+      JoinRoutePath<Prefix, Path>,
+      Query,
+      Body,
+      Responses
+    >,
 
     handler: (
-      context: RouteHandlerContextFor<JoinRoutePath<Prefix, Path>, Options>,
+      context: RouteHandlerContextFor<
+        JoinRoutePath<Prefix, Path>,
+        RouteOptionsFor<JoinRoutePath<Prefix, Path>, Query, Body, Responses>
+      >,
     ) => Result,
   ): RouteRef<
     "POST",
     JoinRoutePath<Prefix, Path>,
-    RouteRequestFor<JoinRoutePath<Prefix, Path>, Options>,
-    RouteResponsesFor<Options, Result>
+    RouteRequestFor<
+      JoinRoutePath<Prefix, Path>,
+      RouteOptionsFor<JoinRoutePath<Prefix, Path>, Query, Body, Responses>
+    >,
+    RouteResponsesFor<
+      RouteOptionsFor<JoinRoutePath<Prefix, Path>, Query, Body, Responses>,
+      Result
+    >
   >;
 
   post(
@@ -180,7 +234,7 @@ export class RouteBuilder<Prefix extends string = ""> {
 
       handler as RuntimeRouteHandler,
 
-      optionsOrHandler as RouteOptions,
+      optionsOrHandler as RuntimeRouteOptions,
     );
   }
 
@@ -191,9 +245,23 @@ export class RouteBuilder<Prefix extends string = ""> {
 
     handler: RuntimeRouteHandler,
 
-    options: RouteOptions | undefined,
+    options: RuntimeRouteOptions | undefined,
   ): unknown {
     const fullPath = this.resolve(path);
+
+    const input = createRuntimeInputPlan(options);
+
+    const beforeHandle = options?.beforeHandle;
+
+    let flags = 0;
+
+    if (input !== undefined) {
+      flags |= RUNTIME_ROUTE_INPUT;
+    }
+
+    if (beforeHandle !== undefined) {
+      flags |= RUNTIME_ROUTE_BEFORE_HANDLE;
+    }
 
     this.#register({
       method,
@@ -201,7 +269,11 @@ export class RouteBuilder<Prefix extends string = ""> {
 
       handler,
 
-      input: createRuntimeInputPlan(options),
+      flags,
+
+      input,
+
+      beforeHandle,
 
       responses: options?.responses,
     });
