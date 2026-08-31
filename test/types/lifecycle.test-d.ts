@@ -47,7 +47,15 @@ const route = app.post(
 
       401: Unauthorized,
     },
+  },
 
+  ({ params, query, body, reply }) => {
+    return reply.status(201, {
+      id: `${params.teamId}-${query.page}-${body.name}`,
+    });
+  },
+
+  {
     beforeHandle: ({ params, query, body, reply }) => {
       const teamId: string = params.teamId;
 
@@ -71,12 +79,28 @@ const route = app.post(
 
       return undefined;
     },
-  },
 
-  ({ params, query, body, reply }) => {
-    return reply.status(201, {
-      id: `${params.teamId}-${query.page}-${body.name}`,
-    });
+    afterHandle: (
+      { params, query, body },
+
+      result,
+    ) => {
+      const teamId: string = params.teamId;
+
+      const page: number = query.page;
+
+      const normalized: true = body.normalized;
+
+      const status: 201 = result.status;
+
+      const id: string = result.body.id;
+
+      void teamId;
+      void page;
+      void normalized;
+      void status;
+      void id;
+    },
   },
 );
 
@@ -124,4 +148,40 @@ type Responses = Expect<
   >
 >;
 
-export type { BodyInput, Params, QueryInput, Responses };
+const inferredResult = app.get(
+  "/after-result",
+
+  () => ({
+    ok: true,
+
+    count: 1,
+  }),
+
+  {
+    afterHandle: (_context, result) => {
+      const ok: boolean = result.ok;
+
+      const count: number = result.count;
+
+      void ok;
+      void count;
+    },
+  },
+);
+
+type InferredResultContract = RouteContractOf<typeof inferredResult>;
+
+type InferredResponse = Expect<
+  Equal<
+    InferredResultContract["responses"],
+    {
+      200: {
+        ok: boolean;
+
+        count: number;
+      };
+    }
+  >
+>;
+
+export type { BodyInput, InferredResponse, Params, QueryInput, Responses };

@@ -3,6 +3,7 @@ import type {
   ResponseSchemaMap,
   RouteHandler,
   RouteHandlerContextFor,
+  RouteLifecycleFor,
   RouteOptions,
   RouteOptionsFor,
   RouteRef,
@@ -43,11 +44,11 @@ export type JoinRoutePath<
 
 const noopRegister: RuntimeRouteRegister = () => {};
 
-type RuntimeRouteOptions = RouteOptions & {
+interface RuntimeRouteLifecycle {
   readonly beforeHandle?: RuntimeBeforeHandle;
 
   readonly afterHandle?: RuntimeAfterHandle;
-};
+}
 
 export class RouteBuilder<Prefix extends string = ""> {
   readonly #prefix: Prefix;
@@ -68,6 +69,14 @@ export class RouteBuilder<Prefix extends string = ""> {
     path: Path & ValidRoutePath<Path>,
 
     handler: RouteHandler<JoinRoutePath<Prefix, Path>, never, never, Result>,
+
+    lifecycle?: RouteLifecycleFor<
+      JoinRoutePath<Prefix, Path>,
+      undefined,
+      undefined,
+      undefined,
+      Result
+    >,
   ): RouteRef<
     "GET",
     JoinRoutePath<Prefix, Path>,
@@ -86,49 +95,30 @@ export class RouteBuilder<Prefix extends string = ""> {
   >(
     path: Path & ValidRoutePath<Path>,
 
-    options: RouteOptionsFor<
+    options: RouteOptionsFor<Query, Body, Responses>,
+
+    handler: (
+      context: RouteHandlerContextFor<
+        JoinRoutePath<Prefix, Path>,
+        RouteOptionsFor<Query, Body, Responses>
+      >,
+    ) => Result,
+
+    lifecycle?: RouteLifecycleFor<
       JoinRoutePath<Prefix, Path>,
       Query,
       Body,
       Responses,
       Result
     >,
-
-    handler: (
-      context: RouteHandlerContextFor<
-        JoinRoutePath<Prefix, Path>,
-        RouteOptionsFor<
-          JoinRoutePath<Prefix, Path>,
-          Query,
-          Body,
-          Responses,
-          Result
-        >
-      >,
-    ) => Result,
   ): RouteRef<
     "GET",
     JoinRoutePath<Prefix, Path>,
     RouteRequestFor<
       JoinRoutePath<Prefix, Path>,
-      RouteOptionsFor<
-        JoinRoutePath<Prefix, Path>,
-        Query,
-        Body,
-        Responses,
-        Result
-      >
+      RouteOptionsFor<Query, Body, Responses>
     >,
-    RouteResponsesFor<
-      RouteOptionsFor<
-        JoinRoutePath<Prefix, Path>,
-        Query,
-        Body,
-        Responses,
-        Result
-      >,
-      Result
-    >
+    RouteResponsesFor<RouteOptionsFor<Query, Body, Responses>, Result>
   >;
 
   get(
@@ -136,15 +126,31 @@ export class RouteBuilder<Prefix extends string = ""> {
 
     optionsOrHandler: unknown,
 
-    handler?: unknown,
+    handlerOrLifecycle?: unknown,
+
+    lifecycle?: unknown,
   ): unknown {
-    return this.registerRoute("GET", path, optionsOrHandler, handler);
+    return this.registerRoute(
+      "GET",
+      path,
+      optionsOrHandler,
+      handlerOrLifecycle,
+      lifecycle,
+    );
   }
 
   post<const Path extends string, Result>(
     path: Path & ValidRoutePath<Path>,
 
     handler: RouteHandler<JoinRoutePath<Prefix, Path>, never, never, Result>,
+
+    lifecycle?: RouteLifecycleFor<
+      JoinRoutePath<Prefix, Path>,
+      undefined,
+      undefined,
+      undefined,
+      Result
+    >,
   ): RouteRef<
     "POST",
     JoinRoutePath<Prefix, Path>,
@@ -163,49 +169,30 @@ export class RouteBuilder<Prefix extends string = ""> {
   >(
     path: Path & ValidRoutePath<Path>,
 
-    options: RouteOptionsFor<
+    options: RouteOptionsFor<Query, Body, Responses>,
+
+    handler: (
+      context: RouteHandlerContextFor<
+        JoinRoutePath<Prefix, Path>,
+        RouteOptionsFor<Query, Body, Responses>
+      >,
+    ) => Result,
+
+    lifecycle?: RouteLifecycleFor<
       JoinRoutePath<Prefix, Path>,
       Query,
       Body,
       Responses,
       Result
     >,
-
-    handler: (
-      context: RouteHandlerContextFor<
-        JoinRoutePath<Prefix, Path>,
-        RouteOptionsFor<
-          JoinRoutePath<Prefix, Path>,
-          Query,
-          Body,
-          Responses,
-          Result
-        >
-      >,
-    ) => Result,
   ): RouteRef<
     "POST",
     JoinRoutePath<Prefix, Path>,
     RouteRequestFor<
       JoinRoutePath<Prefix, Path>,
-      RouteOptionsFor<
-        JoinRoutePath<Prefix, Path>,
-        Query,
-        Body,
-        Responses,
-        Result
-      >
+      RouteOptionsFor<Query, Body, Responses>
     >,
-    RouteResponsesFor<
-      RouteOptionsFor<
-        JoinRoutePath<Prefix, Path>,
-        Query,
-        Body,
-        Responses,
-        Result
-      >,
-      Result
-    >
+    RouteResponsesFor<RouteOptionsFor<Query, Body, Responses>, Result>
   >;
 
   post(
@@ -213,9 +200,17 @@ export class RouteBuilder<Prefix extends string = ""> {
 
     optionsOrHandler: unknown,
 
-    handler?: unknown,
+    handlerOrLifecycle?: unknown,
+
+    lifecycle?: unknown,
   ): unknown {
-    return this.registerRoute("POST", path, optionsOrHandler, handler);
+    return this.registerRoute(
+      "POST",
+      path,
+      optionsOrHandler,
+      handlerOrLifecycle,
+      lifecycle,
+    );
   }
 
   route<const Method extends HttpMethod, const Path extends string, Result>(
@@ -224,6 +219,14 @@ export class RouteBuilder<Prefix extends string = ""> {
     path: Path & ValidRoutePath<Path>,
 
     handler: RouteHandler<JoinRoutePath<Prefix, Path>, never, never, Result>,
+
+    lifecycle?: RouteLifecycleFor<
+      JoinRoutePath<Prefix, Path>,
+      undefined,
+      undefined,
+      undefined,
+      Result
+    >,
   ): RouteRef<
     Method,
     JoinRoutePath<Prefix, Path>,
@@ -239,6 +242,8 @@ export class RouteBuilder<Prefix extends string = ""> {
     path: string,
 
     handler: unknown,
+
+    lifecycle?: unknown,
   ): unknown {
     return this.registerRuntimeRoute(
       method,
@@ -247,6 +252,8 @@ export class RouteBuilder<Prefix extends string = ""> {
       handler as RuntimeRouteHandler,
 
       undefined,
+
+      lifecycle as RuntimeRouteLifecycle | undefined,
     );
   }
 
@@ -257,9 +264,11 @@ export class RouteBuilder<Prefix extends string = ""> {
 
     optionsOrHandler: unknown,
 
-    handler: unknown,
+    handlerOrLifecycle: unknown,
+
+    lifecycle: unknown,
   ): unknown {
-    if (handler === undefined) {
+    if (typeof optionsOrHandler === "function") {
       return this.registerRuntimeRoute(
         method,
         path,
@@ -267,6 +276,8 @@ export class RouteBuilder<Prefix extends string = ""> {
         optionsOrHandler as RuntimeRouteHandler,
 
         undefined,
+
+        handlerOrLifecycle as RuntimeRouteLifecycle | undefined,
       );
     }
 
@@ -274,9 +285,11 @@ export class RouteBuilder<Prefix extends string = ""> {
       method,
       path,
 
-      handler as RuntimeRouteHandler,
+      handlerOrLifecycle as RuntimeRouteHandler,
 
-      optionsOrHandler as RuntimeRouteOptions,
+      optionsOrHandler as RouteOptions,
+
+      lifecycle as RuntimeRouteLifecycle | undefined,
     );
   }
 
@@ -287,15 +300,17 @@ export class RouteBuilder<Prefix extends string = ""> {
 
     handler: RuntimeRouteHandler,
 
-    options: RuntimeRouteOptions | undefined,
+    options: RouteOptions | undefined,
+
+    lifecycle: RuntimeRouteLifecycle | undefined,
   ): unknown {
     const fullPath = this.resolve(path);
 
     const input = createRuntimeInputPlan(options);
 
-    const beforeHandle = options?.beforeHandle;
+    const beforeHandle = lifecycle?.beforeHandle;
 
-    const afterHandle = options?.afterHandle;
+    const afterHandle = lifecycle?.afterHandle;
 
     let flags = 0;
 

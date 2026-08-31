@@ -8,8 +8,11 @@ export type { StandardSchemaV1 } from "./schema";
 
 export type {
   HttpMethod,
+  RouteAfterHandle,
+  RouteBeforeHandle,
   RouteContext,
   RouteContractOf,
+  RouteLifecycleFor,
   RouteRef,
   RouteRequestContract,
 } from "./route";

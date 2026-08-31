@@ -114,16 +114,22 @@ export type RouteAfterHandle<
 ) => void | PromiseLike<void>;
 
 export type RouteOptionsFor<
+  QuerySchema extends StandardSchemaV1 | undefined = undefined,
+  BodySchema extends StandardSchemaV1 | undefined = undefined,
+  Responses extends ResponseSchemaMap | undefined = undefined,
+> = {
+  readonly query?: QuerySchema;
+  readonly body?: BodySchema;
+  readonly responses?: Responses;
+};
+
+export type RouteLifecycleFor<
   Path extends string,
   QuerySchema extends StandardSchemaV1 | undefined = undefined,
   BodySchema extends StandardSchemaV1 | undefined = undefined,
   Responses extends ResponseSchemaMap | undefined = undefined,
   Result = unknown,
 > = {
-  readonly query?: QuerySchema;
-  readonly body?: BodySchema;
-  readonly responses?: Responses;
-
   readonly beforeHandle?: RouteBeforeHandle<
     Path,
     SchemaOutput<QuerySchema>,
