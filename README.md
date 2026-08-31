@@ -1,30 +1,37 @@
 # Gelis
 
-> Experimental — pre-alpha design and type-system prototype.
+> Experimental — pre-alpha framework engineering project.
 
-Gelis is a lightweight, inference-first TypeScript backend framework designed for runtime speed and TypeScript scalability.
+Gelis is an inference-first TypeScript backend framework designed for high runtime performance, TypeScript scalability, portability, and predictable developer ergonomics.
 
 **FAST · LIGHT · TYPED · SCALABLE**
 
-The project is currently validating its type architecture before implementing the HTTP runtime.
+## Current status
 
-## Current milestone
+Validated so far:
 
-The first prototype must prove:
+- bounded route/module/public-contract typing up to 5,000 generated routes;
+- lazy typed-client projection;
+- portable Web Standards runtime;
+- exact static routing plus scanner-based dynamic trie routing;
+- synchronous handler fast path;
+- response normalization and typed `reply.status()`;
+- Bun adapter prototype with negligible measured overhead;
+- Standard Schema query/body validation architecture;
+- same-machine HTTP comparisons against Hono and Elysia.
 
-- stable root application typing;
-- compact route contracts;
-- local path-parameter inference;
-- schema inference without validator lock-in;
-- status-specific typed responses;
-- bounded module contracts;
-- explicit public API contracts;
-- acceptable TypeScript performance at 100, 500, 1,000, and 5,000 routes.
+Current milestone: **Validation Performance Benchmark v0.1**.
 
-See:
+## Design direction
 
-- [`docs/technical-constitution.md`](docs/technical-constitution.md)
-- [`docs/api-surface-v0.1.md`](docs/api-surface-v0.1.md)
+- portable by contract, optimized by adapter;
+- unused features should be close to zero-cost;
+- type-system performance is framework performance;
+- runtime specialization is evidence-driven;
+- benchmark competitor architectures, not marketing claims;
+- preserve Web Standard escape hatches;
+- avoid validator lock-in;
+- avoid framework-wide generic accumulation.
 
 ## Development
 
@@ -32,6 +39,27 @@ See:
 bun install
 bun run check
 ```
+
+Benchmarks:
+
+```bash
+bun run bench:types
+bun run bench:runtime
+bun run bench:http
+bun run bench:http:adapter
+bun run bench:http:validation
+```
+
+## Engineering docs
+
+- [`docs/architecture/technical-constitution.md`](docs/architecture/technical-constitution.md)
+- [`docs/architecture/api-surface-v0.1.md`](docs/architecture/api-surface-v0.1.md)
+- [`docs/architecture/runtime-v0.1.md`](docs/architecture/runtime-v0.1.md)
+- [`docs/architecture/validation-v0.1.md`](docs/architecture/validation-v0.1.md)
+- [`docs/development/roadmap.md`](docs/development/roadmap.md)
+- [`docs/benchmarks/type-system-baseline-v0.1.md`](docs/benchmarks/type-system-baseline-v0.1.md)
+- [`docs/benchmarks/runtime-baseline-v0.1.md`](docs/benchmarks/runtime-baseline-v0.1.md)
+- [`docs/benchmarks/http-comparison-baseline-v0.1.md`](docs/benchmarks/http-comparison-baseline-v0.1.md)
 
 ## License
 
