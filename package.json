@@ -29,7 +29,8 @@
     "bench:runtime:router": "bun bench/runtime/router-components.mjs",
     "bench:http:autocannon": "bun bench/http/run.mjs",
     "bench:http": "bun bench/http/run-oha.mjs",
-    "typecheck:bun-adapter": "tsc -p prototype/bun/tsconfig.json --noEmit"
+    "typecheck:bun-adapter": "tsc -p prototype/bun/tsconfig.json --noEmit",
+    "bench:http:adapter": "bun bench/http/run-gelis-adapter.mjs"
   },
   "devDependencies": {
     "@types/autocannon": "^7.12.7",
