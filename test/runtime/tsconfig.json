@@ -4,5 +4,5 @@
     "types": ["bun"],
     "noEmit": true
   },
-  "include": ["../../src/**/*.ts", "./**/*.ts"]
+  "include": ["../../src/**/*.ts", "../../prototype/bun/**/*.ts", "./**/*.ts"]
 }
