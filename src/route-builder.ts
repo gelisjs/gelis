@@ -16,6 +16,7 @@ import type { StandardSchemaV1 } from "./schema";
 import { createRuntimeInputPlan } from "./runtime/input";
 
 import {
+  RUNTIME_ROUTE_AFTER_HANDLE,
   RUNTIME_ROUTE_BEFORE_HANDLE,
   RUNTIME_ROUTE_INPUT,
 } from "./runtime/types";
@@ -23,6 +24,7 @@ import {
 import type { InferPathParams, ValidRoutePath } from "./types/path";
 
 import type {
+  RuntimeAfterHandle,
   RuntimeBeforeHandle,
   RuntimeRouteHandler,
   RuntimeRouteRegister,
@@ -43,6 +45,8 @@ const noopRegister: RuntimeRouteRegister = () => {};
 
 type RuntimeRouteOptions = RouteOptions & {
   readonly beforeHandle?: RuntimeBeforeHandle;
+
+  readonly afterHandle?: RuntimeAfterHandle;
 };
 
 export class RouteBuilder<Prefix extends string = ""> {
@@ -86,13 +90,20 @@ export class RouteBuilder<Prefix extends string = ""> {
       JoinRoutePath<Prefix, Path>,
       Query,
       Body,
-      Responses
+      Responses,
+      Result
     >,
 
     handler: (
       context: RouteHandlerContextFor<
         JoinRoutePath<Prefix, Path>,
-        RouteOptionsFor<JoinRoutePath<Prefix, Path>, Query, Body, Responses>
+        RouteOptionsFor<
+          JoinRoutePath<Prefix, Path>,
+          Query,
+          Body,
+          Responses,
+          Result
+        >
       >,
     ) => Result,
   ): RouteRef<
@@ -100,10 +111,22 @@ export class RouteBuilder<Prefix extends string = ""> {
     JoinRoutePath<Prefix, Path>,
     RouteRequestFor<
       JoinRoutePath<Prefix, Path>,
-      RouteOptionsFor<JoinRoutePath<Prefix, Path>, Query, Body, Responses>
+      RouteOptionsFor<
+        JoinRoutePath<Prefix, Path>,
+        Query,
+        Body,
+        Responses,
+        Result
+      >
     >,
     RouteResponsesFor<
-      RouteOptionsFor<JoinRoutePath<Prefix, Path>, Query, Body, Responses>,
+      RouteOptionsFor<
+        JoinRoutePath<Prefix, Path>,
+        Query,
+        Body,
+        Responses,
+        Result
+      >,
       Result
     >
   >;
@@ -144,13 +167,20 @@ export class RouteBuilder<Prefix extends string = ""> {
       JoinRoutePath<Prefix, Path>,
       Query,
       Body,
-      Responses
+      Responses,
+      Result
     >,
 
     handler: (
       context: RouteHandlerContextFor<
         JoinRoutePath<Prefix, Path>,
-        RouteOptionsFor<JoinRoutePath<Prefix, Path>, Query, Body, Responses>
+        RouteOptionsFor<
+          JoinRoutePath<Prefix, Path>,
+          Query,
+          Body,
+          Responses,
+          Result
+        >
       >,
     ) => Result,
   ): RouteRef<
@@ -158,10 +188,22 @@ export class RouteBuilder<Prefix extends string = ""> {
     JoinRoutePath<Prefix, Path>,
     RouteRequestFor<
       JoinRoutePath<Prefix, Path>,
-      RouteOptionsFor<JoinRoutePath<Prefix, Path>, Query, Body, Responses>
+      RouteOptionsFor<
+        JoinRoutePath<Prefix, Path>,
+        Query,
+        Body,
+        Responses,
+        Result
+      >
     >,
     RouteResponsesFor<
-      RouteOptionsFor<JoinRoutePath<Prefix, Path>, Query, Body, Responses>,
+      RouteOptionsFor<
+        JoinRoutePath<Prefix, Path>,
+        Query,
+        Body,
+        Responses,
+        Result
+      >,
       Result
     >
   >;
@@ -253,6 +295,8 @@ export class RouteBuilder<Prefix extends string = ""> {
 
     const beforeHandle = options?.beforeHandle;
 
+    const afterHandle = options?.afterHandle;
+
     let flags = 0;
 
     if (input !== undefined) {
@@ -261,6 +305,10 @@ export class RouteBuilder<Prefix extends string = ""> {
 
     if (beforeHandle !== undefined) {
       flags |= RUNTIME_ROUTE_BEFORE_HANDLE;
+    }
+
+    if (afterHandle !== undefined) {
+      flags |= RUNTIME_ROUTE_AFTER_HANDLE;
     }
 
     this.#register({
@@ -274,6 +322,8 @@ export class RouteBuilder<Prefix extends string = ""> {
       input,
 
       beforeHandle,
+
+      afterHandle,
 
       responses: options?.responses,
     });
