@@ -9,6 +9,8 @@ import type {
   RouteResponsesFor,
 } from "./route";
 
+import { createRuntimeInputPlan } from "./runtime/input";
+
 import type { InferPathParams, ValidRoutePath } from "./types/path";
 
 import type {
@@ -196,8 +198,12 @@ export class RouteBuilder<Prefix extends string = ""> {
     this.#register({
       method,
       path: fullPath,
+
       handler,
-      options,
+
+      input: createRuntimeInputPlan(options),
+
+      responses: options?.responses,
     });
 
     return {
