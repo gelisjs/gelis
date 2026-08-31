@@ -33,6 +33,7 @@
     "bench:http:adapter": "bun bench/http/run-gelis-adapter.mjs"
   },
   "devDependencies": {
+    "@hono/standard-validator": "^0.4.0",
     "@types/autocannon": "^7.12.7",
     "@types/bun": "^1.4.0",
     "autocannon": "^8.0.0",
