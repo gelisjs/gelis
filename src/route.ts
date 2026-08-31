@@ -43,10 +43,12 @@ export type InferResponseSchemas<Schemas extends ResponseSchemaMap> = {
   -readonly [Status in keyof Schemas]: SchemaOutput<Schemas[Status]>;
 };
 
-type DeclaredRouteResponsesFor<Options extends RouteOptions> = Options extends {
-  readonly responses: infer Responses extends ResponseSchemaMap;
+type DeclaredRouteResponsesFor<Options> = Options extends {
+  readonly responses?: infer Responses;
 }
-  ? InferResponseSchemas<Responses>
+  ? Responses extends ResponseSchemaMap
+    ? InferResponseSchemas<Responses>
+    : Record<never, never>
   : Record<never, never>;
 
 type ReplyStatus<Responses extends RouteResponses> = Extract<
@@ -90,48 +92,75 @@ export type RouteHandler<
   Result = unknown,
 > = (context: RouteContext<Path, Query, Body>) => Result;
 
+export type RouteBeforeHandle<
+  Path extends string,
+  Query = never,
+  Body = never,
+  Responses extends RouteResponses = Record<never, never>,
+> = (
+  context: RouteContext<Path, Query, Body, Responses>,
+) => unknown | PromiseLike<unknown>;
+
+export type RouteOptionsFor<
+  Path extends string,
+  QuerySchema extends StandardSchemaV1 | undefined = undefined,
+  BodySchema extends StandardSchemaV1 | undefined = undefined,
+  Responses extends ResponseSchemaMap | undefined = undefined,
+> = {
+  readonly query?: QuerySchema;
+  readonly body?: BodySchema;
+  readonly responses?: Responses;
+
+  readonly beforeHandle?: RouteBeforeHandle<
+    Path,
+    SchemaOutput<QuerySchema>,
+    SchemaOutput<BodySchema>,
+    Responses extends ResponseSchemaMap
+      ? InferResponseSchemas<Responses>
+      : Record<never, never>
+  >;
+};
+
 export type RouteRequestFor<
   Path extends string,
-  Options extends RouteOptions,
+  Options,
 > = RouteRequestContract<
   InferPathParams<Path>,
   Options extends {
-    readonly query: infer Query;
+    readonly query?: infer Query;
   }
     ? SchemaInput<Query>
     : never,
   Options extends {
-    readonly body: infer Body;
+    readonly body?: infer Body;
   }
     ? SchemaInput<Body>
     : never
 >;
 
-export type RouteHandlerContextFor<
-  Path extends string,
-  Options extends RouteOptions,
-> = RouteContext<
+export type RouteHandlerContextFor<Path extends string, Options> = RouteContext<
   Path,
   Options extends {
-    readonly query: infer Query;
+    readonly query?: infer Query;
   }
     ? SchemaOutput<Query>
     : never,
   Options extends {
-    readonly body: infer Body;
+    readonly body?: infer Body;
   }
     ? SchemaOutput<Body>
     : never,
   DeclaredRouteResponsesFor<Options>
 >;
 
-export type RouteResponsesFor<
-  Options extends RouteOptions,
-  Result,
-> = Options extends {
-  readonly responses: infer Responses extends ResponseSchemaMap;
+export type RouteResponsesFor<Options, Result> = Options extends {
+  readonly responses?: infer Responses;
 }
-  ? InferResponseSchemas<Responses>
+  ? Responses extends ResponseSchemaMap
+    ? InferResponseSchemas<Responses>
+    : {
+        200: Awaited<Result>;
+      }
   : {
       200: Awaited<Result>;
     };
