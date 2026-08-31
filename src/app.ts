@@ -1,8 +1,8 @@
+import { getModuleRuntimeRoutes } from "./module";
+
 import { pathnameFromUrl } from "./runtime/url";
 
 import { RouteBuilder } from "./route-builder";
-
-import { getModuleRuntimeRoutes } from "./module";
 
 import { Router } from "./runtime/router";
 
@@ -20,11 +20,34 @@ import {
   validationErrorResponse,
 } from "./runtime/input";
 
+import {
+  RUNTIME_ROUTE_BEFORE_HANDLE,
+  RUNTIME_ROUTE_INPUT,
+  RUNTIME_ROUTE_INPUT_BEFORE_HANDLE,
+  RUNTIME_ROUTE_PLAIN,
+} from "./runtime/types";
+
 import type { ModuleRef, ModuleRoutes } from "./module";
 
 import type { RuntimeInputPlan } from "./runtime/input";
 
-import type { RuntimeRouteHandler, RuntimeRouteRecord } from "./runtime/types";
+import type {
+  RuntimeRouteContext,
+  RuntimeRouteHandler,
+  RuntimeRouteRecord,
+} from "./runtime/types";
+
+type RuntimeRouteInvoker = (
+  route: RuntimeRouteRecord,
+
+  request: Request,
+
+  params: Record<string, string>,
+
+  query: unknown,
+
+  body: unknown,
+) => Response | Promise<Response>;
 
 export class Gelis extends RouteBuilder<""> {
   readonly #router: Router;
@@ -73,11 +96,11 @@ export class Gelis extends RouteBuilder<""> {
     /*
      * Critical fast path.
      *
-     * Routes without input schemas
-     * retain the existing direct
-     * handler execution path.
+     * Plain routes retain a single
+     * execution-plan comparison before
+     * direct handler invocation.
      */
-    if (route.input === undefined) {
+    if (route.flags === RUNTIME_ROUTE_PLAIN) {
       const result = route.handler({
         request,
         params,
@@ -96,7 +119,56 @@ export class Gelis extends RouteBuilder<""> {
       return normalizeResponse(result);
     }
 
-    return runInputRoute(route, route.input, request, params);
+    switch (route.flags) {
+      case RUNTIME_ROUTE_INPUT: {
+        if (route.input === undefined) {
+          throw new Error("Missing Gelis runtime input plan");
+        }
+
+        return runInputRoute(
+          route,
+          route.input,
+          request,
+          params,
+          invokeHandlerRoute,
+        );
+      }
+
+      case RUNTIME_ROUTE_BEFORE_HANDLE: {
+        if (route.beforeHandle === undefined) {
+          throw new Error("Missing Gelis beforeHandle hook");
+        }
+
+        return invokeBeforeHandleRoute(
+          route,
+          request,
+          params,
+          undefined,
+          undefined,
+        );
+      }
+
+      case RUNTIME_ROUTE_INPUT_BEFORE_HANDLE: {
+        if (route.input === undefined) {
+          throw new Error("Missing Gelis runtime input plan");
+        }
+
+        if (route.beforeHandle === undefined) {
+          throw new Error("Missing Gelis beforeHandle hook");
+        }
+
+        return runInputRoute(
+          route,
+          route.input,
+          request,
+          params,
+          invokeBeforeHandleRoute,
+        );
+      }
+
+      default:
+        throw new Error("Invalid Gelis runtime route flags");
+    }
   }
 }
 
@@ -108,16 +180,18 @@ function runInputRoute(
   request: Request,
 
   params: Record<string, string>,
+
+  invoke: RuntimeRouteInvoker,
 ): Response | Promise<Response> {
   switch (input.kind) {
     case RUNTIME_INPUT_QUERY:
-      return runQueryRoute(route, input, request, params);
+      return runQueryRoute(route, input, request, params, invoke);
 
     case RUNTIME_INPUT_BODY:
-      return runBodyRoute(route, input, request, params, undefined);
+      return runBodyRoute(route, input, request, params, undefined, invoke);
 
     case RUNTIME_INPUT_QUERY_BODY:
-      return runQueryBodyRoute(route, input, request, params);
+      return runQueryBodyRoute(route, input, request, params, invoke);
 
     default:
       throw new Error("Invalid Gelis runtime input plan");
@@ -132,6 +206,8 @@ function runQueryRoute(
   request: Request,
 
   params: Record<string, string>,
+
+  invoke: RuntimeRouteInvoker,
 ): Response | Promise<Response> {
   let rawQuery: Record<string, string | string[]>;
 
@@ -155,13 +231,7 @@ function runQueryRoute(
         return validationErrorResponse("query", result.issues);
       }
 
-      return invokeHandler(
-        route.handler,
-        request,
-        params,
-        result.value,
-        undefined,
-      );
+      return invoke(route, request, params, result.value, undefined);
     });
   }
 
@@ -169,13 +239,7 @@ function runQueryRoute(
     return validationErrorResponse("query", validation.issues);
   }
 
-  return invokeHandler(
-    route.handler,
-    request,
-    params,
-    validation.value,
-    undefined,
-  );
+  return invoke(route, request, params, validation.value, undefined);
 }
 
 function runBodyRoute(
@@ -188,6 +252,8 @@ function runBodyRoute(
   params: Record<string, string>,
 
   query: unknown,
+
+  invoke: RuntimeRouteInvoker,
 ): Response | Promise<Response> {
   const schema = input.body;
 
@@ -209,13 +275,7 @@ function runBodyRoute(
             return validationErrorResponse("body", result.issues);
           }
 
-          return invokeHandler(
-            route.handler,
-            request,
-            params,
-            query,
-            result.value,
-          );
+          return invoke(route, request, params, query, result.value);
         });
       }
 
@@ -223,13 +283,7 @@ function runBodyRoute(
         return validationErrorResponse("body", validation.issues);
       }
 
-      return invokeHandler(
-        route.handler,
-        request,
-        params,
-        query,
-        validation.value,
-      );
+      return invoke(route, request, params, query, validation.value);
     },
 
     () => malformedJsonResponse(),
@@ -244,6 +298,8 @@ function runQueryBodyRoute(
   request: Request,
 
   params: Record<string, string>,
+
+  invoke: RuntimeRouteInvoker,
 ): Response | Promise<Response> {
   let rawQuery: Record<string, string | string[]>;
 
@@ -267,7 +323,7 @@ function runQueryBodyRoute(
         return validationErrorResponse("query", result.issues);
       }
 
-      return runBodyRoute(route, input, request, params, result.value);
+      return runBodyRoute(route, input, request, params, result.value, invoke);
     });
   }
 
@@ -275,11 +331,11 @@ function runQueryBodyRoute(
     return validationErrorResponse("query", validation.issues);
   }
 
-  return runBodyRoute(route, input, request, params, validation.value);
+  return runBodyRoute(route, input, request, params, validation.value, invoke);
 }
 
-function invokeHandler(
-  handler: RuntimeRouteHandler,
+function invokeHandlerRoute(
+  route: RuntimeRouteRecord,
 
   request: Request,
 
@@ -289,7 +345,7 @@ function invokeHandler(
 
   body: unknown,
 ): Response | Promise<Response> {
-  const result = handler({
+  return invokeHandlerWithContext(route.handler, {
     request,
     params,
     query,
@@ -297,6 +353,59 @@ function invokeHandler(
 
     reply: runtimeReply,
   });
+}
+
+function invokeBeforeHandleRoute(
+  route: RuntimeRouteRecord,
+
+  request: Request,
+
+  params: Record<string, string>,
+
+  query: unknown,
+
+  body: unknown,
+): Response | Promise<Response> {
+  const beforeHandle = route.beforeHandle;
+
+  if (beforeHandle === undefined) {
+    throw new Error("Missing Gelis beforeHandle hook");
+  }
+
+  const context: RuntimeRouteContext = {
+    request,
+    params,
+    query,
+    body,
+
+    reply: runtimeReply,
+  };
+
+  const result = beforeHandle(context);
+
+  if (isPromiseLike(result)) {
+    return Promise.resolve(result).then((early) => {
+      if (early !== undefined) {
+        return normalizeResponse(early);
+      }
+
+      return invokeHandlerWithContext(route.handler, context);
+    });
+  }
+
+  if (result !== undefined) {
+    return normalizeResponse(result);
+  }
+
+  return invokeHandlerWithContext(route.handler, context);
+}
+
+function invokeHandlerWithContext(
+  handler: RuntimeRouteHandler,
+
+  context: RuntimeRouteContext,
+): Response | Promise<Response> {
+  const result = handler(context);
 
   if (isPromiseLike(result)) {
     return Promise.resolve(result).then(normalizeResponse);
