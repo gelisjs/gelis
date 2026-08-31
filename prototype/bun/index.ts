@@ -1,13 +1,6 @@
 import type { Gelis } from "../../src";
 
-export interface GelisBunOptions {
-  readonly port?: number;
-  readonly hostname?: string;
-  readonly reusePort?: boolean;
-  readonly development?: boolean;
-  readonly maxRequestBodySize?: number;
-  readonly idleTimeout?: number;
-}
+export type GelisBunOptions = Bun.Serve.HostnamePortServeOptions<undefined>;
 
 export function serve(
   app: Gelis,
@@ -16,8 +9,6 @@ export function serve(
   return Bun.serve({
     ...options,
 
-    fetch(request) {
-      return app.fetch(request);
-    },
+    fetch: app.fetch.bind(app),
   });
 }
