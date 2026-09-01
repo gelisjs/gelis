@@ -33,7 +33,8 @@
     "typecheck:bun-adapter": "tsc -p prototype/bun/tsconfig.json --noEmit",
     "bench:http:adapter": "bun bench/http/run-gelis-adapter.mjs",
     "bench:http:validation": "bun bench/http/validation/run.mjs",
-    "bench:http:lifecycle": "bun bench/http/lifecycle/run.mjs"
+    "bench:http:lifecycle": "bun bench/http/lifecycle/run.mjs",
+    "bench:runtime:lifecycle:global": "bun bench/runtime/global-lifecycle.mjs"
   },
   "devDependencies": {
     "@hono/standard-validator": "^0.4.0",
