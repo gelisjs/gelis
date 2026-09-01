@@ -33,6 +33,10 @@ const cases = [
 
   "on-error-unused-async-handler",
 
+  "two-on-error-unused-async-handler",
+
+  "three-on-error-unused-async-handler",
+
   "async-handler-error-handled",
 
   "on-request-error-handled",
@@ -218,6 +222,13 @@ function createComparisons(rows: RuntimeResultRow[]): RuntimeComparisonRow[] {
     ["handler-error-async-on-error", "handler-error-handled-sync"],
 
     ["on-error-unused-async-handler", "plain-async-handler"],
+
+    ["two-on-error-unused-async-handler", "on-error-unused-async-handler"],
+
+    [
+      "three-on-error-unused-async-handler",
+      "two-on-error-unused-async-handler",
+    ],
   ];
 
   const comparisons: RuntimeComparisonRow[] = [];
