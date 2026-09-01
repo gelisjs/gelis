@@ -25,17 +25,44 @@ export function compileOnErrorFetch(
         try {
           result = innerFetch(request);
         } catch (error) {
-          return runSingleErrorHook(hook, request, error);
+          /*
+           * Single-handler synchronous error fast path.
+           *
+           * This is deliberately inlined because one
+           * global onError handler is the common plan.
+           *
+           * A Response can escape directly without
+           * another executor function call.
+           */
+          const handled = hook({
+            request,
+            error,
+          });
+
+          if (handled instanceof Response) {
+            return handled;
+          }
+
+          if (isPromiseLike(handled)) {
+            return Promise.resolve(handled).then((resolved) => {
+              if (resolved !== undefined) {
+                return normalizeResponse(resolved);
+              }
+
+              throw error;
+            });
+          }
+
+          if (handled !== undefined) {
+            return normalizeResponse(handled);
+          }
+
+          throw error;
         }
 
         /*
          * RuntimeFetch is an internal Gelis contract:
          * Response | Promise<Response>.
-         *
-         * Application and route executors normalize
-         * arbitrary PromiseLike values before they reach
-         * this boundary, so only native Promise needs
-         * rejection observation here.
          */
         if (result instanceof Promise) {
           return result.catch((error) =>
@@ -107,10 +134,7 @@ function runSingleErrorHook(
    * Response is the common handled-error fast path.
    *
    * normalizeResponse() would perform the same
-   * instanceof check as its first operation, so
-   * returning it directly preserves semantics while
-   * avoiding PromiseLike inspection and an additional
-   * normalization call.
+   * instanceof check as its first operation.
    */
   if (result instanceof Response) {
     return result;
