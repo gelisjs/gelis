@@ -29,3 +29,5 @@ export type {
 } from "./contract";
 
 export type { InferPathParams } from "./types/path";
+
+export type { OnRequest, OnRequestContext } from "./request";
