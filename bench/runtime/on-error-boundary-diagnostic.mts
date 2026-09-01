@@ -43,6 +43,10 @@ const scenarios = [
   "rewrite-1",
   "rewrite-2",
   "rewrite-3",
+
+  "define-rewrite-1",
+  "define-rewrite-2",
+  "define-rewrite-3",
 ] as const;
 
 type Scenario = (typeof scenarios)[number];
@@ -107,6 +111,7 @@ async function runParent(): Promise<void> {
   printGroup(rows, "direct-many");
   printGroup(rows, "object-many");
   printGroup(rows, "rewrite");
+  printGroup(rows, "define-rewrite");
 }
 
 async function runChildScenario(scenario: Scenario): Promise<BenchmarkRow> {
@@ -201,7 +206,43 @@ function buildOperation(
 
     case "rewrite-3":
       return buildRewriteOperation(3);
+
+    case "define-rewrite-1":
+      return buildDefineRewriteOperation(1);
+
+    case "define-rewrite-2":
+      return buildDefineRewriteOperation(2);
+
+    case "define-rewrite-3":
+      return buildDefineRewriteOperation(3);
   }
+}
+
+function buildDefineRewriteOperation(
+  writeCount: number,
+): () => Response | Promise<Response> {
+  class Holder {
+    fetch(request: Request): Response | Promise<Response> {
+      return INNER_FETCH(request);
+    }
+  }
+
+  const holder = new Holder();
+
+  for (let index = 0; index < writeCount; index++) {
+    const compiledFetch = compileErrorBoundary(
+      INNER_FETCH,
+      compileColdErrorHandler(2),
+    );
+
+    Object.defineProperty(holder, "fetch", {
+      configurable: true,
+      writable: true,
+      value: compiledFetch,
+    });
+  }
+
+  return () => holder.fetch(REQUEST);
 }
 
 function buildDirectOperation(
