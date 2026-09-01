@@ -25,48 +25,109 @@ export function compileOnErrorFetch(
         try {
           result = innerFetch(request);
         } catch (error) {
-          /*
-           * Single-handler synchronous error fast path.
-           *
-           * This is deliberately inlined because one
-           * global onError handler is the common plan.
-           *
-           * A Response can escape directly without
-           * another executor function call.
-           */
-          const handled = hook({
-            request,
-            error,
-          });
-
-          if (handled instanceof Response) {
-            return handled;
-          }
-
-          if (isPromiseLike(handled)) {
-            return Promise.resolve(handled).then((resolved) => {
-              if (resolved !== undefined) {
-                return normalizeResponse(resolved);
-              }
-
-              throw error;
-            });
-          }
-
-          if (handled !== undefined) {
-            return normalizeResponse(handled);
-          }
-
-          throw error;
+          return runSingleErrorHook(hook, request, error);
         }
 
-        /*
-         * RuntimeFetch is an internal Gelis contract:
-         * Response | Promise<Response>.
-         */
         if (result instanceof Promise) {
           return result.catch((error) =>
             runSingleErrorHook(hook, request, error),
+          );
+        }
+
+        return result;
+      };
+    }
+
+    case 2: {
+      const first = hooks[0];
+      const second = hooks[1];
+
+      if (first === undefined || second === undefined) {
+        throw new Error("Invalid Gelis onError pair plan");
+      }
+
+      /*
+       * Snapshot once at compilation time.
+       *
+       * Successful requests must not pay the generic
+       * PromiseLike boundary used by the many-hook plan.
+       */
+      const compiledHooks: readonly OnError[] = [first, second];
+
+      return (request) => {
+        let result: Response | Promise<Response>;
+
+        try {
+          result = innerFetch(request);
+        } catch (error) {
+          return runErrorHooks(
+            compiledHooks,
+            {
+              request,
+              error,
+            },
+            error,
+            0,
+          );
+        }
+
+        if (result instanceof Promise) {
+          return result.catch((error) =>
+            runErrorHooks(
+              compiledHooks,
+              {
+                request,
+                error,
+              },
+              error,
+              0,
+            ),
+          );
+        }
+
+        return result;
+      };
+    }
+
+    case 3: {
+      const first = hooks[0];
+      const second = hooks[1];
+      const third = hooks[2];
+
+      if (first === undefined || second === undefined || third === undefined) {
+        throw new Error("Invalid Gelis onError triple plan");
+      }
+
+      const compiledHooks: readonly OnError[] = [first, second, third];
+
+      return (request) => {
+        let result: Response | Promise<Response>;
+
+        try {
+          result = innerFetch(request);
+        } catch (error) {
+          return runErrorHooks(
+            compiledHooks,
+            {
+              request,
+              error,
+            },
+            error,
+            0,
+          );
+        }
+
+        if (result instanceof Promise) {
+          return result.catch((error) =>
+            runErrorHooks(
+              compiledHooks,
+              {
+                request,
+                error,
+              },
+              error,
+              0,
+            ),
           );
         }
 
@@ -130,12 +191,6 @@ function runSingleErrorHook(
     error,
   });
 
-  /*
-   * Response is the common handled-error fast path.
-   *
-   * normalizeResponse() would perform the same
-   * instanceof check as its first operation.
-   */
   if (result instanceof Response) {
     return result;
   }
