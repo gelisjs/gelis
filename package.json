@@ -40,7 +40,8 @@
     "bench:runtime:on-request:isolated": "bun bench/runtime/on-request-isolated.mjs",
     "bench:http:on-request": "bun bench/http/on-request/run.mjs",
     "bench:runtime:on-error": "bun bench/runtime/on-error.mjs",
-    "bench:runtime:on-error:isolated": "bun bench/runtime/on-error-isolated.mjs"
+    "bench:runtime:on-error:isolated": "bun bench/runtime/on-error-isolated.mjs",
+    "bench:http:on-error": "bun bench/http/on-error/run.mjs"
   },
   "devDependencies": {
     "@hono/standard-validator": "^0.4.0",
