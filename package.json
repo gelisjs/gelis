@@ -34,7 +34,8 @@
     "bench:http:adapter": "bun bench/http/run-gelis-adapter.mjs",
     "bench:http:validation": "bun bench/http/validation/run.mjs",
     "bench:http:lifecycle": "bun bench/http/lifecycle/run.mjs",
-    "bench:runtime:lifecycle:global": "bun bench/runtime/global-lifecycle.mjs"
+    "bench:runtime:lifecycle:global": "bun bench/runtime/global-lifecycle.mjs",
+    "bench:http:lifecycle:global": "bun bench/http/global-lifecycle/run.mjs"
   },
   "devDependencies": {
     "@hono/standard-validator": "^0.4.0",
