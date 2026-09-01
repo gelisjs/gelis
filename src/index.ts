@@ -7,6 +7,9 @@ export { defineModule } from "./module";
 export type { StandardSchemaV1 } from "./schema";
 
 export type {
+  GlobalAfterHandle,
+  GlobalBeforeHandle,
+  GlobalRouteContext,
   HttpMethod,
   RouteAfterHandle,
   RouteBeforeHandle,
