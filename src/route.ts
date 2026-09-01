@@ -27,7 +27,9 @@ export type ResponseSchemaMap = Readonly<Record<number, StandardSchemaV1>>;
 
 export interface RouteOptions {
   readonly query?: StandardSchemaV1;
+
   readonly body?: StandardSchemaV1;
+
   readonly responses?: ResponseSchemaMap;
 }
 
@@ -58,6 +60,7 @@ type ReplyStatus<Responses extends RouteResponses> = Extract<
 
 interface ReplyResult<Status extends number, Body> {
   readonly status: Status;
+
   readonly body: Body;
 
   readonly "~gelisReply"?: true;
@@ -66,6 +69,7 @@ interface ReplyResult<Status extends number, Body> {
 interface Reply<Responses extends RouteResponses> {
   status<const Status extends ReplyStatus<Responses>>(
     status: Status,
+
     body: Responses[Status],
   ): ReplyResult<Status, Responses[Status]>;
 }
@@ -79,10 +83,31 @@ export interface RouteContext<
   request: Request;
 
   params: InferPathParams<Path>;
+
   query: Query;
+
   body: Body;
 
   reply: Reply<Responses>;
+}
+
+export interface GlobalRouteContext {
+  request: Request;
+
+  params: Record<string, string>;
+
+  /*
+   * A global hook can apply to many route
+   * contracts, so query/body cannot safely
+   * expose one route-specific type.
+   */
+  query: unknown;
+
+  body: unknown;
+
+  reply: {
+    status(status: number, body: unknown): unknown;
+  };
 }
 
 export type RouteHandler<
@@ -113,13 +138,25 @@ export type RouteAfterHandle<
   result: Awaited<Result>,
 ) => void | PromiseLike<void>;
 
+export type GlobalBeforeHandle = (
+  context: GlobalRouteContext,
+) => unknown | PromiseLike<unknown>;
+
+export type GlobalAfterHandle = (
+  context: GlobalRouteContext,
+
+  result: unknown,
+) => void | PromiseLike<void>;
+
 export type RouteOptionsFor<
   QuerySchema extends StandardSchemaV1 | undefined = undefined,
   BodySchema extends StandardSchemaV1 | undefined = undefined,
   Responses extends ResponseSchemaMap | undefined = undefined,
 > = {
   readonly query?: QuerySchema;
+
   readonly body?: BodySchema;
+
   readonly responses?: Responses;
 };
 
@@ -204,10 +241,12 @@ export interface RouteRef<
   Responses extends RouteResponses = RouteResponses,
 > {
   readonly method: Method;
+
   readonly path: Path;
 
   readonly [routeRefBrand]: {
     readonly request: Request;
+
     readonly responses: Responses;
   };
 }
@@ -228,8 +267,11 @@ export type RouteContractOf<Route> =
   >
     ? {
         method: Method;
+
         path: Path;
+
         request: Request;
+
         responses: Responses;
       }
     : never;
