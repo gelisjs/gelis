@@ -32,20 +32,18 @@ export function compileOnErrorFetch(
          * RuntimeFetch is an internal Gelis contract:
          * Response | Promise<Response>.
          *
-         * Routed/application fetch plans already normalize
-         * PromiseLike handler results into native Promise
-         * instances before they reach this boundary.
-         *
-         * Avoid generic PromiseLike duck-typing and an
-         * unnecessary Promise.resolve() on this hot path.
+         * Application and route executors normalize
+         * arbitrary PromiseLike values before they reach
+         * this boundary, so only native Promise needs
+         * rejection observation here.
          */
-        if (result instanceof Response) {
-          return result;
+        if (result instanceof Promise) {
+          return result.catch((error) =>
+            runSingleErrorHook(hook, request, error),
+          );
         }
 
-        return result.catch((error) =>
-          runSingleErrorHook(hook, request, error),
-        );
+        return result;
       };
     }
 
