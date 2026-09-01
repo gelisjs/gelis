@@ -6,7 +6,6 @@ import type {
 
 export function compileBeforeHandle(
   globalHooks: readonly RuntimeBeforeHandle[],
-
   localHook: RuntimeBeforeHandle | undefined,
 ): RuntimeBeforeHandle | undefined {
   const hooks =
@@ -24,10 +23,22 @@ export function compileBeforeHandle(
       const second = hooks[1];
 
       if (first === undefined || second === undefined) {
-        throw new Error("Invalid Gelis beforeHandle plan");
+        throw new Error("Invalid Gelis beforeHandle pair plan");
       }
 
       return (context) => runBeforePair(first, second, context);
+    }
+
+    case 3: {
+      const first = hooks[0];
+      const second = hooks[1];
+      const third = hooks[2];
+
+      if (first === undefined || second === undefined || third === undefined) {
+        throw new Error("Invalid Gelis beforeHandle triple plan");
+      }
+
+      return (context) => runBeforeTriple(first, second, third, context);
     }
 
     default:
@@ -37,7 +48,6 @@ export function compileBeforeHandle(
 
 export function compileAfterHandle(
   globalHooks: readonly RuntimeAfterHandle[],
-
   localHook: RuntimeAfterHandle | undefined,
 ): RuntimeAfterHandle | undefined {
   const hooks =
@@ -55,10 +65,23 @@ export function compileAfterHandle(
       const second = hooks[1];
 
       if (first === undefined || second === undefined) {
-        throw new Error("Invalid Gelis afterHandle plan");
+        throw new Error("Invalid Gelis afterHandle pair plan");
       }
 
       return (context, result) => runAfterPair(first, second, context, result);
+    }
+
+    case 3: {
+      const first = hooks[0];
+      const second = hooks[1];
+      const third = hooks[2];
+
+      if (first === undefined || second === undefined || third === undefined) {
+        throw new Error("Invalid Gelis afterHandle triple plan");
+      }
+
+      return (context, result) =>
+        runAfterTriple(first, second, third, context, result);
     }
 
     default:
@@ -68,9 +91,7 @@ export function compileAfterHandle(
 
 function runBeforePair(
   first: RuntimeBeforeHandle,
-
   second: RuntimeBeforeHandle,
-
   context: RuntimeRouteContext,
 ): unknown | PromiseLike<unknown> {
   const firstResult = first(context);
@@ -92,11 +113,50 @@ function runBeforePair(
   return second(context);
 }
 
+function runBeforeTriple(
+  first: RuntimeBeforeHandle,
+  second: RuntimeBeforeHandle,
+  third: RuntimeBeforeHandle,
+  context: RuntimeRouteContext,
+): unknown | PromiseLike<unknown> {
+  const firstResult = first(context);
+
+  if (isPromiseLike(firstResult)) {
+    return Promise.resolve(firstResult).then((early) => {
+      if (early !== undefined) {
+        return early;
+      }
+
+      return runBeforePair(second, third, context);
+    });
+  }
+
+  if (firstResult !== undefined) {
+    return firstResult;
+  }
+
+  const secondResult = second(context);
+
+  if (isPromiseLike(secondResult)) {
+    return Promise.resolve(secondResult).then((early) => {
+      if (early !== undefined) {
+        return early;
+      }
+
+      return third(context);
+    });
+  }
+
+  if (secondResult !== undefined) {
+    return secondResult;
+  }
+
+  return third(context);
+}
+
 function runBeforeMany(
   hooks: readonly RuntimeBeforeHandle[],
-
   context: RuntimeRouteContext,
-
   startIndex = 0,
 ): unknown | PromiseLike<unknown> {
   for (let index = startIndex; index < hooks.length; index++) {
@@ -128,11 +188,8 @@ function runBeforeMany(
 
 function runAfterPair(
   first: RuntimeAfterHandle,
-
   second: RuntimeAfterHandle,
-
   context: RuntimeRouteContext,
-
   result: unknown,
 ): void | PromiseLike<void> {
   const firstResult = first(context, result);
@@ -144,13 +201,34 @@ function runAfterPair(
   return second(context, result);
 }
 
+function runAfterTriple(
+  first: RuntimeAfterHandle,
+  second: RuntimeAfterHandle,
+  third: RuntimeAfterHandle,
+  context: RuntimeRouteContext,
+  result: unknown,
+): void | PromiseLike<void> {
+  const firstResult = first(context, result);
+
+  if (isPromiseLike(firstResult)) {
+    return Promise.resolve(firstResult).then(() =>
+      runAfterPair(second, third, context, result),
+    );
+  }
+
+  const secondResult = second(context, result);
+
+  if (isPromiseLike(secondResult)) {
+    return Promise.resolve(secondResult).then(() => third(context, result));
+  }
+
+  return third(context, result);
+}
+
 function runAfterMany(
   hooks: readonly RuntimeAfterHandle[],
-
   context: RuntimeRouteContext,
-
   result: unknown,
-
   startIndex = 0,
 ): void | PromiseLike<void> {
   for (let index = startIndex; index < hooks.length; index++) {
