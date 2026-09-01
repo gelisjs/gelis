@@ -2,7 +2,7 @@ import { normalizeResponse } from "./response";
 
 import type { OnRequest, OnRequestContext } from "../request";
 
-export type RuntimeFetch = (request: Request) => Response | Promise<Response>;
+import type { RuntimeFetch } from "./fetch";
 
 export function compileOnRequestFetch(
   hooks: readonly OnRequest[],

@@ -10,11 +10,13 @@ import { normalizeResponse, runtimeReply } from "./runtime/response";
 
 import { compileAfterHandle, compileBeforeHandle } from "./runtime/lifecycle";
 
-import { compileOnRequestFetch } from "./runtime/on-request";
-
 import type { OnRequest } from "./request";
 
-import type { RuntimeFetch } from "./runtime/on-request";
+import { compileApplicationFetch } from "./runtime/application";
+
+import type { RuntimeFetch } from "./runtime/fetch";
+
+import type { OnError } from "./error";
 
 import {
   RUNTIME_INPUT_BODY,
@@ -90,10 +92,42 @@ interface AppRuntimeState {
   onRequestHooks: OnRequest[] | undefined;
 
   routedFetch: RuntimeFetch | undefined;
+
+  onErrorHooks: OnError[] | undefined;
 }
 
 export class Gelis extends RouteBuilder<""> {
   readonly #state: AppRuntimeState;
+
+  #recompileApplicationFetch(): void {
+    const state = this.#state;
+
+    let routedFetch = state.routedFetch;
+
+    /*
+     * Capture the original routed fetch exactly
+     * once, before any app-level wrapper exists.
+     */
+    if (routedFetch === undefined) {
+      routedFetch = this.fetch.bind(this);
+
+      state.routedFetch = routedFetch;
+    }
+
+    const compiledFetch = compileApplicationFetch(
+      routedFetch,
+      state.onRequestHooks,
+      state.onErrorHooks,
+    );
+
+    Object.defineProperty(this, "fetch", {
+      configurable: true,
+
+      writable: true,
+
+      value: compiledFetch,
+    });
+  }
 
   constructor() {
     const router = new Router();
@@ -110,6 +144,8 @@ export class Gelis extends RouteBuilder<""> {
       onRequestHooks: undefined,
 
       routedFetch: undefined,
+
+      onErrorHooks: undefined,
     };
 
     super(
@@ -126,31 +162,31 @@ export class Gelis extends RouteBuilder<""> {
   onRequest(hook: OnRequest): this {
     const state = this.#state;
 
-    let hooks = state.onRequestHooks;
+    const hooks = state.onRequestHooks;
 
     if (hooks === undefined) {
-      hooks = [hook];
-
-      state.onRequestHooks = hooks;
-
-      state.routedFetch = this.fetch.bind(this);
+      state.onRequestHooks = [hook];
     } else {
       hooks.push(hook);
     }
 
-    const routedFetch = state.routedFetch;
+    this.#recompileApplicationFetch();
 
-    if (routedFetch === undefined) {
-      throw new Error("Missing Gelis routed fetch");
+    return this;
+  }
+
+  onError(hook: OnError): this {
+    const state = this.#state;
+
+    const hooks = state.onErrorHooks;
+
+    if (hooks === undefined) {
+      state.onErrorHooks = [hook];
+    } else {
+      hooks.push(hook);
     }
 
-    Object.defineProperty(this, "fetch", {
-      configurable: true,
-
-      writable: true,
-
-      value: compileOnRequestFetch(hooks, routedFetch),
-    });
+    this.#recompileApplicationFetch();
 
     return this;
   }
