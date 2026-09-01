@@ -8,12 +8,14 @@ This directory records accepted architectural decisions, reproducible benchmark 
 - [`architecture/api-surface-v0.1.md`](architecture/api-surface-v0.1.md)
 - [`architecture/runtime-v0.1.md`](architecture/runtime-v0.1.md)
 - [`architecture/validation-v0.1.md`](architecture/validation-v0.1.md)
+- [`architecture/on-request-v0.1.md`](architecture/on-request-v0.1.md)
 
 ## Benchmarks
 
 - [`benchmarks/type-system-baseline-v0.1.md`](benchmarks/type-system-baseline-v0.1.md)
 - [`benchmarks/runtime-baseline-v0.1.md`](benchmarks/runtime-baseline-v0.1.md)
 - [`benchmarks/http-comparison-baseline-v0.1.md`](benchmarks/http-comparison-baseline-v0.1.md)
+- [`benchmarks/on-request-v0.1.md`](benchmarks/on-request-v0.1.md)
 
 ## Development
 
