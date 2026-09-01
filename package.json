@@ -36,7 +36,8 @@
     "bench:http:lifecycle": "bun bench/http/lifecycle/run.mjs",
     "bench:runtime:lifecycle:global": "bun bench/runtime/global-lifecycle.mjs",
     "bench:http:lifecycle:global": "bun bench/http/global-lifecycle/run.mjs",
-    "bench:runtime:on-request": "bun bench/runtime/on-request.mjs"
+    "bench:runtime:on-request": "bun bench/runtime/on-request.mjs",
+    "bench:runtime:on-request:isolated": "bun bench/runtime/on-request-isolated.mjs"
   },
   "devDependencies": {
     "@hono/standard-validator": "^0.4.0",
