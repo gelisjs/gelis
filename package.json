@@ -27,6 +27,7 @@
     "bench:runtime": "bun bench/runtime/run.mjs",
     "bench:runtime:components": "bun bench/runtime/components.mjs",
     "bench:runtime:router": "bun bench/runtime/router-components.mjs",
+    "bench:runtime:lifecycle": "bun bench/runtime/lifecycle.mjs",
     "bench:http:autocannon": "bun bench/http/run.mjs",
     "bench:http": "bun bench/http/run-oha.mjs",
     "typecheck:bun-adapter": "tsc -p prototype/bun/tsconfig.json --noEmit",
