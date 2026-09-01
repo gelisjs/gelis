@@ -98,6 +98,38 @@ const benchmarkCases = [
   },
 ];
 
+const expectedResponses = {
+  plain: {
+    status: 200,
+    body: "ok",
+  },
+
+  "on-error-unused": {
+    status: 200,
+    body: "ok",
+  },
+
+  "handler-error-sync": {
+    status: 200,
+    body: "handled",
+  },
+
+  "handler-error-async": {
+    status: 200,
+    body: "handled",
+  },
+
+  "async-on-error": {
+    status: 200,
+    body: "handled",
+  },
+
+  "request-phase-error": {
+    status: 200,
+    body: "handled",
+  },
+};
+
 const requestedCases = readListArgument("--cases");
 
 const selectedCases =
@@ -184,6 +216,8 @@ for (let caseIndex = 0; caseIndex < selectedCases.length; caseIndex++) {
 
       try {
         await waitUntilReady(benchmarkCase);
+
+        await semanticPreflight(framework, benchmarkCase);
 
         await prewarmRoutes(benchmarkCase);
 
@@ -371,30 +405,6 @@ function startServer(framework, benchmarkCase) {
       stderr: "pipe",
     },
   );
-}
-
-async function waitUntilReady(benchmarkCase) {
-  const query = "";
-
-  const url = `http://127.0.0.1:${PORT}/r/0${query}`;
-
-  const deadline = Date.now() + 20_000;
-
-  while (Date.now() < deadline) {
-    try {
-      const response = await fetch(url);
-
-      if (response.ok) {
-        return;
-      }
-    } catch {
-      // server not ready
-    }
-
-    await Bun.sleep(25);
-  }
-
-  throw new Error(`Server did not become ready for ${benchmarkCase.name}`);
 }
 
 async function prewarmRoutes(benchmarkCase) {
@@ -660,4 +670,28 @@ async function getOhaVersion() {
   await process.exited;
 
   return stdout.trim();
+}
+
+async function semanticPreflight(framework, benchmarkCase) {
+  const expected = expectedResponses[benchmarkCase.name];
+
+  if (!expected) {
+    throw new Error(`Missing expected response for ${benchmarkCase.name}`);
+  }
+
+  const url = `http://127.0.0.1:${PORT}/r/0`;
+
+  const response = await fetch(url);
+
+  const body = await response.text();
+
+  if (response.status !== expected.status || body !== expected.body) {
+    throw new Error(
+      [
+        `${framework.name} | ${benchmarkCase.name}: semantic preflight failed`,
+        `expected: HTTP ${expected.status} body ${JSON.stringify(expected.body)}`,
+        `received: HTTP ${response.status} body ${JSON.stringify(body)}`,
+      ].join("\n"),
+    );
+  }
 }
