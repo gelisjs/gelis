@@ -74,6 +74,14 @@ const benchmarkCases = [
     mode: "async",
   },
   {
+    name: "two-on-error-unused-async-handler",
+    mode: "async",
+  },
+  {
+    name: "three-on-error-unused-async-handler",
+    mode: "async",
+  },
+  {
     name: "async-handler-error-handled",
     mode: "async",
   },
@@ -238,7 +246,10 @@ function buildApp(scenario: OnErrorCaseName): Gelis {
         continue;
 
       case "plain-async-handler":
+      case "plain-async-handler":
       case "on-error-unused-async-handler":
+      case "two-on-error-unused-async-handler":
+      case "three-on-error-unused-async-handler":
         app.get(path, () => Promise.resolve(OK_RESPONSE));
         continue;
 
@@ -271,11 +282,14 @@ function configureApplicationHooks(
       return;
 
     case "two-on-error-unused-sync":
+    case "two-on-error-unused-async-handler":
       app.onError(HANDLE_ERROR).onError(HANDLE_ERROR);
       return;
 
     case "three-on-error-unused-sync":
+    case "three-on-error-unused-async-handler":
       app.onError(HANDLE_ERROR).onError(HANDLE_ERROR).onError(HANDLE_ERROR);
+
       return;
 
     case "handler-error-unhandled-sync":
@@ -426,8 +440,15 @@ function createComparisons(rows: RuntimeResultRow[]): RuntimeComparisonRow[] {
     ["on-error-unused-sync", "plain-sync"],
     ["two-on-error-unused-sync", "on-error-unused-sync"],
     ["three-on-error-unused-sync", "two-on-error-unused-sync"],
+
     ["handler-error-async-on-error", "handler-error-handled-sync"],
+
     ["on-error-unused-async-handler", "plain-async-handler"],
+    ["two-on-error-unused-async-handler", "on-error-unused-async-handler"],
+    [
+      "three-on-error-unused-async-handler",
+      "two-on-error-unused-async-handler",
+    ],
   ];
 
   const comparisons: RuntimeComparisonRow[] = [];
