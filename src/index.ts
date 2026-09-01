@@ -31,3 +31,5 @@ export type {
 export type { InferPathParams } from "./types/path";
 
 export type { OnRequest, OnRequestContext } from "./request";
+
+export type { OnError, OnErrorContext } from "./error";
