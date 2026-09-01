@@ -480,37 +480,56 @@ async function runOha(urlFile, connections, seconds) {
 }
 
 function parseOha(json) {
-  const summary = json.summary;
+  const requestsPerSecond =
+    json.metrics?.requests_per_sec ?? json.summary?.requestsPerSec;
 
-  const success = json.statusCodeDistribution ?? {};
+  if (typeof requestsPerSecond !== "number") {
+    throw new Error("Unable to read requests/sec from oha output");
+  }
 
-  const total =
-    summary.successRate === undefined
-      ? Object.values(success).reduce((sum, count) => sum + count, 0)
-      : undefined;
+  const successRate = json.metrics?.success_rate ?? json.summary?.successRate;
 
-  const successful = Object.entries(success).reduce((sum, [status, count]) => {
-    const code = Number(status);
-
-    return sum + (code >= 200 && code < 400 ? count : 0);
-  }, 0);
-
-  const successRate =
-    summary.successRate ?? (total === 0 ? 0 : successful / total);
+  if (typeof successRate !== "number") {
+    throw new Error("Unable to read success rate from oha output");
+  }
 
   return {
-    requestsPerSecond: summary.requestsPerSec,
+    requestsPerSecond,
 
     successRate,
 
     latency: {
-      p50: secondsToMilliseconds(summary.latencyPercentiles.p50),
+      p50: getLatencyPercentile(json, "p50"),
 
-      p95: secondsToMilliseconds(summary.latencyPercentiles.p95),
+      p95: getLatencyPercentile(json, "p95"),
 
-      p99: secondsToMilliseconds(summary.latencyPercentiles.p99),
+      p99: getLatencyPercentile(json, "p99"),
     },
   };
+}
+
+function getLatencyPercentile(json, percentile) {
+  /*
+   * Newer oha output exposes CI-friendly
+   * latency metrics directly in milliseconds.
+   */
+  const metric = json.metrics?.latency_ms?.[percentile];
+
+  if (typeof metric === "number") {
+    return metric;
+  }
+
+  /*
+   * Legacy/current standard JSON field is
+   * top-level and expressed in seconds.
+   */
+  const legacy = json.latencyPercentiles?.[percentile];
+
+  if (typeof legacy === "number") {
+    return legacy * 1000;
+  }
+
+  throw new Error(`Unable to read ${percentile} latency from oha output`);
 }
 
 function aggregate(framework, caseName, samples) {
@@ -613,10 +632,6 @@ function coefficientOfVariation(values) {
     values.reduce((sum, value) => sum + (value - mean) ** 2, 0) / values.length;
 
   return Math.sqrt(variance) / mean;
-}
-
-function secondsToMilliseconds(seconds) {
-  return seconds * 1000;
 }
 
 function round(value, digits) {
