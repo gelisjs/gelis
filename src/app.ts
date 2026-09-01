@@ -8,6 +8,8 @@ import { Router } from "./runtime/router";
 
 import { normalizeResponse, runtimeReply } from "./runtime/response";
 
+import { compileAfterHandle, compileBeforeHandle } from "./runtime/lifecycle";
+
 import {
   RUNTIME_INPUT_BODY,
   RUNTIME_INPUT_QUERY,
@@ -33,9 +35,13 @@ import {
 
 import type { ModuleRef, ModuleRoutes } from "./module";
 
+import type { GlobalAfterHandle, GlobalBeforeHandle } from "./route";
+
 import type { RuntimeInputPlan } from "./runtime/input";
 
 import type {
+  RuntimeAfterHandle,
+  RuntimeBeforeHandle,
   RuntimeRouteContext,
   RuntimeRouteHandler,
   RuntimeRouteRecord,
@@ -53,21 +59,70 @@ type RuntimeRouteInvoker = (
   body: unknown,
 ) => Response | Promise<Response>;
 
+interface AppRuntimeRouteEntry {
+  readonly route: RuntimeRouteRecord;
+
+  /*
+   * Keep original route-local hooks separate
+   * from the compiled/effective hooks stored
+   * on the runtime route.
+   */
+  readonly localBeforeHandle: RuntimeBeforeHandle | undefined;
+
+  readonly localAfterHandle: RuntimeAfterHandle | undefined;
+}
+
+interface AppRuntimeState {
+  readonly router: Router;
+
+  readonly routes: AppRuntimeRouteEntry[];
+
+  readonly globalBeforeHooks: RuntimeBeforeHandle[];
+
+  readonly globalAfterHooks: RuntimeAfterHandle[];
+}
+
 export class Gelis extends RouteBuilder<""> {
-  readonly #router: Router;
+  readonly #state: AppRuntimeState;
 
   constructor() {
     const router = new Router();
+
+    const state: AppRuntimeState = {
+      router,
+
+      routes: [],
+
+      globalBeforeHooks: [],
+
+      globalAfterHooks: [],
+    };
 
     super(
       "",
 
       (route) => {
-        router.register(route);
+        registerAppRuntimeRoute(state, route);
       },
     );
 
-    this.#router = router;
+    this.#state = state;
+  }
+
+  onBeforeHandle(hook: GlobalBeforeHandle): this {
+    this.#state.globalBeforeHooks.push(hook as RuntimeBeforeHandle);
+
+    recompileAppLifecycle(this.#state);
+
+    return this;
+  }
+
+  onAfterHandle(hook: GlobalAfterHandle): this {
+    this.#state.globalAfterHooks.push(hook as RuntimeAfterHandle);
+
+    recompileAppLifecycle(this.#state);
+
+    return this;
   }
 
   mount<const Prefix extends string, const Routes extends ModuleRoutes>(
@@ -75,15 +130,27 @@ export class Gelis extends RouteBuilder<""> {
   ): void {
     const routes = getModuleRuntimeRoutes(module);
 
-    for (const route of routes) {
-      this.#router.register(route);
+    for (const template of routes) {
+      /*
+       * Modules are templates shared between
+       * applications.
+       *
+       * Never compile application-global
+       * lifecycle directly into the module's
+       * original runtime record.
+       */
+      const route: RuntimeRouteRecord = {
+        ...template,
+      };
+
+      registerAppRuntimeRoute(this.#state, route);
     }
   }
 
   fetch(request: Request): Response | Promise<Response> {
     const pathname = pathnameFromUrl(request.url);
 
-    const matched = this.#router.match(request.method, pathname);
+    const matched = this.#state.router.match(request.method, pathname);
 
     if (!matched) {
       return new Response(
@@ -100,9 +167,10 @@ export class Gelis extends RouteBuilder<""> {
     /*
      * Critical fast path.
      *
-     * Plain routes pay one execution-plan
-     * comparison and then invoke the handler
-     * directly.
+     * Applications/routes with no validation
+     * and no effective lifecycle hooks retain
+     * one route-plan comparison followed by
+     * direct handler invocation.
      */
     if (route.flags === RUNTIME_ROUTE_PLAIN) {
       const result = route.handler({
@@ -198,6 +266,82 @@ export class Gelis extends RouteBuilder<""> {
         throw new Error("Invalid Gelis runtime route flags");
     }
   }
+}
+
+function registerAppRuntimeRoute(
+  state: AppRuntimeState,
+
+  route: RuntimeRouteRecord,
+): void {
+  /*
+   * RouteBuilder gives us route-local lifecycle.
+   * Save it before replacing route.before/after
+   * with effective compiled plans.
+   */
+  const entry: AppRuntimeRouteEntry = {
+    route,
+
+    localBeforeHandle: route.beforeHandle,
+
+    localAfterHandle: route.afterHandle,
+  };
+
+  applyLifecyclePlan(state, entry);
+
+  /*
+   * Register before adding the metadata entry.
+   * If the router rejects a duplicate route,
+   * application lifecycle state stays clean.
+   */
+  state.router.register(route);
+
+  state.routes.push(entry);
+}
+
+function recompileAppLifecycle(state: AppRuntimeState): void {
+  for (const entry of state.routes) {
+    applyLifecyclePlan(state, entry);
+  }
+}
+
+function applyLifecyclePlan(
+  state: AppRuntimeState,
+
+  entry: AppRuntimeRouteEntry,
+): void {
+  const route = entry.route;
+
+  const beforeHandle = compileBeforeHandle(
+    state.globalBeforeHooks,
+
+    entry.localBeforeHandle,
+  );
+
+  const afterHandle = compileAfterHandle(
+    state.globalAfterHooks,
+
+    entry.localAfterHandle,
+  );
+
+  route.beforeHandle = beforeHandle;
+
+  route.afterHandle = afterHandle;
+
+  let flags = 0;
+
+  if (route.input !== undefined) {
+    flags |= RUNTIME_ROUTE_INPUT;
+  }
+
+  if (beforeHandle !== undefined) {
+    flags |= RUNTIME_ROUTE_BEFORE_HANDLE;
+  }
+
+  if (afterHandle !== undefined) {
+    flags |= RUNTIME_ROUTE_AFTER_HANDLE;
+  }
+
+  route.flags = flags;
 }
 
 function runInputPlan(
