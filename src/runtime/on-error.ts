@@ -33,6 +33,10 @@ export function compileOnErrorFetch(
           return runSingleErrorHook(hook, request, error);
         }
 
+        /*
+         * RuntimeFetch is an internal Gelis contract:
+         * Response | Promise<Response>.
+         */
         if (result instanceof Promise) {
           return result.catch((error) =>
             runSingleErrorHook(hook, request, error),
@@ -51,33 +55,36 @@ export function compileOnErrorFetch(
         throw new Error("Invalid Gelis onError pair plan");
       }
 
-      return compileErrorBoundary(
-        innerFetch,
-        compileManyErrorHandler([first, second]),
-      );
-    }
+      /*
+       * Keep the successful request boundary independent
+       * from the cold error-execution plan.
+       *
+       * This avoids the fixed generic-plan penalty for the
+       * common two-handler configuration.
+       */
+      const compiledHooks: readonly OnError[] = [first, second];
 
-    case 3: {
-      const first = hooks[0];
-      const second = hooks[1];
-      const third = hooks[2];
+      const handleError: RuntimeErrorHandler = (request, error) =>
+        runErrorHooks(
+          compiledHooks,
+          {
+            request,
+            error,
+          },
+          error,
+          0,
+        );
 
-      if (first === undefined || second === undefined || third === undefined) {
-        throw new Error("Invalid Gelis onError triple plan");
-      }
-
-      return compileErrorBoundary(
-        innerFetch,
-        compileManyErrorHandler([first, second, third]),
-      );
+      return compileErrorBoundary(innerFetch, handleError);
     }
 
     default: {
       /*
        * Configuration-time snapshot.
        *
-       * Error handlers are intentionally
-       * not merged or copied per request.
+       * Three or more handlers use the generic error plan.
+       * Specialized triple plans did not improve the
+       * successful request path on Bun/JSC.
        */
       const compiledHooks = [...hooks];
 
@@ -118,21 +125,6 @@ export function compileOnErrorFetch(
   }
 }
 
-function compileManyErrorHandler(
-  hooks: readonly OnError[],
-): RuntimeErrorHandler {
-  return (request, error) =>
-    runErrorHooks(
-      hooks,
-      {
-        request,
-        error,
-      },
-      error,
-      0,
-    );
-}
-
 function compileErrorBoundary(
   innerFetch: RuntimeFetch,
   handleError: RuntimeErrorHandler,
@@ -164,6 +156,10 @@ function runSingleErrorHook(
     error,
   });
 
+  /*
+   * Response is the common synchronous handled-error path.
+   * normalizeResponse() would perform the same check first.
+   */
   if (result instanceof Response) {
     return result;
   }
@@ -199,11 +195,11 @@ function runErrorHooks(
     }
 
     /*
-     * Deliberately do not wrap hook execution
-     * in another error boundary.
+     * Deliberately do not wrap hook execution in another
+     * error boundary.
      *
-     * If an onError handler itself throws,
-     * that new error must escape immediately.
+     * An error thrown by onError itself must escape
+     * immediately and must not recursively enter onError.
      */
     const result = hook(context);
 
