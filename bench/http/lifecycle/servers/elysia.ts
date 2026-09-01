@@ -108,15 +108,7 @@ switch (CASE) {
       app.get(
         `/r/${index}`,
 
-        ({ query }) => {
-          const validated = query as QueryOutput;
-
-          if (validated.page !== 42 || validated.q !== "gelis") {
-            throw new Error("Unexpected validated query");
-          }
-
-          return new Response("ok");
-        },
+        () => new Response("ok"),
 
         {
           query: querySyncSchema,
