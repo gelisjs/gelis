@@ -58,13 +58,21 @@ export interface RuntimeRouteRecord {
 
   readonly handler: RuntimeRouteHandler;
 
-  readonly flags: number;
+  /*
+   * Lifecycle execution fields are mutable
+   * deliberately.
+   *
+   * Gelis recompiles effective lifecycle plans
+   * at configuration time when global hooks
+   * are added.
+   */
+  flags: number;
 
   readonly input: RuntimeInputPlan | undefined;
 
-  readonly beforeHandle: RuntimeBeforeHandle | undefined;
+  beforeHandle: RuntimeBeforeHandle | undefined;
 
-  readonly afterHandle: RuntimeAfterHandle | undefined;
+  afterHandle: RuntimeAfterHandle | undefined;
 
   readonly responses: ResponseSchemaMap | undefined;
 }
