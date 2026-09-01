@@ -407,8 +407,69 @@ function startServer(framework, benchmarkCase) {
   );
 }
 
+async function waitUntilReady(benchmarkCase) {
+  const url = `http://127.0.0.1:${PORT}/r/0`;
+
+  const deadline = Date.now() + 20_000;
+
+  let lastError;
+
+  while (Date.now() < deadline) {
+    try {
+      const response = await fetch(url);
+
+      /*
+       * Any HTTP response proves that the
+       * server is reachable.
+       *
+       * Scenario correctness is validated
+       * separately by semanticPreflight().
+       */
+      await response.arrayBuffer();
+
+      return;
+    } catch (error) {
+      lastError = error;
+    }
+
+    await Bun.sleep(25);
+  }
+
+  throw new Error(`Server did not become reachable for ${benchmarkCase.name}`, {
+    cause: lastError,
+  });
+}
+
+async function semanticPreflight(framework, benchmarkCase) {
+  const expected = expectedResponses[benchmarkCase.name];
+
+  if (!expected) {
+    throw new Error(`Missing expected response for ${benchmarkCase.name}`);
+  }
+
+  const url = `http://127.0.0.1:${PORT}/r/0`;
+
+  const response = await fetch(url);
+
+  const body = await response.text();
+
+  if (response.status !== expected.status || body !== expected.body) {
+    throw new Error(
+      [
+        `${framework.name} | ${benchmarkCase.name}: semantic preflight failed`,
+        `expected: HTTP ${expected.status} body ${JSON.stringify(expected.body)}`,
+        `received: HTTP ${response.status} body ${JSON.stringify(body)}`,
+      ].join("\n"),
+    );
+  }
+}
+
 async function prewarmRoutes(benchmarkCase) {
-  const query = "";
+  const expected = expectedResponses[benchmarkCase.name];
+
+  if (!expected) {
+    throw new Error(`Missing expected response for ${benchmarkCase.name}`);
+  }
 
   const BATCH = 100;
 
@@ -416,14 +477,20 @@ async function prewarmRoutes(benchmarkCase) {
     const requests = [];
 
     for (let index = start; index < Math.min(start + BATCH, ROUTES); index++) {
-      requests.push(fetch(`http://127.0.0.1:${PORT}/r/${index}${query}`));
+      requests.push(fetch(`http://127.0.0.1:${PORT}/r/${index}`));
     }
 
     const responses = await Promise.all(requests);
 
     for (const response of responses) {
-      if (!response.ok) {
-        throw new Error(`Prewarm failed with HTTP ${response.status}`);
+      if (response.status !== expected.status) {
+        throw new Error(
+          [
+            `Prewarm failed for ${benchmarkCase.name}`,
+            `expected HTTP ${expected.status}`,
+            `received HTTP ${response.status}`,
+          ].join(": "),
+        );
       }
 
       await response.arrayBuffer();
