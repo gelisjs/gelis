@@ -4,6 +4,11 @@ import type { RuntimeFetch } from "./fetch";
 
 import { normalizeResponse } from "./response";
 
+type RuntimeErrorHandler = (
+  request: Request,
+  error: unknown,
+) => Response | Promise<Response>;
+
 export function compileOnErrorFetch(
   hooks: readonly OnError[],
   innerFetch: RuntimeFetch,
@@ -46,47 +51,10 @@ export function compileOnErrorFetch(
         throw new Error("Invalid Gelis onError pair plan");
       }
 
-      /*
-       * Snapshot once at compilation time.
-       *
-       * Successful requests must not pay the generic
-       * PromiseLike boundary used by the many-hook plan.
-       */
-      const compiledHooks: readonly OnError[] = [first, second];
-
-      return (request) => {
-        let result: Response | Promise<Response>;
-
-        try {
-          result = innerFetch(request);
-        } catch (error) {
-          return runErrorHooks(
-            compiledHooks,
-            {
-              request,
-              error,
-            },
-            error,
-            0,
-          );
-        }
-
-        if (result instanceof Promise) {
-          return result.catch((error) =>
-            runErrorHooks(
-              compiledHooks,
-              {
-                request,
-                error,
-              },
-              error,
-              0,
-            ),
-          );
-        }
-
-        return result;
-      };
+      return compileErrorBoundary(
+        innerFetch,
+        compileManyErrorHandler([first, second]),
+      );
     }
 
     case 3: {
@@ -98,41 +66,10 @@ export function compileOnErrorFetch(
         throw new Error("Invalid Gelis onError triple plan");
       }
 
-      const compiledHooks: readonly OnError[] = [first, second, third];
-
-      return (request) => {
-        let result: Response | Promise<Response>;
-
-        try {
-          result = innerFetch(request);
-        } catch (error) {
-          return runErrorHooks(
-            compiledHooks,
-            {
-              request,
-              error,
-            },
-            error,
-            0,
-          );
-        }
-
-        if (result instanceof Promise) {
-          return result.catch((error) =>
-            runErrorHooks(
-              compiledHooks,
-              {
-                request,
-                error,
-              },
-              error,
-              0,
-            ),
-          );
-        }
-
-        return result;
-      };
+      return compileErrorBoundary(
+        innerFetch,
+        compileManyErrorHandler([first, second, third]),
+      );
     }
 
     default: {
@@ -179,6 +116,42 @@ export function compileOnErrorFetch(
       };
     }
   }
+}
+
+function compileManyErrorHandler(
+  hooks: readonly OnError[],
+): RuntimeErrorHandler {
+  return (request, error) =>
+    runErrorHooks(
+      hooks,
+      {
+        request,
+        error,
+      },
+      error,
+      0,
+    );
+}
+
+function compileErrorBoundary(
+  innerFetch: RuntimeFetch,
+  handleError: RuntimeErrorHandler,
+): RuntimeFetch {
+  return (request) => {
+    let result: Response | Promise<Response>;
+
+    try {
+      result = innerFetch(request);
+    } catch (error) {
+      return handleError(request, error);
+    }
+
+    if (result instanceof Promise) {
+      return result.catch((error) => handleError(request, error));
+    }
+
+    return result;
+  };
 }
 
 function runSingleErrorHook(
