@@ -16,20 +16,6 @@ function phaseWork(): void {
   errorSink = (errorSink + 1) | 0;
 }
 
-function syncError(): Response {
-  phaseWork();
-
-  return new Response("handled");
-}
-
-async function asyncError(): Promise<Response> {
-  await Promise.resolve();
-
-  phaseWork();
-
-  return new Response("handled");
-}
-
 function requestError(): never {
   phaseWork();
 
@@ -47,40 +33,77 @@ switch (CASE) {
     break;
 
   case "on-error-unused":
-    /*
-     * Elysia lifecycle scoping requires
-     * onError to be registered before
-     * routes it should affect.
-     */
-    app.onError(syncError);
+    app.onError(({ set }) => {
+      set.status = 200;
+
+      phaseWork();
+
+      return new Response("handled", {
+        status: 200,
+      });
+    });
 
     registerPlainRoutes();
 
     break;
 
   case "handler-error-sync":
-    app.onError(syncError);
+    app.onError(({ set }) => {
+      set.status = 200;
+
+      phaseWork();
+
+      return new Response("handled", {
+        status: 200,
+      });
+    });
 
     registerSyncThrowingRoutes();
 
     break;
 
   case "handler-error-async":
-    app.onError(syncError);
+    app.onError(({ set }) => {
+      set.status = 200;
+
+      phaseWork();
+
+      return new Response("handled", {
+        status: 200,
+      });
+    });
 
     registerAsyncThrowingRoutes();
 
     break;
 
   case "async-on-error":
-    app.onError(asyncError);
+    app.onError(async ({ set }) => {
+      set.status = 200;
+
+      await Promise.resolve();
+
+      phaseWork();
+
+      return new Response("handled", {
+        status: 200,
+      });
+    });
 
     registerSyncThrowingRoutes();
 
     break;
 
   case "request-phase-error":
-    app.onError(syncError);
+    app.onError(({ set }) => {
+      set.status = 200;
+
+      phaseWork();
+
+      return new Response("handled", {
+        status: 200,
+      });
+    });
 
     app.onRequest(requestError);
 
