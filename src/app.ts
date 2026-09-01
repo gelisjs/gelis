@@ -10,6 +10,12 @@ import { normalizeResponse, runtimeReply } from "./runtime/response";
 
 import { compileAfterHandle, compileBeforeHandle } from "./runtime/lifecycle";
 
+import { compileOnRequest, createOnRequestFetch } from "./runtime/on-request";
+
+import type { OnRequest } from "./request";
+
+import type { RuntimeFetch } from "./runtime/on-request";
+
 import {
   RUNTIME_INPUT_BODY,
   RUNTIME_INPUT_QUERY,
@@ -73,13 +79,17 @@ interface AppRuntimeRouteEntry {
 }
 
 interface AppRuntimeState {
-  readonly router: Router;
+  router: Router;
 
-  readonly routes: AppRuntimeRouteEntry[];
+  routes: AppRuntimeRouteEntry[];
 
-  readonly globalBeforeHooks: RuntimeBeforeHandle[];
+  globalBeforeHooks: RuntimeBeforeHandle[];
 
-  readonly globalAfterHooks: RuntimeAfterHandle[];
+  globalAfterHooks: RuntimeAfterHandle[];
+
+  onRequestHooks: OnRequest[] | undefined;
+
+  routedFetch: RuntimeFetch | undefined;
 }
 
 export class Gelis extends RouteBuilder<""> {
@@ -96,6 +106,10 @@ export class Gelis extends RouteBuilder<""> {
       globalBeforeHooks: [],
 
       globalAfterHooks: [],
+
+      onRequestHooks: undefined,
+
+      routedFetch: undefined,
     };
 
     super(
@@ -107,6 +121,56 @@ export class Gelis extends RouteBuilder<""> {
     );
 
     this.#state = state;
+  }
+
+  onRequest(hook: OnRequest): this {
+    const state = this.#state;
+
+    let hooks = state.onRequestHooks;
+
+    /*
+     * Capture the untouched routed fetch only
+     * once, before this instance gets its own
+     * onRequest fetch property.
+     */
+    if (hooks === undefined) {
+      hooks = [hook];
+
+      state.onRequestHooks = hooks;
+
+      state.routedFetch = this.fetch.bind(this);
+    } else {
+      hooks.push(hook);
+    }
+
+    const routedFetch = state.routedFetch;
+
+    if (routedFetch === undefined) {
+      throw new Error("Missing Gelis routed fetch");
+    }
+
+    const plan = compileOnRequest(hooks);
+
+    if (plan === undefined) {
+      throw new Error("Missing Gelis onRequest plan");
+    }
+
+    /*
+     * Shadow the prototype fetch only for apps
+     * that actually enable onRequest.
+     *
+     * Apps without onRequest continue using the
+     * existing prototype fetch exactly as before.
+     */
+    Object.defineProperty(this, "fetch", {
+      configurable: true,
+
+      writable: true,
+
+      value: createOnRequestFetch(plan, routedFetch),
+    });
+
+    return this;
   }
 
   onBeforeHandle(hook: GlobalBeforeHandle): this {
