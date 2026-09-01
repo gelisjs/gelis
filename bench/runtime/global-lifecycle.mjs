@@ -192,15 +192,51 @@ const benchmarkCases = [
   },
 ];
 
+const requestedCases = readListArgument("--cases");
+
+const selectedCases =
+  requestedCases.length === 0
+    ? benchmarkCases
+    : requestedCases.map((name) => {
+        const benchmarkCase = benchmarkCases.find(
+          (candidate) => candidate.name === name,
+        );
+
+        if (!benchmarkCase) {
+          throw new Error(`Unknown global lifecycle benchmark case: ${name}`);
+        }
+
+        return benchmarkCase;
+      });
+
+const selectedCaseNames = selectedCases.map(
+  (benchmarkCase) => benchmarkCase.name,
+);
+
+const resultFileName =
+  requestedCases.length === 0
+    ? "latest-global-lifecycle.json"
+    : `latest-global-lifecycle-${selectedCaseNames.join("-")}.json`;
+
 mkdirSync(RESULTS_DIR, {
   recursive: true,
 });
+
+console.log(`Selected cases: ${selectedCaseNames.join(", ")}`);
+
+console.log(
+  requestedCases.length === 0
+    ? "Benchmark mode: full"
+    : "Benchmark mode: filtered",
+);
+
+console.log("");
 
 let sink;
 
 const runtimeRows = [];
 
-for (const benchmarkCase of benchmarkCases) {
+for (const benchmarkCase of selectedCases) {
   const app = buildApp(benchmarkCase.name);
 
   const query = benchmarkCase.query ? "?page=42&q=gelis" : "";
@@ -216,7 +252,8 @@ for (const benchmarkCase of benchmarkCases) {
   runtimeRows.push(await benchmarkAsyncCase(benchmarkCase.name, app, request));
 }
 
-const configurationRows = benchmarkConfiguration();
+const configurationRows =
+  requestedCases.length === 0 ? benchmarkConfiguration() : [];
 
 const comparisons = createComparisons(runtimeRows);
 
@@ -293,7 +330,7 @@ console.table(
 );
 
 writeFileSync(
-  resolve(RESULTS_DIR, "latest-global-lifecycle.json"),
+  resolve(RESULTS_DIR, resultFileName),
 
   `${JSON.stringify(
     {
@@ -310,9 +347,7 @@ writeFileSync(
   )}\n`,
 );
 
-console.log(
-  "\nRaw results: " + "bench/runtime/results/latest-global-lifecycle.json",
-);
+console.log(`\nRaw results: bench/runtime/results/${resultFileName}`);
 
 function buildApp(scenario) {
   const app = new Gelis();
@@ -665,20 +700,24 @@ function createComparisons(rows) {
     ["global-after-async", "plain-async-handler"],
   ];
 
-  return pairs.map(([scenarioName, referenceName]) => {
+  const comparisons = [];
+
+  for (const [scenarioName, referenceName] of pairs) {
     const scenario = byScenario.get(scenarioName);
 
     const reference = byScenario.get(referenceName);
 
+    /*
+     * Filtered benchmarks intentionally
+     * contain only a subset of scenarios.
+     */
     if (!scenario || !reference) {
-      throw new Error(
-        `Missing benchmark comparison: ${scenarioName} -> ${referenceName}`,
-      );
+      continue;
     }
 
     const deltaNs = scenario.nsPerOp - reference.nsPerOp;
 
-    return {
+    comparisons.push({
       scenario: scenarioName,
 
       reference: referenceName,
@@ -690,8 +729,10 @@ function createComparisons(rows) {
       deltaNs,
 
       deltaPercent: (scenario.nsPerOp / reference.nsPerOp - 1) * 100,
-    };
-  });
+    });
+  }
+
+  return comparisons;
 }
 
 function calibrateSync(operation) {
@@ -780,3 +821,19 @@ function round(value, digits) {
 }
 
 void sink;
+
+function readListArgument(name) {
+  const prefix = `${name}=`;
+
+  const argument = process.argv.find((value) => value.startsWith(prefix));
+
+  if (!argument) {
+    return [];
+  }
+
+  return argument
+    .slice(prefix.length)
+    .split(",")
+    .map((value) => value.trim())
+    .filter(Boolean);
+}
