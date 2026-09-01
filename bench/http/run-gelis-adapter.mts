@@ -1,4 +1,4 @@
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, writeFileSync } from "node:fs";
 
 import { cpus } from "node:os";
 
@@ -18,7 +18,7 @@ const PORT = 3100;
 
 const ROUTES = 5000;
 
-const SAMPLES = 7;
+const SAMPLES = 9;
 
 const CONNECTIONS = 50;
 
@@ -30,39 +30,49 @@ const DURATION = "10s";
 
 const PREWARM_BATCH_SIZE = 100;
 
-const frameworks = [
+interface AdapterVariant {
+  readonly name: "direct" | "adapter";
+  readonly file: string;
+}
+
+interface AdapterResultRow {
+  variant: AdapterVariant["name"];
+  routeKind: HttpRouteCase["routeKind"];
+  bodyKind: HttpRouteCase["bodyKind"];
+  sample: number;
+  requestsPerSecond: number;
+  p50: number;
+  p95: number;
+  p99: number;
+  successRate: number;
+}
+
+interface AdapterAggregateRow {
+  variant: AdapterVariant["name"];
+  routeKind: HttpRouteCase["routeKind"];
+  bodyKind: HttpRouteCase["bodyKind"];
+  requestsMedian: number;
+  requestsMin: number;
+  requestsMax: number;
+  requestsCv: number;
+  p50: number;
+  p95: number;
+  p99: number;
+}
+
+const variants = [
   {
-    name: "gelis",
+    name: "direct",
 
     file: resolve(HERE, "servers/gelis.ts"),
   },
 
   {
-    name: "hono",
+    name: "adapter",
 
-    file: resolve(HERE, "servers/hono.ts"),
+    file: resolve(HERE, "servers/gelis-adapter.ts"),
   },
-
-  {
-    name: "elysia",
-
-    file: resolve(HERE, "servers/elysia.ts"),
-
-    env: {
-      PRECOMPILE: "false",
-    },
-  },
-
-  {
-    name: "elysia-precompile",
-
-    file: resolve(HERE, "servers/elysia.ts"),
-
-    env: {
-      PRECOMPILE: "true",
-    },
-  },
-];
+] as const satisfies readonly AdapterVariant[];
 
 const cases = [
   {
@@ -88,7 +98,7 @@ const cases = [
 
     bodyKind: "json",
   },
-];
+] as const satisfies readonly HttpRouteCase[];
 
 mkdirSync(RESULTS_DIR, {
   recursive: true,
@@ -102,7 +112,7 @@ await ensureOha();
 
 const urlSets = generateUrlSets();
 
-const rawResults = [];
+const rawResults: AdapterResultRow[] = [];
 
 for (let caseIndex = 0; caseIndex < cases.length; caseIndex++) {
   const benchmarkCase = cases[caseIndex];
@@ -114,30 +124,27 @@ for (let caseIndex = 0; caseIndex < cases.length; caseIndex++) {
   const urlSet = urlSets[benchmarkCase.routeKind];
 
   if (!urlSet) {
-    throw new Error(`Missing URL set for ${benchmarkCase.routeKind}`);
+    throw new Error("Missing URL set");
   }
 
   for (let sample = 0; sample < SAMPLES; sample++) {
-    const order = rotate(frameworks, sample + caseIndex);
+    /*
+     * Alternate order to reduce
+     * systematic first/second-run bias.
+     */
+    const order = sample % 2 === 0 ? variants : [...variants].reverse();
 
-    for (const framework of order) {
-      const result = await runFramework(
-        framework,
-        benchmarkCase,
-        urlSet,
-        sample,
-      );
+    for (const variant of order) {
+      const result = await runVariant(variant, benchmarkCase, urlSet, sample);
 
       rawResults.push(result);
 
       console.log(
         [
-          framework.name,
+          variant.name,
           `${benchmarkCase.routeKind}-${benchmarkCase.bodyKind}`,
           `sample ${sample + 1}/${SAMPLES}`,
-          `${Math.round(result.requestsPerSecond).toLocaleString(
-            "en-US",
-          )} req/s`,
+          `${formatInteger(result.requestsPerSecond)} req/s`,
         ].join(" | "),
       );
     }
@@ -146,17 +153,13 @@ for (let caseIndex = 0; caseIndex < cases.length; caseIndex++) {
 
 const rows = aggregate(rawResults);
 
-console.log("\nGelis HTTP benchmark — oha mixed routes");
+console.log("\nGelis Bun adapter overhead benchmark");
 
 console.log(`Runtime:     bun ${Bun.version}`);
 
 console.log(`oha:         ${await getOhaVersion()}`);
 
 console.log(`CPU:         ${cpus()[0]?.model ?? "unknown"}`);
-
-console.log(`Hono:        ${packageVersion("hono")}`);
-
-console.log(`Elysia:      ${packageVersion("elysia")}`);
 
 console.log(`Routes:      ${ROUTES}`);
 
@@ -168,7 +171,7 @@ console.log("Workload:    mixed-all\n");
 
 console.table(
   rows.map((row) => ({
-    framework: row.framework,
+    variant: row.variant,
 
     case: `${row.routeKind}-${row.bodyKind}`,
 
@@ -185,16 +188,14 @@ console.table(
     "p95 ms": round(row.p95, 3),
 
     "p99 ms": round(row.p99, 3),
-
-    success: `${round(row.successRate * 100, 2)}%`,
   })),
 );
+
+printComparison(rows);
 
 const output = {
   metadata: {
     generatedAt: new Date().toISOString(),
-
-    workload: "mixed-all",
 
     bun: Bun.version,
 
@@ -208,17 +209,9 @@ const output = {
 
     connections: CONNECTIONS,
 
-    warmupConnections: WARMUP_CONNECTIONS,
-
-    warmupDuration: WARMUP_DURATION,
-
     duration: DURATION,
 
-    versions: {
-      hono: packageVersion("hono"),
-
-      elysia: packageVersion("elysia"),
-    },
+    workload: "mixed-all",
   },
 
   results: rows,
@@ -227,16 +220,16 @@ const output = {
 };
 
 writeFileSync(
-  resolve(RESULTS_DIR, "latest-oha-mixed.json"),
+  resolve(RESULTS_DIR, "latest-gelis-adapter.json"),
 
   `${JSON.stringify(output, null, 2)}\n`,
 );
 
-console.log("\nRaw results: " + "bench/http/results/latest-oha-mixed.json");
+console.log("\nRaw results: " + "bench/http/results/latest-gelis-adapter.json");
 
-function generateUrlSets() {
-  const staticUrls = [];
-  const dynamicUrls = [];
+function generateUrlSets(): Record<HttpRouteCase["routeKind"], UrlSet> {
+  const staticUrls: string[] = [];
+  const dynamicUrls: string[] = [];
 
   for (let index = 0; index < ROUTES; index++) {
     staticUrls.push(`http://127.0.0.1:${PORT}/r/${index}`);
@@ -244,13 +237,13 @@ function generateUrlSets() {
     dynamicUrls.push(`http://127.0.0.1:${PORT}/r/${index}/target-${index}`);
   }
 
-  const staticFile = resolve(GENERATED_DIR, "static-urls.txt");
+  const staticFile = resolve(GENERATED_DIR, "adapter-static-urls.txt");
 
-  const dynamicFile = resolve(GENERATED_DIR, "dynamic-urls.txt");
+  const dynamicFile = resolve(GENERATED_DIR, "adapter-dynamic-urls.txt");
 
-  writeUrlFile(staticFile, staticUrls);
+  writeFileSync(staticFile, `${staticUrls.join("\n")}\n`);
 
-  writeUrlFile(dynamicFile, dynamicUrls);
+  writeFileSync(dynamicFile, `${dynamicUrls.join("\n")}\n`);
 
   return {
     static: {
@@ -258,7 +251,7 @@ function generateUrlSets() {
 
       file: staticFile,
 
-      readinessUrl: staticUrls[0],
+      readinessUrl: firstUrl(staticUrls, "static"),
     },
 
     dynamic: {
@@ -266,25 +259,25 @@ function generateUrlSets() {
 
       file: dynamicFile,
 
-      readinessUrl: dynamicUrls[0],
+      readinessUrl: firstUrl(dynamicUrls, "dynamic"),
     },
   };
 }
 
-function writeUrlFile(path, urls) {
-  writeFileSync(path, `${urls.join("\n")}\n`);
-}
-
-async function runFramework(framework, benchmarkCase, urlSet, sample) {
+async function runVariant(
+  variant: AdapterVariant,
+  benchmarkCase: HttpRouteCase,
+  urlSet: UrlSet,
+  sample: number,
+): Promise<AdapterResultRow> {
   const server = Bun.spawn(
-    [process.execPath, framework.file],
+    [process.execPath, variant.file],
 
     {
       cwd: ROOT,
 
       env: {
         ...process.env,
-        ...framework.env,
 
         PORT: String(PORT),
 
@@ -304,19 +297,8 @@ async function runFramework(framework, benchmarkCase, urlSet, sample) {
   try {
     await waitForServer(urlSet.readinessUrl);
 
-    /*
-     * Touch every route once before measuring.
-     *
-     * This makes the comparison a steady-state
-     * routing benchmark instead of accidentally
-     * measuring first-request/JIT compilation.
-     */
     await prewarmAllRoutes(urlSet.urls);
 
-    /*
-     * Short load warmup after every route has
-     * already been exercised.
-     */
     await runOha(urlSet.file, WARMUP_DURATION, WARMUP_CONNECTIONS);
 
     const result = await runOha(urlSet.file, DURATION, CONNECTIONS);
@@ -324,11 +306,11 @@ async function runFramework(framework, benchmarkCase, urlSet, sample) {
     const successRate = getSuccessRate(result);
 
     if (successRate !== 1) {
-      throw new Error(`${framework.name} success rate: ${successRate}`);
+      throw new Error(`${variant.name} success rate: ${successRate}`);
     }
 
     return {
-      framework: framework.name,
+      variant: variant.name,
 
       routeKind: benchmarkCase.routeKind,
 
@@ -355,7 +337,7 @@ async function runFramework(framework, benchmarkCase, urlSet, sample) {
   }
 }
 
-async function prewarmAllRoutes(urls) {
+async function prewarmAllRoutes(urls: string[]): Promise<void> {
   for (let start = 0; start < urls.length; start += PREWARM_BATCH_SIZE) {
     const batch = urls.slice(start, start + PREWARM_BATCH_SIZE);
 
@@ -364,7 +346,7 @@ async function prewarmAllRoutes(urls) {
         const response = await fetch(url);
 
         if (!response.ok) {
-          throw new Error(`Prewarm failed: ${url} -> ${response.status}`);
+          throw new Error(`Prewarm failed: ${url}`);
         }
 
         await response.arrayBuffer();
@@ -373,7 +355,11 @@ async function prewarmAllRoutes(urls) {
   }
 }
 
-async function runOha(urlFile, duration, connections) {
+async function runOha(
+  urlFile: string,
+  duration: string,
+  connections: number,
+): Promise<OhaJson> {
   const child = Bun.spawn(
     [
       "oha",
@@ -415,11 +401,13 @@ async function runOha(urlFile, duration, connections) {
     throw new Error(`oha exited with ${exitCode}\n${stderr}`);
   }
 
-  return JSON.parse(stdout);
+  const json: unknown = JSON.parse(stdout);
+
+  return toOhaJson(json);
 }
 
-async function waitForServer(url) {
-  let lastError;
+async function waitForServer(url: string): Promise<void> {
+  let lastError: unknown;
 
   for (let attempt = 0; attempt < 100; attempt++) {
     try {
@@ -442,11 +430,11 @@ async function waitForServer(url) {
   });
 }
 
-function aggregate(results) {
-  const groups = new Map();
+function aggregate(results: AdapterResultRow[]): AdapterAggregateRow[] {
+  const groups = new Map<string, AdapterResultRow[]>();
 
   for (const result of results) {
-    const key = [result.framework, result.routeKind, result.bodyKind].join(":");
+    const key = [result.variant, result.routeKind, result.bodyKind].join(":");
 
     let group = groups.get(key);
 
@@ -459,7 +447,7 @@ function aggregate(results) {
     group.push(result);
   }
 
-  const rows = [];
+  const rows: AdapterAggregateRow[] = [];
 
   for (const group of groups.values()) {
     const first = group[0];
@@ -468,60 +456,91 @@ function aggregate(results) {
       continue;
     }
 
-    const requestRates = group.map((result) => result.requestsPerSecond);
+    const rates = group.map((result) => result.requestsPerSecond);
 
     rows.push({
-      framework: first.framework,
+      variant: first.variant,
 
       routeKind: first.routeKind,
 
       bodyKind: first.bodyKind,
 
-      requestsMedian: median(requestRates),
+      requestsMedian: median(rates),
 
-      requestsMin: Math.min(...requestRates),
+      requestsMin: Math.min(...rates),
 
-      requestsMax: Math.max(...requestRates),
+      requestsMax: Math.max(...rates),
 
-      requestsCv: coefficientOfVariation(requestRates),
+      requestsCv: coefficientOfVariation(rates),
 
       p50: median(group.map((result) => result.p50)),
 
       p95: median(group.map((result) => result.p95)),
 
       p99: median(group.map((result) => result.p99)),
-
-      successRate: median(group.map((result) => result.successRate)),
-
-      samples: requestRates,
     });
   }
 
   return rows;
 }
 
-function getRequestsPerSecond(result) {
+function printComparison(rows: AdapterAggregateRow[]): void {
+  console.log("\nAdapter throughput delta:");
+
+  for (const benchmarkCase of cases) {
+    const direct = rows.find(
+      (row) =>
+        row.variant === "direct" &&
+        row.routeKind === benchmarkCase.routeKind &&
+        row.bodyKind === benchmarkCase.bodyKind,
+    );
+
+    const adapter = rows.find(
+      (row) =>
+        row.variant === "adapter" &&
+        row.routeKind === benchmarkCase.routeKind &&
+        row.bodyKind === benchmarkCase.bodyKind,
+    );
+
+    if (!direct || !adapter) {
+      continue;
+    }
+
+    const delta = (adapter.requestsMedian / direct.requestsMedian - 1) * 100;
+
+    console.log(
+      `${benchmarkCase.routeKind}-${benchmarkCase.bodyKind}: ${formatSigned(
+        delta,
+      )}%`,
+    );
+  }
+}
+
+function getRequestsPerSecond(result: OhaJson): number {
   const value =
     result.metrics?.requests_per_sec ?? result.summary?.requestsPerSec;
 
   if (typeof value !== "number") {
-    throw new Error("Unable to read oha requests/sec");
+    throw new Error("Unable to read requests/sec");
   }
 
   return value;
 }
 
-function getSuccessRate(result) {
+function getSuccessRate(result: OhaJson): number {
   const value = result.metrics?.success_rate ?? result.summary?.successRate;
 
   if (typeof value !== "number") {
-    throw new Error("Unable to read oha success rate");
+    throw new Error("Unable to read success rate");
   }
 
   return value;
 }
 
-function getLatencyPercentile(result, percentile) {
+function getLatencyPercentile(
+  result: OhaJson,
+  percentile: "p50" | "p95" | "p99",
+): number {
   const metricValue = result.metrics?.latency_ms?.[percentile];
 
   if (typeof metricValue === "number") {
@@ -534,10 +553,10 @@ function getLatencyPercentile(result, percentile) {
     return legacyValue * 1000;
   }
 
-  throw new Error(`Unable to read oha ${percentile}`);
+  throw new Error(`Unable to read ${percentile}`);
 }
 
-function coefficientOfVariation(values) {
+function coefficientOfVariation(values: number[]): number {
   const average = mean(values);
 
   if (average === 0) {
@@ -558,7 +577,7 @@ function coefficientOfVariation(values) {
   return Math.sqrt(variance) / average;
 }
 
-function mean(values) {
+function mean(values: number[]): number {
   return (
     values.reduce(
       (total, value) => total + value,
@@ -568,25 +587,32 @@ function mean(values) {
   );
 }
 
-function rotate(values, offset) {
-  const index = offset % values.length;
-
-  return [...values.slice(index), ...values.slice(0, index)];
-}
-
-function median(values) {
+function median(values: number[]): number {
   const sorted = [...values].sort((a, b) => a - b);
 
   const middle = Math.floor(sorted.length / 2);
 
   if (sorted.length % 2 === 1) {
-    return sorted[middle];
+    const value = sorted[middle];
+
+    if (value === undefined) {
+      throw new Error("Cannot compute median of an empty sample set");
+    }
+
+    return value;
   }
 
-  return (sorted[middle - 1] + sorted[middle]) / 2;
+  const left = sorted[middle - 1];
+  const right = sorted[middle];
+
+  if (left === undefined || right === undefined) {
+    throw new Error("Cannot compute median of an empty sample set");
+  }
+
+  return (left + right) / 2;
 }
 
-async function ensureOha() {
+async function ensureOha(): Promise<void> {
   const child = Bun.spawn(
     ["oha", "--version"],
 
@@ -604,7 +630,7 @@ async function ensureOha() {
   }
 }
 
-async function getOhaVersion() {
+async function getOhaVersion(): Promise<string> {
   const child = Bun.spawn(
     ["oha", "--version"],
 
@@ -622,28 +648,42 @@ async function getOhaVersion() {
   return output.trim();
 }
 
-function packageVersion(name) {
-  try {
-    const path = resolve(ROOT, "node_modules", name, "package.json");
-
-    return JSON.parse(readFileSync(path, "utf8")).version;
-  } catch {
-    return "unknown";
-  }
-}
-
-function sleep(milliseconds) {
+function sleep(milliseconds: number): Promise<void> {
   return new Promise((resolvePromise) =>
     setTimeout(resolvePromise, milliseconds),
   );
 }
 
-function round(value, digits) {
+function round(value: number, digits: number): number {
   const factor = 10 ** digits;
 
   return Math.round(value * factor) / factor;
 }
 
-function formatInteger(value) {
+function formatInteger(value: number): string {
   return Math.round(value).toLocaleString("en-US");
+}
+
+function formatSigned(value: number): string {
+  const rounded = round(value, 2);
+
+  return rounded >= 0 ? `+${rounded}` : String(rounded);
+}
+
+function firstUrl(urls: string[], label: string): string {
+  const url = urls[0];
+
+  if (url === undefined) {
+    throw new Error(`No generated ${label} URLs`);
+  }
+
+  return url;
+}
+
+function toOhaJson(value: unknown): OhaJson {
+  if (value === null || typeof value !== "object") {
+    throw new Error("oha output must be a JSON object");
+  }
+
+  return value as OhaJson;
 }

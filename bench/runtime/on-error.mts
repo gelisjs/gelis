@@ -33,7 +33,7 @@ const THROW_ON_REQUEST = () => {
   throw REQUEST_ERROR;
 };
 
-const CIRCULAR_RESULT = {};
+const CIRCULAR_RESULT: Record<string, unknown> = {};
 CIRCULAR_RESULT.self = CIRCULAR_RESULT;
 
 const benchmarkCases = [
@@ -85,7 +85,11 @@ const benchmarkCases = [
     name: "normalization-error-handled",
     mode: "sync",
   },
-];
+] as const;
+
+type OnErrorCase = (typeof benchmarkCases)[number];
+
+type OnErrorCaseName = OnErrorCase["name"];
 
 const requestedCases = readListArgument("--cases");
 
@@ -127,9 +131,9 @@ console.log(
 
 console.log("");
 
-let sink;
+let sink: unknown;
 
-const runtimeRows = [];
+const runtimeRows: RuntimeResultRow[] = [];
 
 for (const benchmarkCase of selectedCases) {
   const app = buildApp(benchmarkCase.name);
@@ -154,7 +158,7 @@ for (const benchmarkCase of selectedCases) {
       break;
 
     default:
-      throw new Error(`Unknown benchmark mode: ${benchmarkCase.mode}`);
+      throw new Error("Unknown benchmark mode");
   }
 }
 
@@ -216,7 +220,7 @@ writeFileSync(
 
 console.log(`\nRaw results: bench/runtime/results/${resultFileName}`);
 
-function buildApp(scenario) {
+function buildApp(scenario: OnErrorCaseName): Gelis {
   const app = new Gelis();
 
   configureApplicationHooks(app, scenario);
@@ -253,7 +257,10 @@ function buildApp(scenario) {
   return app;
 }
 
-function configureApplicationHooks(app, scenario) {
+function configureApplicationHooks(
+  app: Gelis,
+  scenario: OnErrorCaseName,
+): void {
   switch (scenario) {
     case "on-error-unused-sync":
     case "on-error-unused-async-handler":
@@ -294,7 +301,11 @@ function configureApplicationHooks(app, scenario) {
   }
 }
 
-function benchmarkSyncCase(scenario, app, request) {
+function benchmarkSyncCase(
+  scenario: string,
+  app: Gelis,
+  request: Request,
+): RuntimeResultRow {
   const operation = () => {
     const result = app.fetch(request);
 
@@ -311,7 +322,7 @@ function benchmarkSyncCase(scenario, app, request) {
 
   const iterations = calibrateSync(operation);
 
-  const samples = [];
+  const samples: number[] = [];
 
   for (let sample = 0; sample < SAMPLES; sample++) {
     const elapsed = measureSync(operation, iterations);
@@ -331,7 +342,11 @@ function benchmarkSyncCase(scenario, app, request) {
   };
 }
 
-function benchmarkSyncThrowCase(scenario, app, request) {
+function benchmarkSyncThrowCase(
+  scenario: string,
+  app: Gelis,
+  request: Request,
+): RuntimeResultRow {
   const operation = () => {
     try {
       app.fetch(request);
@@ -349,7 +364,7 @@ function benchmarkSyncThrowCase(scenario, app, request) {
 
   const iterations = calibrateSync(operation);
 
-  const samples = [];
+  const samples: number[] = [];
 
   for (let sample = 0; sample < SAMPLES; sample++) {
     const elapsed = measureSync(operation, iterations);
@@ -369,7 +384,11 @@ function benchmarkSyncThrowCase(scenario, app, request) {
   };
 }
 
-async function benchmarkAsyncCase(scenario, app, request) {
+async function benchmarkAsyncCase(
+  scenario: string,
+  app: Gelis,
+  request: Request,
+): Promise<RuntimeResultRow> {
   const operation = async () => {
     sink = await app.fetch(request);
   };
@@ -380,7 +399,7 @@ async function benchmarkAsyncCase(scenario, app, request) {
 
   const iterations = await calibrateAsync(operation);
 
-  const samples = [];
+  const samples: number[] = [];
 
   for (let sample = 0; sample < SAMPLES; sample++) {
     const elapsed = await measureAsync(operation, iterations);
@@ -400,19 +419,18 @@ async function benchmarkAsyncCase(scenario, app, request) {
   };
 }
 
-function createComparisons(rows) {
+function createComparisons(rows: RuntimeResultRow[]): RuntimeComparisonRow[] {
   const byScenario = new Map(rows.map((row) => [row.scenario, row]));
 
-  const pairs = [
+  const pairs: Array<readonly [string, string]> = [
     ["on-error-unused-sync", "plain-sync"],
     ["two-on-error-unused-sync", "on-error-unused-sync"],
     ["three-on-error-unused-sync", "two-on-error-unused-sync"],
-    ["handler-error-handled-sync", "handler-error-unhandled-sync"],
     ["handler-error-async-on-error", "handler-error-handled-sync"],
     ["on-error-unused-async-handler", "plain-async-handler"],
   ];
 
-  const comparisons = [];
+  const comparisons: RuntimeComparisonRow[] = [];
 
   for (const [scenarioName, referenceName] of pairs) {
     const scenario = byScenario.get(scenarioName);
@@ -438,7 +456,7 @@ function createComparisons(rows) {
   return comparisons;
 }
 
-function calibrateSync(operation) {
+function calibrateSync(operation: SyncOperation): number {
   let iterations = 1000;
 
   while (true) {
@@ -455,7 +473,7 @@ function calibrateSync(operation) {
   }
 }
 
-async function calibrateAsync(operation) {
+async function calibrateAsync(operation: AsyncOperation): Promise<number> {
   let iterations = 100;
 
   while (true) {
@@ -472,7 +490,7 @@ async function calibrateAsync(operation) {
   }
 }
 
-function measureSync(operation, iterations) {
+function measureSync(operation: SyncOperation, iterations: number): number {
   const start = performance.now();
 
   for (let index = 0; index < iterations; index++) {
@@ -482,7 +500,10 @@ function measureSync(operation, iterations) {
   return performance.now() - start;
 }
 
-async function measureAsync(operation, iterations) {
+async function measureAsync(
+  operation: AsyncOperation,
+  iterations: number,
+): Promise<number> {
   const start = performance.now();
 
   for (let index = 0; index < iterations; index++) {
@@ -492,7 +513,7 @@ async function measureAsync(operation, iterations) {
   return performance.now() - start;
 }
 
-function isPromiseLike(value) {
+function isPromiseLike(value: unknown): value is PromiseLike<unknown> {
   if (
     value === null ||
     (typeof value !== "object" && typeof value !== "function")
@@ -500,28 +521,47 @@ function isPromiseLike(value) {
     return false;
   }
 
-  return typeof value.then === "function";
+  return (
+    typeof (
+      value as {
+        then?: unknown;
+      }
+    ).then === "function"
+  );
 }
 
-function median(values) {
+function median(values: number[]): number {
   const sorted = [...values].sort((a, b) => a - b);
 
   const middle = Math.floor(sorted.length / 2);
 
   if (sorted.length % 2 === 1) {
-    return sorted[middle];
+    const value = sorted[middle];
+
+    if (value === undefined) {
+      throw new Error("Cannot compute median of an empty sample set");
+    }
+
+    return value;
   }
 
-  return (sorted[middle - 1] + sorted[middle]) / 2;
+  const left = sorted[middle - 1];
+  const right = sorted[middle];
+
+  if (left === undefined || right === undefined) {
+    throw new Error("Cannot compute median of an empty sample set");
+  }
+
+  return (left + right) / 2;
 }
 
-function round(value, digits) {
+function round(value: number, digits: number): number {
   const factor = 10 ** digits;
 
   return Math.round(value * factor) / factor;
 }
 
-function readListArgument(name) {
+function readListArgument(name: string): string[] {
   const prefix = `${name}=`;
 
   const argument = process.argv.find((value) => value.startsWith(prefix));

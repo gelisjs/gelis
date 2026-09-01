@@ -12,6 +12,8 @@ import { Router } from "../../src/runtime/router.ts";
 
 import { runtimeReply } from "../../src/runtime/response.ts";
 
+import type { RuntimeRouteRecord } from "../../src/runtime/types.ts";
+
 const HERE = fileURLToPath(new URL(".", import.meta.url));
 
 const RESULTS_DIR = resolve(HERE, "results");
@@ -24,14 +26,44 @@ const SAMPLES = QUICK ? 3 : 7;
 
 const TARGET_MS = QUICK ? 40 : 80;
 
+type RouteKind = "static" | "dynamic";
+
+type ResponseKind = "raw" | "json";
+
+interface RegistrationRow {
+  kind: RouteKind;
+  routes: number;
+  milliseconds: number;
+  routesPerMs: number;
+}
+
+interface DispatchRow {
+  scenario: string;
+  routes: number;
+  nsPerOp: number;
+  opsPerSecond: number;
+}
+
+interface RuntimeMetadata {
+  generatedAt: string;
+  runtime: string;
+  platform: NodeJS.Platform;
+  arch: NodeJS.Architecture;
+  cpu: string;
+  logicalCpus: number;
+  totalMemoryMB: number;
+  samples: number;
+  sizes: number[];
+}
+
 mkdirSync(RESULTS_DIR, {
   recursive: true,
 });
 
-let sink;
+let sink: unknown;
 
-const registrationRows = [];
-const benchmarkRows = [];
+const registrationRows: RegistrationRow[] = [];
+const benchmarkRows: DispatchRow[] = [];
 
 for (const size of SIZES) {
   registrationRows.push(measureRegistration("static", size));
@@ -121,37 +153,43 @@ console.table(
 
 console.log("\nRaw results: " + "bench/runtime/results/latest.json");
 
-function buildRouter(kind, size) {
+function buildRouter(kind: RouteKind, size: number): Router {
   const router = new Router();
 
   for (let index = 0; index < size; index++) {
     const path = kind === "static" ? `/r/${index}` : `/r/${index}/:id`;
 
-    router.register({
-      method: "GET",
+    router.register(
+      {
+        method: "GET",
 
-      path,
+        path,
 
-      options: undefined,
+        options: undefined,
 
-      handler: kind === "static" ? () => index : ({ params }) => params.id,
-    });
+        handler:
+          kind === "static"
+            ? () => index
+            : ({ params }: { params: Record<string, string> }) =>
+                (params as { id: string }).id,
+      } as unknown as RuntimeRouteRecord,
+    );
   }
 
   return router;
 }
 
-function targetPath(kind, size) {
+function targetPath(kind: RouteKind, size: number): string {
   const last = size - 1;
 
   return kind === "static" ? `/r/${last}` : `/r/${last}/target`;
 }
 
-function measureRegistration(kind, size) {
+function measureRegistration(kind: RouteKind, size: number): RegistrationRow {
   // Warm up registration/JIT.
   buildRouter(kind, Math.min(size, 100));
 
-  const samples = [];
+  const samples: number[] = [];
 
   for (let sample = 0; sample < SAMPLES; sample++) {
     const start = performance.now();
@@ -175,7 +213,7 @@ function measureRegistration(kind, size) {
   };
 }
 
-function runRouterCase(kind, size) {
+function runRouterCase(kind: RouteKind, size: number): DispatchRow {
   const router = buildRouter(kind, size);
 
   const pathname = targetPath(kind, size);
@@ -190,7 +228,7 @@ function runRouterCase(kind, size) {
   );
 }
 
-function runDispatchCase(kind, size) {
+function runDispatchCase(kind: RouteKind, size: number): DispatchRow {
   const router = buildRouter(kind, size);
 
   const pathname = targetPath(kind, size);
@@ -223,7 +261,11 @@ function runDispatchCase(kind, size) {
   );
 }
 
-function buildApp(kind, responseKind, size) {
+function buildApp(
+  kind: RouteKind,
+  responseKind: ResponseKind,
+  size: number,
+): Gelis {
   const app = new Gelis();
 
   const rawResponse = new Response(null, {
@@ -261,7 +303,7 @@ function buildApp(kind, responseKind, size) {
       path,
 
       ({ params }) => ({
-        id: params.id,
+        id: (params as { id: string }).id,
 
         route: index,
       }),
@@ -271,7 +313,11 @@ function buildApp(kind, responseKind, size) {
   return app;
 }
 
-function runFetchCase(kind, responseKind, size) {
+function runFetchCase(
+  kind: RouteKind,
+  responseKind: ResponseKind,
+  size: number,
+): DispatchRow {
   const app = buildApp(kind, responseKind, size);
 
   const pathname = targetPath(kind, size);
@@ -296,12 +342,16 @@ function runFetchCase(kind, responseKind, size) {
   );
 }
 
-function benchmarkSync(scenario, routes, operation) {
+function benchmarkSync(
+  scenario: string,
+  routes: number,
+  operation: SyncOperation,
+): DispatchRow {
   warmSync(operation);
 
   const iterations = calibrateSync(operation);
 
-  const samples = [];
+  const samples: number[] = [];
 
   for (let sample = 0; sample < SAMPLES; sample++) {
     samples.push(measureSync(operation, iterations));
@@ -310,33 +360,13 @@ function benchmarkSync(scenario, routes, operation) {
   return makeResult(scenario, routes, median(samples));
 }
 
-async function benchmarkAsync(scenario, routes, operation) {
-  await warmAsync(operation);
-
-  const iterations = await calibrateAsync(operation);
-
-  const samples = [];
-
-  for (let sample = 0; sample < SAMPLES; sample++) {
-    samples.push(await measureAsync(operation, iterations));
-  }
-
-  return makeResult(scenario, routes, median(samples));
-}
-
-function warmSync(operation) {
+function warmSync(operation: SyncOperation): void {
   for (let index = 0; index < 10_000; index++) {
     operation();
   }
 }
 
-async function warmAsync(operation) {
-  for (let index = 0; index < 2_000; index++) {
-    await operation();
-  }
-}
-
-function calibrateSync(operation) {
+function calibrateSync(operation: SyncOperation): number {
   let iterations = 1000;
 
   while (true) {
@@ -350,21 +380,7 @@ function calibrateSync(operation) {
   }
 }
 
-async function calibrateAsync(operation) {
-  let iterations = 100;
-
-  while (true) {
-    const elapsed = await measureAsyncMilliseconds(operation, iterations);
-
-    if (elapsed >= 10 || iterations >= 1_000_000) {
-      return scaledIterations(iterations, elapsed);
-    }
-
-    iterations *= 2;
-  }
-}
-
-function scaledIterations(iterations, elapsed) {
+function scaledIterations(iterations: number, elapsed: number): number {
   const scaled = Math.round(
     iterations * (TARGET_MS / Math.max(elapsed, 0.001)),
   );
@@ -372,19 +388,16 @@ function scaledIterations(iterations, elapsed) {
   return Math.max(1, scaled);
 }
 
-function measureSync(operation, iterations) {
+function measureSync(operation: SyncOperation, iterations: number): number {
   const elapsed = measureSyncMilliseconds(operation, iterations);
 
   return (elapsed * 1_000_000) / iterations;
 }
 
-async function measureAsync(operation, iterations) {
-  const elapsed = await measureAsyncMilliseconds(operation, iterations);
-
-  return (elapsed * 1_000_000) / iterations;
-}
-
-function measureSyncMilliseconds(operation, iterations) {
+function measureSyncMilliseconds(
+  operation: SyncOperation,
+  iterations: number,
+): number {
   const start = performance.now();
 
   for (let index = 0; index < iterations; index++) {
@@ -394,17 +407,11 @@ function measureSyncMilliseconds(operation, iterations) {
   return performance.now() - start;
 }
 
-async function measureAsyncMilliseconds(operation, iterations) {
-  const start = performance.now();
-
-  for (let index = 0; index < iterations; index++) {
-    await operation();
-  }
-
-  return performance.now() - start;
-}
-
-function makeResult(scenario, routes, nsPerOp) {
+function makeResult(
+  scenario: string,
+  routes: number,
+  nsPerOp: number,
+): DispatchRow {
   return {
     scenario,
     routes,
@@ -415,19 +422,32 @@ function makeResult(scenario, routes, nsPerOp) {
   };
 }
 
-function median(values) {
+function median(values: number[]): number {
   const sorted = [...values].sort((a, b) => a - b);
 
   const middle = Math.floor(sorted.length / 2);
 
   if (sorted.length % 2 === 1) {
-    return sorted[middle];
+    const value = sorted[middle];
+
+    if (value === undefined) {
+      throw new Error("Cannot compute median of an empty sample set");
+    }
+
+    return value;
   }
 
-  return (sorted[middle - 1] + sorted[middle]) / 2;
+  const left = sorted[middle - 1];
+  const right = sorted[middle];
+
+  if (left === undefined || right === undefined) {
+    throw new Error("Cannot compute median of an empty sample set");
+  }
+
+  return (left + right) / 2;
 }
 
-function printMetadata(metadata) {
+function printMetadata(metadata: RuntimeMetadata): void {
   console.log("\nGelis runtime benchmark");
 
   console.log(`Runtime:     ${metadata.runtime}`);
@@ -441,7 +461,7 @@ function printMetadata(metadata) {
   console.log(`Samples:     ${metadata.samples}`);
 }
 
-function round(value, digits) {
+function round(value: number, digits: number): number {
   const factor = 10 ** digits;
 
   return Math.round(value * factor) / factor;

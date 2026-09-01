@@ -2,14 +2,42 @@ import { cpus } from "node:os";
 
 import { Router } from "../../src/runtime/router.ts";
 
+import type { RuntimeRouteRecord } from "../../src/runtime/types.ts";
+
 const SAMPLES = 7;
 const TARGET_MS = 80;
 
 const SIZES = [1, 100, 1000, 5000];
 
-let sink;
+let sink: unknown;
 
-const rows = [];
+interface ScannerDynamicRoute {
+  readonly paramNames: string[];
+}
+
+interface ScannerNode {
+  staticChildren: Map<string, ScannerNode> | undefined;
+  paramChild: ScannerNode | undefined;
+  route: ScannerDynamicRoute | undefined;
+}
+
+interface ScannerMethodTable {
+  readonly staticRoutes: Map<string, true>;
+  readonly dynamicRoot: ScannerNode;
+}
+
+interface ScannerMatch {
+  readonly params: Record<string, string>;
+}
+
+interface ScannerBenchmarkRow {
+  scenario: string;
+  routes: number;
+  nsPerOp: number;
+  opsPerSecond: number;
+}
+
+const rows: ScannerBenchmarkRow[] = [];
 
 for (const size of SIZES) {
   const current = buildCurrentRouter(size);
@@ -63,25 +91,27 @@ console.table(
   })),
 );
 
-function buildCurrentRouter(size) {
+function buildCurrentRouter(size: number): Router {
   const router = new Router();
 
   for (let index = 0; index < size; index++) {
-    router.register({
-      method: "GET",
+    router.register(
+      {
+        method: "GET",
 
-      path: `/r/${index}/:id`,
+        path: `/r/${index}/:id`,
 
-      options: undefined,
+        options: undefined,
 
-      handler: () => undefined,
-    });
+        handler: () => undefined,
+      } as unknown as RuntimeRouteRecord,
+    );
   }
 
   return router;
 }
 
-function buildScannerRouter(size) {
+function buildScannerRouter(size: number): ScannerRouter {
   const router = new ScannerRouter();
 
   for (let index = 0; index < size; index++) {
@@ -92,9 +122,9 @@ function buildScannerRouter(size) {
 }
 
 class ScannerRouter {
-  #methods = new Map();
+  #methods = new Map<string, ScannerMethodTable>();
 
-  register(method, path) {
+  register(method: string, path: string): void {
     let table = this.#methods.get(method);
 
     if (!table) {
@@ -109,7 +139,7 @@ class ScannerRouter {
 
     const segments = path === "/" ? [] : path.slice(1).split("/");
 
-    const paramNames = [];
+    const paramNames: string[] = [];
 
     let hasParams = false;
 
@@ -160,7 +190,7 @@ class ScannerRouter {
     };
   }
 
-  match(method, pathname) {
+  match(method: string, pathname: string): ScannerMatch | undefined {
     const table = this.#methods.get(method);
 
     if (!table) {
@@ -173,7 +203,7 @@ class ScannerRouter {
       };
     }
 
-    const captures = [];
+    const captures: number[] = [];
 
     const route = matchNode(table.dynamicRoot, pathname, 1, captures);
 
@@ -181,7 +211,7 @@ class ScannerRouter {
       return undefined;
     }
 
-    const params = {};
+    const params: Record<string, string> = {};
 
     for (let index = 0; index < route.paramNames.length; index++) {
       const start = captures[index * 2];
@@ -205,7 +235,7 @@ class ScannerRouter {
   }
 }
 
-function createNode() {
+function createNode(): ScannerNode {
   return {
     staticChildren: undefined,
 
@@ -215,7 +245,12 @@ function createNode() {
   };
 }
 
-function matchNode(node, pathname, start, captures) {
+function matchNode(
+  node: ScannerNode,
+  pathname: string,
+  start: number,
+  captures: number[],
+): ScannerDynamicRoute | undefined {
   if (start >= pathname.length) {
     return node.route;
   }
@@ -257,7 +292,7 @@ function matchNode(node, pathname, start, captures) {
   return undefined;
 }
 
-function decodeParam(value) {
+function decodeParam(value: string): string {
   if (!value.includes("%")) {
     return value;
   }
@@ -265,7 +300,7 @@ function decodeParam(value) {
   return decodeURIComponent(value);
 }
 
-const EMPTY_PARAMS = Object.freeze({});
+const EMPTY_PARAMS = Object.freeze({}) as Record<string, string>;
 
 function verifyScannerCorrectness() {
   const router = new ScannerRouter();
@@ -299,7 +334,11 @@ function verifyScannerCorrectness() {
   }
 }
 
-function benchmarkCase(scenario, routes, operation) {
+function benchmarkCase(
+  scenario: string,
+  routes: number,
+  operation: SyncOperation,
+): ScannerBenchmarkRow {
   for (let index = 0; index < 10_000; index++) {
     operation();
   }
@@ -322,7 +361,7 @@ function benchmarkCase(scenario, routes, operation) {
     iterations *= 2;
   }
 
-  const samples = [];
+  const samples: number[] = [];
 
   for (let sample = 0; sample < SAMPLES; sample++) {
     const elapsed = measure(operation, iterations);
@@ -342,7 +381,7 @@ function benchmarkCase(scenario, routes, operation) {
   };
 }
 
-function measure(operation, iterations) {
+function measure(operation: SyncOperation, iterations: number): number {
   const start = performance.now();
 
   for (let index = 0; index < iterations; index++) {
@@ -352,16 +391,29 @@ function measure(operation, iterations) {
   return performance.now() - start;
 }
 
-function median(values) {
+function median(values: number[]): number {
   const sorted = [...values].sort((a, b) => a - b);
 
   const middle = Math.floor(sorted.length / 2);
 
   if (sorted.length % 2 === 1) {
-    return sorted[middle];
+    const value = sorted[middle];
+
+    if (value === undefined) {
+      throw new Error("Cannot compute median of an empty sample set");
+    }
+
+    return value;
   }
 
-  return (sorted[middle - 1] + sorted[middle]) / 2;
+  const left = sorted[middle - 1];
+  const right = sorted[middle];
+
+  if (left === undefined || right === undefined) {
+    throw new Error("Cannot compute median of an empty sample set");
+  }
+
+  return (left + right) / 2;
 }
 
 void sink;

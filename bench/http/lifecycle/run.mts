@@ -18,15 +18,24 @@ const PORT = 3100;
 
 const ROUTES = 5000;
 
-const QUICK = process.argv.includes("--quick");
+const CONNECTIONS = 50;
 
-const CONNECTIONS = QUICK ? 20 : 50;
+const SAMPLES = 7;
 
-const SAMPLES = QUICK ? 1 : 7;
+const WARMUP_DURATION = "2s";
 
-const WARMUP_DURATION = QUICK ? "1s" : "2s";
+const DURATION = "10s";
 
-const DURATION = QUICK ? "2s" : "10s";
+interface LifecycleHttpFramework {
+  readonly name: string;
+  readonly file: string;
+  readonly env?: Record<string, string>;
+}
+
+interface LifecycleHttpCase {
+  readonly name: string;
+  readonly query: boolean;
+}
 
 const frameworks = [
   {
@@ -60,7 +69,7 @@ const frameworks = [
       PRECOMPILE: "true",
     },
   },
-];
+] as const satisfies readonly LifecycleHttpFramework[];
 
 const cases = [
   {
@@ -70,102 +79,96 @@ const cases = [
   },
 
   {
-    name: "global-before-sync",
+    name: "before-sync",
 
     query: false,
   },
 
   {
-    name: "global-after-sync",
+    name: "before-async",
 
     query: false,
   },
 
   {
-    name: "global-before-after-sync",
+    name: "after-sync",
 
     query: false,
   },
 
   {
-    name: "three-global-before-sync",
+    name: "before-after-sync",
 
     query: false,
   },
 
   {
-    name: "three-global-after-sync",
-
-    query: false,
-  },
-
-  {
-    name: "validation-global-before",
+    name: "validation-before",
 
     query: true,
   },
 
   {
-    name: "global-early-return",
+    name: "early-return",
 
     query: false,
   },
-];
+] as const satisfies readonly LifecycleHttpCase[];
 
 const requestedCases = readListArgument("--cases");
 
 const selectedCases =
   requestedCases.length === 0
     ? cases
-    : requestedCases.map((name) => {
-        const benchmarkCase = cases.find(
-          (candidate) => candidate.name === name,
-        );
+    : cases.filter((benchmarkCase) =>
+        requestedCases.includes(benchmarkCase.name),
+      );
 
-        if (!benchmarkCase) {
-          throw new Error(`Unknown global lifecycle HTTP case: ${name}`);
-        }
+if (
+  requestedCases.length !== 0 &&
+  selectedCases.length !== requestedCases.length
+) {
+  const knownCases = new Set<string>(
+    cases.map((benchmarkCase) => benchmarkCase.name),
+  );
 
-        return benchmarkCase;
-      });
+  const unknownCases = requestedCases.filter((name) => !knownCases.has(name));
+
+  throw new Error(
+    `Unknown lifecycle benchmark case(s): ${unknownCases.join(", ")}`,
+  );
+}
 
 const selectedCaseNames = selectedCases.map(
   (benchmarkCase) => benchmarkCase.name,
 );
 
-const resultFileName = createResultFileName();
+const resultFileName =
+  requestedCases.length === 0
+    ? "latest-lifecycle.json"
+    : `latest-lifecycle-${selectedCaseNames.join("-")}.json`;
 
-mkdirSync(
-  RESULTS_DIR,
+mkdirSync(RESULTS_DIR, {
+  recursive: true,
+});
 
-  {
-    recursive: true,
-  },
-);
-
-mkdirSync(
-  GENERATED_DIR,
-
-  {
-    recursive: true,
-  },
-);
+mkdirSync(GENERATED_DIR, {
+  recursive: true,
+});
 
 await ensureOha();
 
-console.log(`Selected cases: ${selectedCaseNames.join(", ")}`);
+console.log(`Lifecycle cases: ${selectedCaseNames.join(", ")}`);
 
 console.log(
-  QUICK
-    ? "Benchmark mode: quick"
-    : requestedCases.length === 0
-      ? "Benchmark mode: full"
-      : "Benchmark mode: filtered",
+  requestedCases.length === 0
+    ? "Benchmark mode: full"
+    : "Benchmark mode: filtered",
 );
 
 console.log("");
 
-const rawResults = [];
+const rawResults: HttpCaseResultRow[] = [];
 
 for (let caseIndex = 0; caseIndex < selectedCases.length; caseIndex++) {
   const benchmarkCase = selectedCases[caseIndex];
@@ -177,11 +180,7 @@ for (let caseIndex = 0; caseIndex < selectedCases.length; caseIndex++) {
   const urlSet = generateUrls(benchmarkCase);
 
   for (let sample = 0; sample < SAMPLES; sample++) {
-    const order = rotate(
-      frameworks,
-
-      sample + caseIndex,
-    );
+    const order = rotate(frameworks, sample + caseIndex);
 
     for (const framework of order) {
       const result = await runFramework(
@@ -196,11 +195,8 @@ for (let caseIndex = 0; caseIndex < selectedCases.length; caseIndex++) {
       console.log(
         [
           framework.name,
-
           benchmarkCase.name,
-
           `sample ${sample + 1}/${SAMPLES}`,
-
           `${formatInteger(result.requestsPerSecond)} req/s`,
         ].join(" | "),
       );
@@ -210,7 +206,7 @@ for (let caseIndex = 0; caseIndex < selectedCases.length; caseIndex++) {
 
 const rows = aggregate(rawResults);
 
-console.log("\nGelis global lifecycle HTTP benchmark");
+console.log("\nGelis lifecycle HTTP benchmark");
 
 console.log(`Runtime:     bun ${Bun.version}`);
 
@@ -229,10 +225,6 @@ console.log(`Routes:      ${ROUTES}`);
 console.log(`Connections: ${CONNECTIONS}`);
 
 console.log(`Samples:     ${SAMPLES}`);
-
-console.log(`Warmup:      ${WARMUP_DURATION}`);
-
-console.log(`Duration:    ${DURATION}`);
 
 console.log(`Cases:       ${selectedCaseNames.join(", ")}\n`);
 
@@ -278,13 +270,13 @@ const output = {
 
     samples: SAMPLES,
 
-    warmupDuration: WARMUP_DURATION,
-
     duration: DURATION,
 
-    quick: QUICK,
+    warmupDuration: WARMUP_DURATION,
 
     cases: selectedCaseNames,
+
+    filtered: requestedCases.length !== 0,
 
     versions: {
       hono: packageVersion("hono"),
@@ -308,26 +300,8 @@ writeFileSync(
 
 console.log(`\nRaw results: bench/http/results/${resultFileName}`);
 
-function createResultFileName() {
-  if (QUICK) {
-    if (requestedCases.length === 0) {
-      return "latest-global-lifecycle-quick.json";
-    }
-
-    return (
-      "latest-global-lifecycle-quick-" + `${selectedCaseNames.join("-")}.json`
-    );
-  }
-
-  if (requestedCases.length === 0) {
-    return "latest-global-lifecycle.json";
-  }
-
-  return "latest-global-lifecycle-" + `${selectedCaseNames.join("-")}.json`;
-}
-
-function generateUrls(benchmarkCase) {
-  const urls = [];
+function generateUrls(benchmarkCase: LifecycleHttpCase): UrlSet {
+  const urls: string[] = [];
 
   for (let index = 0; index < ROUTES; index++) {
     const query = benchmarkCase.query ? "?page=42&q=gelis" : "";
@@ -338,7 +312,7 @@ function generateUrls(benchmarkCase) {
   const file = resolve(
     GENERATED_DIR,
 
-    `global-lifecycle-${benchmarkCase.name}.txt`,
+    `lifecycle-${benchmarkCase.name}.txt`,
   );
 
   writeFileSync(
@@ -349,14 +323,18 @@ function generateUrls(benchmarkCase) {
 
   return {
     urls,
-
     file,
 
-    readinessUrl: urls[0],
+    readinessUrl: firstUrl(urls, benchmarkCase.name),
   };
 }
 
-async function runFramework(framework, benchmarkCase, urlSet, sample) {
+async function runFramework(
+  framework: LifecycleHttpFramework,
+  benchmarkCase: LifecycleHttpCase,
+  urlSet: UrlSet,
+  sample: number,
+): Promise<HttpCaseResultRow> {
   const server = Bun.spawn(
     [process.execPath, framework.file],
 
@@ -365,7 +343,6 @@ async function runFramework(framework, benchmarkCase, urlSet, sample) {
 
       env: {
         ...process.env,
-
         ...framework.env,
 
         PORT: String(PORT),
@@ -386,27 +363,16 @@ async function runFramework(framework, benchmarkCase, urlSet, sample) {
 
     await prewarmRoutes(urlSet.urls);
 
-    await runOha(
-      urlSet.file,
+    await runOha(urlSet.file, WARMUP_DURATION, 10);
 
-      WARMUP_DURATION,
-
-      Math.min(CONNECTIONS, 10),
-    );
-
-    const result = await runOha(
-      urlSet.file,
-
-      DURATION,
-
-      CONNECTIONS,
-    );
+    const result = await runOha(urlSet.file, DURATION, CONNECTIONS);
 
     const successRate = getSuccessRate(result);
 
     if (successRate !== 1) {
       throw new Error(
-        `${framework.name} ${benchmarkCase.name} success rate: ${successRate}`,
+        `${framework.name} ${benchmarkCase.name} ` +
+          `success rate: ${successRate}`,
       );
     }
 
@@ -436,15 +402,11 @@ async function runFramework(framework, benchmarkCase, urlSet, sample) {
   }
 }
 
-async function prewarmRoutes(urls) {
+async function prewarmRoutes(urls: string[]): Promise<void> {
   const batchSize = 100;
 
   for (let start = 0; start < urls.length; start += batchSize) {
-    const batch = urls.slice(
-      start,
-
-      start + batchSize,
-    );
+    const batch = urls.slice(start, start + batchSize);
 
     await Promise.all(
       batch.map(async (url) => {
@@ -460,8 +422,8 @@ async function prewarmRoutes(urls) {
   }
 }
 
-async function waitForServer(url) {
-  let lastError;
+async function waitForServer(url: string): Promise<void> {
+  let lastError: unknown;
 
   for (let attempt = 0; attempt < 100; attempt++) {
     try {
@@ -488,8 +450,12 @@ async function waitForServer(url) {
   );
 }
 
-async function runOha(urlFile, duration, connections) {
-  const args = [
+async function runOha(
+  urlFile: string,
+  duration: string,
+  connections: number,
+): Promise<OhaJson> {
+  const args: string[] = [
     "oha",
 
     "--no-tui",
@@ -535,11 +501,13 @@ async function runOha(urlFile, duration, connections) {
     throw new Error(`oha exited with ${exitCode}\n${stderr}`);
   }
 
-  return JSON.parse(stdout);
+  const json: unknown = JSON.parse(stdout);
+
+  return toOhaJson(json);
 }
 
-function aggregate(results) {
-  const groups = new Map();
+function aggregate(results: HttpCaseResultRow[]): HttpCaseAggregateRow[] {
+  const groups = new Map<string, HttpCaseResultRow[]>();
 
   for (const result of results) {
     const key = `${result.framework}:${result.case}`;
@@ -555,7 +523,7 @@ function aggregate(results) {
     group.push(result);
   }
 
-  const rows = [];
+  const rows: HttpCaseAggregateRow[] = [];
 
   for (const group of groups.values()) {
     const first = group[0];
@@ -592,8 +560,8 @@ function aggregate(results) {
   return rows;
 }
 
-function printGelisComparisons(rows) {
-  const byCase = new Map();
+function printGelisComparisons(rows: HttpCaseAggregateRow[]): void {
+  const byCase = new Map<string, Map<string, HttpCaseAggregateRow>>();
 
   for (const row of rows) {
     let group = byCase.get(row.case);
@@ -607,7 +575,7 @@ function printGelisComparisons(rows) {
     group.set(row.framework, row);
   }
 
-  const comparisons = [];
+  const comparisons: Array<Record<string, string | number>> = [];
 
   for (const [caseName, group] of byCase) {
     const gelis = group.get("gelis");
@@ -644,25 +612,38 @@ function printGelisComparisons(rows) {
   console.table(comparisons);
 }
 
-function rotate(values, offset) {
+function rotate<T>(values: readonly T[], offset: number): T[] {
   const index = offset % values.length;
 
   return [...values.slice(index), ...values.slice(0, index)];
 }
 
-function median(values) {
+function median(values: number[]): number {
   const sorted = [...values].sort((a, b) => a - b);
 
   const middle = Math.floor(sorted.length / 2);
 
   if (sorted.length % 2 === 1) {
-    return sorted[middle];
+    const value = sorted[middle];
+
+    if (value === undefined) {
+      throw new Error("Cannot compute median of an empty sample set");
+    }
+
+    return value;
   }
 
-  return (sorted[middle - 1] + sorted[middle]) / 2;
+  const left = sorted[middle - 1];
+  const right = sorted[middle];
+
+  if (left === undefined || right === undefined) {
+    throw new Error("Cannot compute median of an empty sample set");
+  }
+
+  return (left + right) / 2;
 }
 
-function coefficientOfVariation(values) {
+function coefficientOfVariation(values: number[]): number {
   const average =
     values.reduce(
       (total, value) => total + value,
@@ -688,7 +669,7 @@ function coefficientOfVariation(values) {
   return Math.sqrt(variance) / average;
 }
 
-function getRequestsPerSecond(result) {
+function getRequestsPerSecond(result: OhaJson): number {
   const value =
     result.metrics?.requests_per_sec ?? result.summary?.requestsPerSec;
 
@@ -699,7 +680,7 @@ function getRequestsPerSecond(result) {
   return value;
 }
 
-function getSuccessRate(result) {
+function getSuccessRate(result: OhaJson): number {
   const value = result.metrics?.success_rate ?? result.summary?.successRate;
 
   if (typeof value !== "number") {
@@ -709,7 +690,10 @@ function getSuccessRate(result) {
   return value;
 }
 
-function getLatencyPercentile(result, percentile) {
+function getLatencyPercentile(
+  result: OhaJson,
+  percentile: "p50" | "p95" | "p99",
+): number {
   const metric = result.metrics?.latency_ms?.[percentile];
 
   if (typeof metric === "number") {
@@ -725,7 +709,7 @@ function getLatencyPercentile(result, percentile) {
   throw new Error(`Unable to read ${percentile}`);
 }
 
-async function ensureOha() {
+async function ensureOha(): Promise<void> {
   const child = Bun.spawn(
     ["oha", "--version"],
 
@@ -741,7 +725,7 @@ async function ensureOha() {
   }
 }
 
-async function getOhaVersion() {
+async function getOhaVersion(): Promise<string> {
   const child = Bun.spawn(
     ["oha", "--version"],
 
@@ -759,17 +743,17 @@ async function getOhaVersion() {
   return output.trim();
 }
 
-function packageVersion(name) {
+function packageVersion(name: string): string {
   try {
     const path = resolve(ROOT, "node_modules", name, "package.json");
 
-    return JSON.parse(readFileSync(path, "utf8")).version;
+    return readPackageVersion(path);
   } catch {
     return "unknown";
   }
 }
 
-function readListArgument(name) {
+function readListArgument(name: string): string[] {
   const prefix = `${name}=`;
 
   const argument = process.argv.find((value) => value.startsWith(prefix));
@@ -785,18 +769,51 @@ function readListArgument(name) {
     .filter(Boolean);
 }
 
-function sleep(milliseconds) {
+function sleep(milliseconds: number): Promise<void> {
   return new Promise((resolvePromise) =>
     setTimeout(resolvePromise, milliseconds),
   );
 }
 
-function round(value, digits) {
+function round(value: number, digits: number): number {
   const factor = 10 ** digits;
 
   return Math.round(value * factor) / factor;
 }
 
-function formatInteger(value) {
+function formatInteger(value: number): string {
   return Math.round(value).toLocaleString("en-US");
+}
+
+function firstUrl(urls: string[], label: string): string {
+  const url = urls[0];
+
+  if (url === undefined) {
+    throw new Error(`No generated ${label} URLs`);
+  }
+
+  return url;
+}
+
+function toOhaJson(value: unknown): OhaJson {
+  if (value === null || typeof value !== "object") {
+    throw new Error("oha output must be a JSON object");
+  }
+
+  return value as OhaJson;
+}
+
+function readPackageVersion(packagePath: string): string {
+  const parsed: unknown = JSON.parse(readFileSync(packagePath, "utf8"));
+
+  if (
+    parsed !== null &&
+    typeof parsed === "object" &&
+    "version" in parsed &&
+    typeof parsed.version === "string"
+  ) {
+    return parsed.version;
+  }
+
+  return "unknown";
 }

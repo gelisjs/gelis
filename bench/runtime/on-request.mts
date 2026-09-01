@@ -30,21 +30,15 @@ const TARGET_INDEX = ROUTES - 1;
 
 const OK_RESPONSE = new Response("ok");
 
-const LOCAL_BEFORE = {
-  beforeHandle: () => undefined,
-};
+const EARLY_RESPONSE = new Response("early");
 
-const LOCAL_AFTER = {
-  afterHandle: () => undefined,
-};
+const SYNC_REQUEST = () => undefined;
 
-const SYNC_BEFORE = () => undefined;
+const ASYNC_REQUEST = () => Promise.resolve(undefined);
 
-const SYNC_AFTER = () => undefined;
+const SYNC_EARLY_REQUEST = () => EARLY_RESPONSE;
 
-const ASYNC_BEFORE = () => Promise.resolve(undefined);
-
-const ASYNC_AFTER = () => Promise.resolve(undefined);
+const ASYNC_EARLY_REQUEST = () => Promise.resolve(EARLY_RESPONSE);
 
 const VALIDATION_OPTIONS = {
   query: querySyncSchema,
@@ -53,144 +47,96 @@ const VALIDATION_OPTIONS = {
 const benchmarkCases = [
   {
     name: "plain-sync",
-    mode: "sync",
-    query: false,
-  },
 
-  /*
-   * Local references.
-   *
-   * These let us compare the global compiler
-   * against the already-accepted local path
-   * in the exact same benchmark process.
-   */
-  {
-    name: "local-before-sync",
     mode: "sync",
+
     query: false,
   },
 
   {
-    name: "local-after-sync",
-    mode: "sync",
-    query: false,
-  },
+    name: "on-request-sync",
 
-  /*
-   * One global hook should compile to a direct
-   * function reference rather than a loop.
-   */
-  {
-    name: "global-before-sync",
     mode: "sync",
+
     query: false,
   },
 
   {
-    name: "global-after-sync",
+    name: "two-on-request-sync",
+
     mode: "sync",
+
     query: false,
   },
 
   {
-    name: "global-before-after-sync",
-    mode: "sync",
-    query: false,
-  },
+    name: "three-on-request-sync",
 
-  /*
-   * Global + local produces the specialized
-   * two-hook executor.
-   */
-  {
-    name: "global-local-before-sync",
     mode: "sync",
+
     query: false,
   },
 
   {
-    name: "global-local-after-sync",
-    mode: "sync",
-    query: false,
-  },
+    name: "late-on-request-sync",
 
-  /*
-   * Explicitly exercise 2-hook specialization
-   * and 3+ generic plan.
-   */
-  {
-    name: "two-global-before-sync",
     mode: "sync",
+
     query: false,
   },
 
   {
-    name: "three-global-before-sync",
-    mode: "sync",
-    query: false,
-  },
+    name: "early-return",
 
-  {
-    name: "two-global-after-sync",
     mode: "sync",
-    query: false,
-  },
 
-  {
-    name: "three-global-after-sync",
-    mode: "sync",
-    query: false,
-  },
-
-  /*
-   * Registration order must not affect the
-   * request-time plan.
-   */
-  {
-    name: "late-global-before-sync",
-    mode: "sync",
-    query: false,
-  },
-
-  {
-    name: "late-global-after-sync",
-    mode: "sync",
     query: false,
   },
 
   {
     name: "validation-only",
+
     mode: "sync",
+
     query: true,
   },
 
   {
-    name: "validation-global-before",
+    name: "validation-on-request",
+
     mode: "sync",
+
     query: true,
   },
 
-  /*
-   * Promise-aware global paths.
-   */
   {
     name: "plain-async-handler",
+
     mode: "async",
+
     query: false,
   },
 
   {
-    name: "global-before-async",
+    name: "on-request-async",
+
     mode: "async",
+
     query: false,
   },
 
   {
-    name: "global-after-async",
+    name: "async-early-return",
+
     mode: "async",
+
     query: false,
   },
-];
+] as const;
+
+type OnRequestCase = (typeof benchmarkCases)[number];
+
+type OnRequestCaseName = OnRequestCase["name"];
 
 const requestedCases = readListArgument("--cases");
 
@@ -203,7 +149,7 @@ const selectedCases =
         );
 
         if (!benchmarkCase) {
-          throw new Error(`Unknown global lifecycle benchmark case: ${name}`);
+          throw new Error(`Unknown onRequest benchmark case: ${name}`);
         }
 
         return benchmarkCase;
@@ -215,12 +161,16 @@ const selectedCaseNames = selectedCases.map(
 
 const resultFileName =
   requestedCases.length === 0
-    ? "latest-global-lifecycle.json"
-    : `latest-global-lifecycle-${selectedCaseNames.join("-")}.json`;
+    ? "latest-on-request.json"
+    : `latest-on-request-${selectedCaseNames.join("-")}.json`;
 
-mkdirSync(RESULTS_DIR, {
-  recursive: true,
-});
+mkdirSync(
+  RESULTS_DIR,
+
+  {
+    recursive: true,
+  },
+);
 
 console.log(`Selected cases: ${selectedCaseNames.join(", ")}`);
 
@@ -232,9 +182,9 @@ console.log(
 
 console.log("");
 
-let sink;
+let sink: unknown;
 
-const runtimeRows = [];
+const runtimeRows: RuntimeResultRow[] = [];
 
 for (const benchmarkCase of selectedCases) {
   const app = buildApp(benchmarkCase.name);
@@ -252,9 +202,6 @@ for (const benchmarkCase of selectedCases) {
   runtimeRows.push(await benchmarkAsyncCase(benchmarkCase.name, app, request));
 }
 
-const configurationRows =
-  requestedCases.length === 0 ? benchmarkConfiguration() : [];
-
 const comparisons = createComparisons(runtimeRows);
 
 const metadata = {
@@ -271,9 +218,11 @@ const metadata = {
   samples: SAMPLES,
 
   targetMilliseconds: TARGET_MS,
+
+  cases: selectedCaseNames,
 };
 
-console.log("\nGelis global lifecycle runtime benchmark");
+console.log("\nGelis onRequest runtime benchmark");
 
 console.log(`Runtime:     ${metadata.runtime}`);
 
@@ -315,20 +264,6 @@ console.table(
   })),
 );
 
-console.log("\nConfiguration-time lifecycle compilation\n");
-
-console.table(
-  configurationRows.map((row) => ({
-    scenario: row.scenario,
-
-    routes: row.routes,
-
-    "median ms": round(row.milliseconds, 3),
-
-    "ns/route": Math.round(row.nanosecondsPerRoute),
-  })),
-);
-
 writeFileSync(
   resolve(RESULTS_DIR, resultFileName),
 
@@ -339,8 +274,6 @@ writeFileSync(
       runtime: runtimeRows,
 
       comparisons,
-
-      configuration: configurationRows,
     },
     null,
     2,
@@ -349,17 +282,17 @@ writeFileSync(
 
 console.log(`\nRaw results: bench/runtime/results/${resultFileName}`);
 
-function buildApp(scenario) {
+function buildApp(scenario: OnRequestCaseName): Gelis {
   const app = new Gelis();
 
-  configureEarlyGlobals(app, scenario);
+  configureEarlyOnRequest(app, scenario);
 
   for (let index = 0; index < ROUTES; index++) {
     const path = `/r/${index}`;
 
     if (
       scenario === "validation-only" ||
-      scenario === "validation-global-before"
+      scenario === "validation-on-request"
     ) {
       app.get(
         path,
@@ -367,54 +300,6 @@ function buildApp(scenario) {
         VALIDATION_OPTIONS,
 
         () => OK_RESPONSE,
-      );
-
-      continue;
-    }
-
-    if (scenario === "local-before-sync") {
-      app.get(
-        path,
-
-        () => OK_RESPONSE,
-
-        LOCAL_BEFORE,
-      );
-
-      continue;
-    }
-
-    if (scenario === "local-after-sync") {
-      app.get(
-        path,
-
-        () => OK_RESPONSE,
-
-        LOCAL_AFTER,
-      );
-
-      continue;
-    }
-
-    if (scenario === "global-local-before-sync") {
-      app.get(
-        path,
-
-        () => OK_RESPONSE,
-
-        LOCAL_BEFORE,
-      );
-
-      continue;
-    }
-
-    if (scenario === "global-local-after-sync") {
-      app.get(
-        path,
-
-        () => OK_RESPONSE,
-
-        LOCAL_AFTER,
       );
 
       continue;
@@ -430,6 +315,18 @@ function buildApp(scenario) {
       continue;
     }
 
+    if (scenario === "early-return" || scenario === "async-early-return") {
+      app.get(
+        path,
+
+        () => {
+          throw new Error(`${scenario} handler must not run`);
+        },
+      );
+
+      continue;
+    }
+
     app.get(
       path,
 
@@ -437,82 +334,59 @@ function buildApp(scenario) {
     );
   }
 
-  configureLateGlobals(app, scenario);
+  if (scenario === "late-on-request-sync") {
+    app.onRequest(SYNC_REQUEST);
+  }
 
   return app;
 }
 
-function configureEarlyGlobals(app, scenario) {
+function configureEarlyOnRequest(
+  app: Gelis,
+  scenario: OnRequestCaseName,
+): void {
   switch (scenario) {
-    case "global-before-sync":
-    case "global-local-before-sync":
-    case "validation-global-before":
-      app.onBeforeHandle(SYNC_BEFORE);
+    case "on-request-sync":
+    case "validation-on-request":
+      app.onRequest(SYNC_REQUEST);
 
       return;
 
-    case "global-after-sync":
-    case "global-local-after-sync":
-      app.onAfterHandle(SYNC_AFTER);
+    case "two-on-request-sync":
+      app.onRequest(SYNC_REQUEST).onRequest(SYNC_REQUEST);
 
       return;
 
-    case "global-before-after-sync":
-      app.onBeforeHandle(SYNC_BEFORE).onAfterHandle(SYNC_AFTER);
-
-      return;
-
-    case "two-global-before-sync":
-      app.onBeforeHandle(SYNC_BEFORE).onBeforeHandle(SYNC_BEFORE);
-
-      return;
-
-    case "three-global-before-sync":
+    case "three-on-request-sync":
       app
-        .onBeforeHandle(SYNC_BEFORE)
-        .onBeforeHandle(SYNC_BEFORE)
-        .onBeforeHandle(SYNC_BEFORE);
+        .onRequest(SYNC_REQUEST)
+        .onRequest(SYNC_REQUEST)
+        .onRequest(SYNC_REQUEST);
 
       return;
 
-    case "two-global-after-sync":
-      app.onAfterHandle(SYNC_AFTER).onAfterHandle(SYNC_AFTER);
+    case "early-return":
+      app.onRequest(SYNC_EARLY_REQUEST);
 
       return;
 
-    case "three-global-after-sync":
-      app
-        .onAfterHandle(SYNC_AFTER)
-        .onAfterHandle(SYNC_AFTER)
-        .onAfterHandle(SYNC_AFTER);
+    case "on-request-async":
+      app.onRequest(ASYNC_REQUEST);
 
       return;
 
-    case "global-before-async":
-      app.onBeforeHandle(ASYNC_BEFORE);
-
-      return;
-
-    case "global-after-async":
-      app.onAfterHandle(ASYNC_AFTER);
+    case "async-early-return":
+      app.onRequest(ASYNC_EARLY_REQUEST);
 
       return;
   }
 }
 
-function configureLateGlobals(app, scenario) {
-  if (scenario === "late-global-before-sync") {
-    app.onBeforeHandle(SYNC_BEFORE);
-
-    return;
-  }
-
-  if (scenario === "late-global-after-sync") {
-    app.onAfterHandle(SYNC_AFTER);
-  }
-}
-
-function benchmarkSyncCase(scenario, app, request) {
+function benchmarkSyncCase(
+  scenario: string,
+  app: Gelis,
+  request: Request,
+): RuntimeResultRow {
   const operation = () => {
     const result = app.fetch(request);
 
@@ -529,7 +403,7 @@ function benchmarkSyncCase(scenario, app, request) {
 
   const iterations = calibrateSync(operation);
 
-  const samples = [];
+  const samples: number[] = [];
 
   for (let sample = 0; sample < SAMPLES; sample++) {
     const elapsed = measureSync(operation, iterations);
@@ -554,7 +428,11 @@ function benchmarkSyncCase(scenario, app, request) {
   };
 }
 
-async function benchmarkAsyncCase(scenario, app, request) {
+async function benchmarkAsyncCase(
+  scenario: string,
+  app: Gelis,
+  request: Request,
+): Promise<RuntimeResultRow> {
   const operation = async () => {
     sink = await app.fetch(request);
   };
@@ -565,7 +443,7 @@ async function benchmarkAsyncCase(scenario, app, request) {
 
   const iterations = await calibrateAsync(operation);
 
-  const samples = [];
+  const samples: number[] = [];
 
   for (let sample = 0; sample < SAMPLES; sample++) {
     const elapsed = await measureAsync(operation, iterations);
@@ -590,127 +468,32 @@ async function benchmarkAsyncCase(scenario, app, request) {
   };
 }
 
-function benchmarkConfiguration() {
-  return [
-    measureLateCompile("late-first-global-before", "before", 0),
-
-    measureLateCompile("late-second-global-before", "before", 1),
-
-    measureLateCompile("late-third-global-before", "before", 2),
-
-    measureLateCompile("late-first-global-after", "after", 0),
-
-    measureLateCompile("late-second-global-after", "after", 1),
-
-    measureLateCompile("late-third-global-after", "after", 2),
-  ];
-}
-
-function measureLateCompile(scenario, phase, existingHooks) {
-  /*
-   * Warm the JIT on a smaller app first.
-   */
-  {
-    const warm = buildConfigurationApp(100, phase, existingHooks);
-
-    registerGlobalHook(warm, phase);
-  }
-
-  const samples = [];
-
-  for (let sample = 0; sample < SAMPLES; sample++) {
-    const app = buildConfigurationApp(ROUTES, phase, existingHooks);
-
-    const start = performance.now();
-
-    registerGlobalHook(app, phase);
-
-    samples.push(performance.now() - start);
-  }
-
-  const milliseconds = median(samples);
-
-  return {
-    scenario,
-
-    routes: ROUTES,
-
-    milliseconds,
-
-    nanosecondsPerRoute: (milliseconds * 1_000_000) / ROUTES,
-  };
-}
-
-function buildConfigurationApp(routes, phase, existingHooks) {
-  const app = new Gelis();
-
-  for (let index = 0; index < existingHooks; index++) {
-    registerGlobalHook(app, phase);
-  }
-
-  for (let index = 0; index < routes; index++) {
-    app.get(
-      `/config/${index}`,
-
-      () => OK_RESPONSE,
-    );
-  }
-
-  return app;
-}
-
-function registerGlobalHook(app, phase) {
-  if (phase === "before") {
-    app.onBeforeHandle(SYNC_BEFORE);
-
-    return;
-  }
-
-  app.onAfterHandle(SYNC_AFTER);
-}
-
-function createComparisons(rows) {
+function createComparisons(rows: RuntimeResultRow[]): RuntimeComparisonRow[] {
   const byScenario = new Map(rows.map((row) => [row.scenario, row]));
 
-  const pairs = [
-    ["global-before-sync", "local-before-sync"],
+  const pairs: Array<readonly [string, string]> = [
+    ["on-request-sync", "plain-sync"],
 
-    ["global-after-sync", "local-after-sync"],
+    ["two-on-request-sync", "on-request-sync"],
 
-    ["late-global-before-sync", "global-before-sync"],
+    ["three-on-request-sync", "two-on-request-sync"],
 
-    ["late-global-after-sync", "global-after-sync"],
+    ["late-on-request-sync", "on-request-sync"],
 
-    ["global-local-before-sync", "local-before-sync"],
+    ["validation-on-request", "validation-only"],
 
-    ["global-local-after-sync", "local-after-sync"],
+    ["on-request-async", "plain-async-handler"],
 
-    ["two-global-before-sync", "global-before-sync"],
-
-    ["three-global-before-sync", "global-before-sync"],
-
-    ["two-global-after-sync", "global-after-sync"],
-
-    ["three-global-after-sync", "global-after-sync"],
-
-    ["validation-global-before", "validation-only"],
-
-    ["global-before-async", "plain-async-handler"],
-
-    ["global-after-async", "plain-async-handler"],
+    ["async-early-return", "on-request-async"],
   ];
 
-  const comparisons = [];
+  const comparisons: RuntimeComparisonRow[] = [];
 
   for (const [scenarioName, referenceName] of pairs) {
     const scenario = byScenario.get(scenarioName);
 
     const reference = byScenario.get(referenceName);
 
-    /*
-     * Filtered benchmarks intentionally
-     * contain only a subset of scenarios.
-     */
     if (!scenario || !reference) {
       continue;
     }
@@ -735,7 +518,7 @@ function createComparisons(rows) {
   return comparisons;
 }
 
-function calibrateSync(operation) {
+function calibrateSync(operation: SyncOperation): number {
   let iterations = 1000;
 
   while (true) {
@@ -753,7 +536,7 @@ function calibrateSync(operation) {
   }
 }
 
-async function calibrateAsync(operation) {
+async function calibrateAsync(operation: AsyncOperation): Promise<number> {
   let iterations = 100;
 
   while (true) {
@@ -771,7 +554,7 @@ async function calibrateAsync(operation) {
   }
 }
 
-function measureSync(operation, iterations) {
+function measureSync(operation: SyncOperation, iterations: number): number {
   const start = performance.now();
 
   for (let index = 0; index < iterations; index++) {
@@ -781,7 +564,10 @@ function measureSync(operation, iterations) {
   return performance.now() - start;
 }
 
-async function measureAsync(operation, iterations) {
+async function measureAsync(
+  operation: AsyncOperation,
+  iterations: number,
+): Promise<number> {
   const start = performance.now();
 
   for (let index = 0; index < iterations; index++) {
@@ -791,7 +577,7 @@ async function measureAsync(operation, iterations) {
   return performance.now() - start;
 }
 
-function isPromiseLike(value) {
+function isPromiseLike(value: unknown): value is PromiseLike<unknown> {
   if (
     value === null ||
     (typeof value !== "object" && typeof value !== "function")
@@ -799,30 +585,47 @@ function isPromiseLike(value) {
     return false;
   }
 
-  return typeof value.then === "function";
+  return (
+    typeof (
+      value as {
+        then?: unknown;
+      }
+    ).then === "function"
+  );
 }
 
-function median(values) {
+function median(values: number[]): number {
   const sorted = [...values].sort((a, b) => a - b);
 
   const middle = Math.floor(sorted.length / 2);
 
   if (sorted.length % 2 === 1) {
-    return sorted[middle];
+    const value = sorted[middle];
+
+    if (value === undefined) {
+      throw new Error("Cannot compute median of an empty sample set");
+    }
+
+    return value;
   }
 
-  return (sorted[middle - 1] + sorted[middle]) / 2;
+  const left = sorted[middle - 1];
+  const right = sorted[middle];
+
+  if (left === undefined || right === undefined) {
+    throw new Error("Cannot compute median of an empty sample set");
+  }
+
+  return (left + right) / 2;
 }
 
-function round(value, digits) {
+function round(value: number, digits: number): number {
   const factor = 10 ** digits;
 
   return Math.round(value * factor) / factor;
 }
 
-void sink;
-
-function readListArgument(name) {
+function readListArgument(name: string): string[] {
   const prefix = `${name}=`;
 
   const argument = process.argv.find((value) => value.startsWith(prefix));
@@ -837,3 +640,5 @@ function readListArgument(name) {
     .map((value) => value.trim())
     .filter(Boolean);
 }
+
+void sink;

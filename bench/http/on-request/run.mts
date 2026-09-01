@@ -28,6 +28,17 @@ const WARMUP_SECONDS = QUICK ? 1 : 2;
 
 const DURATION_SECONDS = QUICK ? 2 : 10;
 
+interface OnRequestHttpFramework {
+  readonly name: string;
+  readonly server: string;
+  readonly env: Record<string, string>;
+}
+
+interface OnRequestHttpCase {
+  readonly name: string;
+  readonly query: boolean;
+}
+
 const frameworks = [
   {
     name: "gelis",
@@ -64,71 +75,51 @@ const frameworks = [
       PRECOMPILE: "true",
     },
   },
-];
+] as const satisfies readonly OnRequestHttpFramework[];
 
 const benchmarkCases = [
   {
     name: "plain",
+
     query: false,
   },
 
   {
-    name: "on-error-unused",
+    name: "on-request-sync",
+
     query: false,
   },
 
   {
-    name: "handler-error-sync",
+    name: "two-on-request-sync",
+
     query: false,
   },
 
   {
-    name: "handler-error-async",
+    name: "three-on-request-sync",
+
     query: false,
   },
 
   {
-    name: "async-on-error",
+    name: "on-request-async",
+
     query: false,
   },
 
   {
-    name: "request-phase-error",
+    name: "validation-on-request",
+
+    query: true,
+  },
+
+  {
+    name: "early-return",
+
     query: false,
   },
-];
-
-const expectedResponses = {
-  plain: {
-    status: 200,
-    body: "ok",
-  },
-
-  "on-error-unused": {
-    status: 200,
-    body: "ok",
-  },
-
-  "handler-error-sync": {
-    status: 200,
-    body: "handled",
-  },
-
-  "handler-error-async": {
-    status: 200,
-    body: "handled",
-  },
-
-  "async-on-error": {
-    status: 200,
-    body: "handled",
-  },
-
-  "request-phase-error": {
-    status: 200,
-    body: "handled",
-  },
-};
+] as const satisfies readonly OnRequestHttpCase[];
 
 const requestedCases = readListArgument("--cases");
 
@@ -141,7 +132,7 @@ const selectedCases =
         );
 
         if (!found) {
-          throw new Error(`Unknown onError HTTP benchmark case: ${name}`);
+          throw new Error(`Unknown onRequest HTTP benchmark case: ${name}`);
         }
 
         return found;
@@ -169,11 +160,11 @@ const filtered = requestedCases.length > 0;
 
 const resultFile = QUICK
   ? filtered
-    ? `latest-on-error-quick-${selectedCaseNames.join("-")}.json`
-    : "latest-on-error-quick.json"
+    ? `latest-on-request-quick-${selectedCaseNames.join("-")}.json`
+    : "latest-on-request-quick.json"
   : filtered
-    ? `latest-on-error-${selectedCaseNames.join("-")}.json`
-    : "latest-on-error.json";
+    ? `latest-on-request-${selectedCaseNames.join("-")}.json`
+    : "latest-on-request.json";
 
 console.log(`Selected cases: ${selectedCaseNames.join(", ")}`);
 
@@ -187,7 +178,7 @@ console.log(
 
 console.log("");
 
-const allRows = [];
+const allRows: HttpNestedAggregateRow[] = [];
 
 for (let caseIndex = 0; caseIndex < selectedCases.length; caseIndex++) {
   const benchmarkCase = selectedCases[caseIndex];
@@ -198,7 +189,7 @@ for (let caseIndex = 0; caseIndex < selectedCases.length; caseIndex++) {
 
   const urlFile = createUrlFile(benchmarkCase);
 
-  const rows = new Map();
+  const rows = new Map<string, OhaSample[]>();
 
   for (const framework of frameworks) {
     rows.set(framework.name, []);
@@ -217,8 +208,6 @@ for (let caseIndex = 0; caseIndex < selectedCases.length; caseIndex++) {
       try {
         await waitUntilReady(benchmarkCase);
 
-        await semanticPreflight(framework, benchmarkCase);
-
         await prewarmRoutes(benchmarkCase);
 
         await runOha(urlFile, Math.min(CONNECTIONS, 10), WARMUP_SECONDS);
@@ -231,7 +220,13 @@ for (let caseIndex = 0; caseIndex < selectedCases.length; caseIndex++) {
           );
         }
 
-        rows.get(framework.name).push(result);
+        const frameworkRows = rows.get(framework.name);
+
+        if (!frameworkRows) {
+          throw new Error(`Missing result bucket for ${framework.name}`);
+        }
+
+        frameworkRows.push(result);
 
         console.log(
           `${framework.name} | ${benchmarkCase.name} | sample ${sample + 1}/${SAMPLES} | ${Math.round(
@@ -249,11 +244,15 @@ for (let caseIndex = 0; caseIndex < selectedCases.length; caseIndex++) {
   for (const framework of frameworks) {
     const samples = rows.get(framework.name);
 
+    if (!samples) {
+      throw new Error(`Missing samples for ${framework.name}`);
+    }
+
     allRows.push(aggregate(framework.name, benchmarkCase.name, samples));
   }
 }
 
-console.log("\nGelis onError HTTP benchmark");
+console.log("\nGelis onRequest HTTP benchmark");
 
 console.log(`Runtime:     bun ${Bun.version}`);
 
@@ -357,16 +356,16 @@ writeFileSync(
 
 console.log(`\nRaw results: bench/http/results/${resultFile}`);
 
-function createUrlFile(benchmarkCase) {
+function createUrlFile(benchmarkCase: OnRequestHttpCase): string {
   const file = resolve(
     GENERATED_DIR,
 
-    `on-error-${benchmarkCase.name}.txt`,
+    `on-request-${benchmarkCase.name}.txt`,
   );
 
-  const query = "";
+  const query = benchmarkCase.query ? "?page=42&q=gelis" : "";
 
-  const urls = [];
+  const urls: string[] = [];
 
   for (let index = 0; index < ROUTES; index++) {
     urls.push(`http://127.0.0.1:${PORT}/r/${index}${query}`);
@@ -381,7 +380,10 @@ function createUrlFile(benchmarkCase) {
   return file;
 }
 
-function startServer(framework, benchmarkCase) {
+function startServer(
+  framework: OnRequestHttpFramework,
+  benchmarkCase: OnRequestHttpCase,
+) {
   return Bun.spawn(
     [process.execPath, framework.server],
 
@@ -407,90 +409,49 @@ function startServer(framework, benchmarkCase) {
   );
 }
 
-async function waitUntilReady(benchmarkCase) {
-  const url = `http://127.0.0.1:${PORT}/r/0`;
+async function waitUntilReady(
+  benchmarkCase: OnRequestHttpCase,
+): Promise<void> {
+  const query = benchmarkCase.query ? "?page=42&q=gelis" : "";
+
+  const url = `http://127.0.0.1:${PORT}/r/0${query}`;
 
   const deadline = Date.now() + 20_000;
-
-  let lastError;
 
   while (Date.now() < deadline) {
     try {
       const response = await fetch(url);
 
-      /*
-       * Any HTTP response proves that the
-       * server is reachable.
-       *
-       * Scenario correctness is validated
-       * separately by semanticPreflight().
-       */
-      await response.arrayBuffer();
-
-      return;
-    } catch (error) {
-      lastError = error;
+      if (response.ok) {
+        return;
+      }
+    } catch {
+      // server not ready
     }
 
     await Bun.sleep(25);
   }
 
-  throw new Error(`Server did not become reachable for ${benchmarkCase.name}`, {
-    cause: lastError,
-  });
+  throw new Error(`Server did not become ready for ${benchmarkCase.name}`);
 }
 
-async function semanticPreflight(framework, benchmarkCase) {
-  const expected = expectedResponses[benchmarkCase.name];
-
-  if (!expected) {
-    throw new Error(`Missing expected response for ${benchmarkCase.name}`);
-  }
-
-  const url = `http://127.0.0.1:${PORT}/r/0`;
-
-  const response = await fetch(url);
-
-  const body = await response.text();
-
-  if (response.status !== expected.status || body !== expected.body) {
-    throw new Error(
-      [
-        `${framework.name} | ${benchmarkCase.name}: semantic preflight failed`,
-        `expected: HTTP ${expected.status} body ${JSON.stringify(expected.body)}`,
-        `received: HTTP ${response.status} body ${JSON.stringify(body)}`,
-      ].join("\n"),
-    );
-  }
-}
-
-async function prewarmRoutes(benchmarkCase) {
-  const expected = expectedResponses[benchmarkCase.name];
-
-  if (!expected) {
-    throw new Error(`Missing expected response for ${benchmarkCase.name}`);
-  }
+async function prewarmRoutes(benchmarkCase: OnRequestHttpCase): Promise<void> {
+  const query = benchmarkCase.query ? "?page=42&q=gelis" : "";
 
   const BATCH = 100;
 
   for (let start = 0; start < ROUTES; start += BATCH) {
-    const requests = [];
+    const requests: Promise<Response>[] = [];
 
     for (let index = start; index < Math.min(start + BATCH, ROUTES); index++) {
-      requests.push(fetch(`http://127.0.0.1:${PORT}/r/${index}`));
+      requests.push(fetch(`http://127.0.0.1:${PORT}/r/${index}${query}`));
     }
 
     const responses = await Promise.all(requests);
 
     for (const response of responses) {
-      if (response.status !== expected.status) {
-        throw new Error(
-          [
-            `Prewarm failed for ${benchmarkCase.name}`,
-            `expected HTTP ${expected.status}`,
-            `received HTTP ${response.status}`,
-          ].join(": "),
-        );
+      if (!response.ok) {
+        throw new Error(`Prewarm failed with HTTP ${response.status}`);
       }
 
       await response.arrayBuffer();
@@ -498,7 +459,11 @@ async function prewarmRoutes(benchmarkCase) {
   }
 }
 
-async function runOha(urlFile, connections, seconds) {
+async function runOha(
+  urlFile: string,
+  connections: number,
+  seconds: number,
+): Promise<OhaSample> {
   const process = Bun.spawn(
     [
       "oha",
@@ -539,12 +504,14 @@ async function runOha(urlFile, connections, seconds) {
     throw new Error(`oha failed:\n${stderr}`);
   }
 
-  const json = JSON.parse(stdout);
+  const json: unknown = JSON.parse(stdout);
 
   return parseOha(json);
 }
 
-function parseOha(json) {
+function parseOha(value: unknown): OhaSample {
+  const json = toOhaJson(value);
+
   const requestsPerSecond =
     json.metrics?.requests_per_sec ?? json.summary?.requestsPerSec;
 
@@ -573,7 +540,10 @@ function parseOha(json) {
   };
 }
 
-function getLatencyPercentile(json, percentile) {
+function getLatencyPercentile(
+  json: OhaJson,
+  percentile: "p50" | "p95" | "p99",
+): number {
   /*
    * Newer oha output exposes CI-friendly
    * latency metrics directly in milliseconds.
@@ -597,7 +567,11 @@ function getLatencyPercentile(json, percentile) {
   throw new Error(`Unable to read ${percentile} latency from oha output`);
 }
 
-function aggregate(framework, caseName, samples) {
+function aggregate(
+  framework: string,
+  caseName: string,
+  samples: OhaSample[],
+): HttpNestedAggregateRow {
   const throughput = samples.map((sample) => sample.requestsPerSecond);
 
   return {
@@ -629,8 +603,10 @@ function aggregate(framework, caseName, samples) {
   };
 }
 
-function createComparisons(rows) {
-  const comparisons = [];
+function createComparisons(
+  rows: HttpNestedAggregateRow[],
+): HttpThroughputComparisonRow[] {
+  const comparisons: HttpThroughputComparisonRow[] = [];
 
   for (const caseName of selectedCaseNames) {
     const gelis = rows.find(
@@ -670,23 +646,36 @@ function createComparisons(rows) {
   return comparisons;
 }
 
-function rotate(values, offset) {
+function rotate<T>(values: readonly T[], offset: number): T[] {
   return [...values.slice(offset), ...values.slice(0, offset)];
 }
 
-function median(values) {
+function median(values: number[]): number {
   const sorted = [...values].sort((a, b) => a - b);
 
   const middle = Math.floor(sorted.length / 2);
 
   if (sorted.length % 2 === 1) {
-    return sorted[middle];
+    const value = sorted[middle];
+
+    if (value === undefined) {
+      throw new Error("Cannot compute median of an empty sample set");
+    }
+
+    return value;
   }
 
-  return (sorted[middle - 1] + sorted[middle]) / 2;
+  const left = sorted[middle - 1];
+  const right = sorted[middle];
+
+  if (left === undefined || right === undefined) {
+    throw new Error("Cannot compute median of an empty sample set");
+  }
+
+  return (left + right) / 2;
 }
 
-function coefficientOfVariation(values) {
+function coefficientOfVariation(values: number[]): number {
   if (values.length < 2) {
     return 0;
   }
@@ -699,13 +688,13 @@ function coefficientOfVariation(values) {
   return Math.sqrt(variance) / mean;
 }
 
-function round(value, digits) {
+function round(value: number, digits: number): number {
   const factor = 10 ** digits;
 
   return Math.round(value * factor) / factor;
 }
 
-function readListArgument(name) {
+function readListArgument(name: string): string[] {
   const prefix = `${name}=`;
 
   const argument = process.argv.find((value) => value.startsWith(prefix));
@@ -721,7 +710,7 @@ function readListArgument(name) {
     .filter(Boolean);
 }
 
-async function getOhaVersion() {
+async function getOhaVersion(): Promise<string> {
   const process = Bun.spawn(
     ["oha", "--version"],
 
@@ -739,26 +728,10 @@ async function getOhaVersion() {
   return stdout.trim();
 }
 
-async function semanticPreflight(framework, benchmarkCase) {
-  const expected = expectedResponses[benchmarkCase.name];
-
-  if (!expected) {
-    throw new Error(`Missing expected response for ${benchmarkCase.name}`);
+function toOhaJson(value: unknown): OhaJson {
+  if (value === null || typeof value !== "object") {
+    throw new Error("oha output must be a JSON object");
   }
 
-  const url = `http://127.0.0.1:${PORT}/r/0`;
-
-  const response = await fetch(url);
-
-  const body = await response.text();
-
-  if (response.status !== expected.status || body !== expected.body) {
-    throw new Error(
-      [
-        `${framework.name} | ${benchmarkCase.name}: semantic preflight failed`,
-        `expected: HTTP ${expected.status} body ${JSON.stringify(expected.body)}`,
-        `received: HTTP ${response.status} body ${JSON.stringify(body)}`,
-      ].join("\n"),
-    );
-  }
+  return value as OhaJson;
 }

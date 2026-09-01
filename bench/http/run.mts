@@ -23,6 +23,33 @@ const CONNECTIONS = 100;
 const PIPELINING = 10;
 const DURATION = 10;
 
+interface AutocannonFramework {
+  readonly name: string;
+  readonly file: string;
+}
+
+interface AutocannonResultRow {
+  framework: string;
+  routeKind: HttpRouteCase["routeKind"];
+  bodyKind: HttpRouteCase["bodyKind"];
+  sample: number;
+  requestsPerSecond: number;
+  p50: number;
+  p99: number;
+  errors: number;
+  non2xx: number;
+}
+
+interface AutocannonAggregateRow {
+  framework: string;
+  routeKind: HttpRouteCase["routeKind"];
+  bodyKind: HttpRouteCase["bodyKind"];
+  requestsPerSecond: number;
+  p50: number;
+  p99: number;
+  errors: number;
+}
+
 const frameworks = [
   {
     name: "gelis",
@@ -41,7 +68,7 @@ const frameworks = [
 
     file: resolve(HERE, "servers/elysia.ts"),
   },
-];
+] as const satisfies readonly AutocannonFramework[];
 
 const cases = [
   {
@@ -67,13 +94,13 @@ const cases = [
 
     bodyKind: "json",
   },
-];
+] as const satisfies readonly HttpRouteCase[];
 
 mkdirSync(RESULTS_DIR, {
   recursive: true,
 });
 
-const rawResults = [];
+const rawResults: AutocannonResultRow[] = [];
 
 for (const benchmarkCase of cases) {
   for (let sample = 0; sample < SAMPLES; sample++) {
@@ -159,7 +186,11 @@ writeFileSync(
 
 console.log("\nRaw results: " + "bench/http/results/latest.json");
 
-async function runFramework(framework, benchmarkCase, sample) {
+async function runFramework(
+  framework: AutocannonFramework,
+  benchmarkCase: HttpRouteCase,
+  sample: number,
+): Promise<AutocannonResultRow> {
   const target =
     benchmarkCase.routeKind === "static"
       ? `/r/${ROUTES - 1}`
@@ -250,8 +281,8 @@ async function runFramework(framework, benchmarkCase, sample) {
   }
 }
 
-async function waitForServer(url) {
-  let lastError;
+async function waitForServer(url: string): Promise<void> {
+  let lastError: unknown;
 
   for (let attempt = 0; attempt < 100; attempt++) {
     try {
@@ -274,8 +305,8 @@ async function waitForServer(url) {
   });
 }
 
-function aggregate(results) {
-  const groups = new Map();
+function aggregate(results: AutocannonResultRow[]): AutocannonAggregateRow[] {
+  const groups = new Map<string, AutocannonResultRow[]>();
 
   for (const result of results) {
     const key = [result.framework, result.routeKind, result.bodyKind].join(":");
@@ -291,10 +322,14 @@ function aggregate(results) {
     group.push(result);
   }
 
-  const rows = [];
+  const rows: AutocannonAggregateRow[] = [];
 
   for (const group of groups.values()) {
     const first = group[0];
+
+    if (!first) {
+      continue;
+    }
 
     rows.push({
       framework: first.framework,
@@ -322,36 +357,64 @@ function aggregate(results) {
   return rows;
 }
 
-function rotate(values, offset) {
+function rotate<T>(values: readonly T[], offset: number): T[] {
   const index = offset % values.length;
 
   return [...values.slice(index), ...values.slice(0, index)];
 }
 
-function median(values) {
+function median(values: number[]): number {
   const sorted = [...values].sort((a, b) => a - b);
 
   const middle = Math.floor(sorted.length / 2);
 
   if (sorted.length % 2 === 1) {
-    return sorted[middle];
+    const value = sorted[middle];
+
+    if (value === undefined) {
+      throw new Error("Cannot compute median of an empty sample set");
+    }
+
+    return value;
   }
 
-  return (sorted[middle - 1] + sorted[middle]) / 2;
+  const left = sorted[middle - 1];
+  const right = sorted[middle];
+
+  if (left === undefined || right === undefined) {
+    throw new Error("Cannot compute median of an empty sample set");
+  }
+
+  return (left + right) / 2;
 }
 
-function packageVersion(name) {
+function packageVersion(name: string): string {
   try {
     const path = resolve(ROOT, "node_modules", name, "package.json");
 
-    return JSON.parse(readFileSync(path, "utf8")).version;
+    return readPackageVersion(path);
   } catch {
     return "unknown";
   }
 }
 
-function sleep(milliseconds) {
+function sleep(milliseconds: number): Promise<void> {
   return new Promise((resolvePromise) =>
     setTimeout(resolvePromise, milliseconds),
   );
+}
+
+function readPackageVersion(packagePath: string): string {
+  const parsed: unknown = JSON.parse(readFileSync(packagePath, "utf8"));
+
+  if (
+    parsed !== null &&
+    typeof parsed === "object" &&
+    "version" in parsed &&
+    typeof parsed.version === "string"
+  ) {
+    return parsed.version;
+  }
+
+  return "unknown";
 }

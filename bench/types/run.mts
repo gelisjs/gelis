@@ -8,7 +8,7 @@ import { spawnSync } from "node:child_process";
 
 import { fileURLToPath } from "node:url";
 
-import "./generate.mjs";
+import "./generate.mts";
 
 const HERE = fileURLToPath(new URL(".", import.meta.url));
 
@@ -23,7 +23,7 @@ const TYPESCRIPT_PACKAGE = resolve(
 
 const RESULTS_DIR = resolve(HERE, "results");
 
-const DEFAULT_SIZES = [100, 500, 1000, 5000];
+const DEFAULT_SIZES = [100, 500, 1000, 5000] as const;
 
 const SCENARIOS = [
   "baseline",
@@ -33,7 +33,61 @@ const SCENARIOS = [
   "client-sparse",
   "client-module",
   "client",
-];
+] as const;
+
+type BenchmarkSize = (typeof DEFAULT_SIZES)[number];
+
+type TypeScenario = (typeof SCENARIOS)[number];
+
+interface TypeDiagnostics {
+  files?: number;
+  linesOfTypeScript?: number;
+  identifiers?: number;
+  symbols?: number;
+  types?: number;
+  instantiations: number;
+  memoryMB: number;
+  parseTime?: number;
+  bindTime?: number;
+  checkTime: number;
+  totalTime: number;
+}
+
+interface TypeBenchmarkRow extends TypeDiagnostics {
+  scenario: TypeScenario;
+  routes: BenchmarkSize;
+  runs: number;
+  checkVsBaseline: number | null;
+  checkVsRichContract: number | null;
+  samples: TypeDiagnostics[];
+}
+
+interface TypeBenchmarkMetadata {
+  generatedAt: string;
+  platform: NodeJS.Platform;
+  arch: NodeJS.Architecture;
+  runtime: string;
+  typescript: string;
+  cpu: string;
+  logicalCpus: number;
+  totalMemoryMB: number;
+  runsPerCase: number;
+  sizes: BenchmarkSize[];
+}
+
+const DIAGNOSTIC_KEYS = [
+  "files",
+  "linesOfTypeScript",
+  "identifiers",
+  "symbols",
+  "types",
+  "instantiations",
+  "memoryMB",
+  "parseTime",
+  "bindTime",
+  "checkTime",
+  "totalTime",
+] as const satisfies readonly (keyof TypeDiagnostics)[];
 
 const SIZES = readSizesArgument(DEFAULT_SIZES);
 
@@ -45,13 +99,13 @@ mkdirSync(RESULTS_DIR, {
 
 // Warm filesystem/compiler startup.
 // This result is intentionally discarded.
-compile("baseline", SIZES[0]);
+compile("baseline", firstSize(SIZES));
 
-const rows = [];
+const rows: TypeBenchmarkRow[] = [];
 
 for (const size of SIZES) {
   for (const scenario of SCENARIOS) {
-    const samples = [];
+    const samples: TypeDiagnostics[] = [];
 
     for (let run = 0; run < RUNS; run++) {
       samples.push(compile(scenario, size));
@@ -61,6 +115,8 @@ for (const size of SIZES) {
       scenario,
       routes: size,
       runs: RUNS,
+      checkVsBaseline: null,
+      checkVsRichContract: null,
 
       ...medianDiagnostics(samples),
 
@@ -103,7 +159,7 @@ const metadata = {
     ? `bun ${globalThis.Bun.version}`
     : `node ${process.version}`,
 
-  typescript: JSON.parse(readFileSync(TYPESCRIPT_PACKAGE, "utf8")).version,
+  typescript: readPackageVersion(TYPESCRIPT_PACKAGE),
 
   cpu: cpus()[0]?.model ?? "unknown",
 
@@ -138,7 +194,7 @@ writeFileSync(
 printMetadata(metadata);
 printTable(rows);
 
-function compile(scenario, size) {
+function compile(scenario: TypeScenario, size: BenchmarkSize): TypeDiagnostics {
   const project = resolve(
     HERE,
     "generated",
@@ -181,8 +237,8 @@ function compile(scenario, size) {
   return parseDiagnostics(result.stdout);
 }
 
-function parseDiagnostics(output) {
-  const metrics = {};
+function parseDiagnostics(output: string): TypeDiagnostics {
+  const metrics: Partial<TypeDiagnostics> = {};
 
   for (const line of output.split(/\r?\n/)) {
     const match = /^([^:]+):\s+(.+)$/.exec(line.trim());
@@ -192,6 +248,10 @@ function parseDiagnostics(output) {
     }
 
     const [, key, raw] = match;
+
+    if (key === undefined || raw === undefined) {
+      continue;
+    }
 
     switch (key) {
       case "Files":
@@ -240,21 +300,13 @@ function parseDiagnostics(output) {
     }
   }
 
-  for (const key of ["instantiations", "memoryMB", "checkTime", "totalTime"]) {
-    if (metrics[key] === undefined) {
-      throw new Error(`Could not parse ` + `TypeScript metric: ${key}`);
-    }
-  }
-
-  return metrics;
+  return completeDiagnostics(metrics);
 }
 
-function medianDiagnostics(samples) {
-  const keys = new Set(samples.flatMap((sample) => Object.keys(sample)));
+function medianDiagnostics(samples: TypeDiagnostics[]): TypeDiagnostics {
+  const result: Partial<TypeDiagnostics> = {};
 
-  const result = {};
-
-  for (const key of keys) {
+  for (const key of DIAGNOSTIC_KEYS) {
     const values = samples
       .map((sample) => sample[key])
       .filter((value) => typeof value === "number");
@@ -264,30 +316,97 @@ function medianDiagnostics(samples) {
     }
   }
 
-  return result;
+  return completeDiagnostics(result);
 }
 
-function median(values) {
+function completeDiagnostics(
+  metrics: Partial<TypeDiagnostics>,
+): TypeDiagnostics {
+  const diagnostics: TypeDiagnostics = {
+    instantiations: requiredMetric(metrics, "instantiations"),
+    memoryMB: requiredMetric(metrics, "memoryMB"),
+    checkTime: requiredMetric(metrics, "checkTime"),
+    totalTime: requiredMetric(metrics, "totalTime"),
+  };
+
+  if (metrics.files !== undefined) {
+    diagnostics.files = metrics.files;
+  }
+
+  if (metrics.linesOfTypeScript !== undefined) {
+    diagnostics.linesOfTypeScript = metrics.linesOfTypeScript;
+  }
+
+  if (metrics.identifiers !== undefined) {
+    diagnostics.identifiers = metrics.identifiers;
+  }
+
+  if (metrics.symbols !== undefined) {
+    diagnostics.symbols = metrics.symbols;
+  }
+
+  if (metrics.types !== undefined) {
+    diagnostics.types = metrics.types;
+  }
+
+  if (metrics.parseTime !== undefined) {
+    diagnostics.parseTime = metrics.parseTime;
+  }
+
+  if (metrics.bindTime !== undefined) {
+    diagnostics.bindTime = metrics.bindTime;
+  }
+
+  return diagnostics;
+}
+
+function requiredMetric(
+  metrics: Partial<TypeDiagnostics>,
+  key: keyof TypeDiagnostics,
+): number {
+  const value = metrics[key];
+
+  if (typeof value !== "number") {
+    throw new Error(`Could not parse TypeScript metric: ${key}`);
+  }
+
+  return value;
+}
+
+function median(values: number[]): number {
   const sorted = [...values].sort((a, b) => a - b);
 
   const middle = Math.floor(sorted.length / 2);
 
   if (sorted.length % 2 === 1) {
-    return sorted[middle];
+    const value = sorted[middle];
+
+    if (value === undefined) {
+      throw new Error("Cannot compute median of an empty sample set");
+    }
+
+    return value;
   }
 
-  return (sorted[middle - 1] + sorted[middle]) / 2;
+  const left = sorted[middle - 1];
+  const right = sorted[middle];
+
+  if (left === undefined || right === undefined) {
+    throw new Error("Cannot compute median of an empty sample set");
+  }
+
+  return (left + right) / 2;
 }
 
-function parseNumber(value) {
+function parseNumber(value: string): number {
   return Number(value.replaceAll(",", "").trim());
 }
 
-function parseSeconds(value) {
+function parseSeconds(value: string): number {
   return Number(value.replace(/s$/, "").trim());
 }
 
-function parseMemoryMB(value) {
+function parseMemoryMB(value: string): number {
   const trimmed = value.trim();
 
   if (trimmed.endsWith("K")) {
@@ -301,7 +420,7 @@ function parseMemoryMB(value) {
   return Number(trimmed) / 1024 / 1024;
 }
 
-function readRunsArgument(fallback) {
+function readRunsArgument(fallback: number): number {
   const argument = process.argv.find((value) => value.startsWith("--runs="));
 
   if (!argument) {
@@ -317,11 +436,13 @@ function readRunsArgument(fallback) {
   return value;
 }
 
-function readSizesArgument(fallback) {
+function readSizesArgument(
+  fallback: readonly BenchmarkSize[],
+): BenchmarkSize[] {
   const argument = process.argv.find((value) => value.startsWith("--sizes="));
 
   if (!argument) {
-    return fallback;
+    return [...fallback];
   }
 
   const values = argument
@@ -330,7 +451,7 @@ function readSizesArgument(fallback) {
     .map((value) => Number.parseInt(value, 10));
 
   for (const value of values) {
-    if (!fallback.includes(value)) {
+    if (!fallback.includes(value as BenchmarkSize)) {
       throw new Error(
         `Unsupported benchmark size: ${value}. ` +
           `Use one of: ${fallback.join(", ")}`,
@@ -338,10 +459,20 @@ function readSizesArgument(fallback) {
     }
   }
 
-  return values;
+  return values as BenchmarkSize[];
 }
 
-function printMetadata(metadata) {
+function firstSize(values: readonly BenchmarkSize[]): BenchmarkSize {
+  const value = values[0];
+
+  if (value === undefined) {
+    throw new Error("At least one benchmark size is required");
+  }
+
+  return value;
+}
+
+function printMetadata(metadata: TypeBenchmarkMetadata): void {
   console.log("\nGelis type-system benchmark");
 
   console.log(`Runtime:     ${metadata.runtime}`);
@@ -357,7 +488,7 @@ function printMetadata(metadata) {
   console.log(`Runs/case:   ${metadata.runsPerCase}\n`);
 }
 
-function printTable(rows) {
+function printTable(rows: TypeBenchmarkRow[]): void {
   console.table(
     rows.map((row) => ({
       scenario: row.scenario,
@@ -389,13 +520,13 @@ function printTable(rows) {
   );
 }
 
-function round(value, digits) {
+function round(value: number, digits: number): number {
   const factor = 10 ** digits;
 
   return Math.round(value * factor) / factor;
 }
 
-function toCsv(rows) {
+function toCsv(rows: TypeBenchmarkRow[]): string {
   const columns = [
     "scenario",
     "routes",
@@ -413,7 +544,7 @@ function toCsv(rows) {
     "totalTime",
     "checkVsBaseline",
     "checkVsRichContract",
-  ];
+  ] as const satisfies readonly (keyof TypeBenchmarkRow)[];
 
   const lines = [columns.join(",")];
 
@@ -422,4 +553,19 @@ function toCsv(rows) {
   }
 
   return `${lines.join("\n")}\n`;
+}
+
+function readPackageVersion(packagePath: string): string {
+  const parsed: unknown = JSON.parse(readFileSync(packagePath, "utf8"));
+
+  if (
+    parsed !== null &&
+    typeof parsed === "object" &&
+    "version" in parsed &&
+    typeof parsed.version === "string"
+  ) {
+    return parsed.version;
+  }
+
+  throw new Error(`Unable to read package version from ${packagePath}`);
 }

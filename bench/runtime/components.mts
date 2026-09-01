@@ -2,10 +2,12 @@ import { cpus } from "node:os";
 
 import { normalizeResponse, runtimeReply } from "../../src/runtime/response.ts";
 
+import type { RuntimeRouteContext } from "../../src/runtime/types.ts";
+
 const SAMPLES = 7;
 const TARGET_MS = 80;
 
-let sink;
+let sink: unknown;
 
 const request = new Request("http://gelis.test/users/123?hello=world");
 
@@ -26,13 +28,15 @@ const serializedJson = JSON.stringify(jsonPayload);
 
 const JSON_HEADERS = Object.freeze({
   "content-type": "application/json",
-});
+}) satisfies HeadersInit;
 
-const syncHandler = () => rawResponse;
+const syncHandler: (context: RuntimeRouteContext) => Response = () =>
+  rawResponse;
 
-const asyncHandler = async () => rawResponse;
+const asyncHandler: (context: RuntimeRouteContext) => Promise<Response> =
+  async () => rawResponse;
 
-const context = {
+const context: RuntimeRouteContext = {
   request,
 
   params: {
@@ -47,7 +51,25 @@ const context = {
   },
 };
 
-const cases = [
+type ComponentCase =
+  | {
+      name: string;
+      async: false;
+      operation: SyncOperation;
+    }
+  | {
+      name: string;
+      async: true;
+      operation: AsyncOperation;
+    };
+
+interface ComponentRow {
+  scenario: string;
+  nsPerOp: number;
+  opsPerSecond: number;
+}
+
+const cases: ComponentCase[] = [
   {
     name: "pathname-new-url",
 
@@ -242,7 +264,7 @@ const cases = [
   },
 ];
 
-const rows = [];
+const rows: ComponentRow[] = [];
 
 for (const benchmark of cases) {
   const nsPerOp = benchmark.async
@@ -276,7 +298,7 @@ console.table(
   })),
 );
 
-function pathnameFromAbsoluteUrl(value) {
+function pathnameFromAbsoluteUrl(value: string): string {
   const scheme = value.indexOf("://");
 
   if (scheme === -1) {
@@ -312,7 +334,7 @@ function pathnameFromAbsoluteUrl(value) {
   return value.slice(pathStart, pathEnd);
 }
 
-function benchmarkSync(operation) {
+function benchmarkSync(operation: SyncOperation): number {
   for (let index = 0; index < 10_000; index++) {
     operation();
   }
@@ -331,7 +353,7 @@ function benchmarkSync(operation) {
     iterations *= 2;
   }
 
-  const samples = [];
+  const samples: number[] = [];
 
   for (let sample = 0; sample < SAMPLES; sample++) {
     const elapsed = measureSyncMs(operation, iterations);
@@ -342,7 +364,7 @@ function benchmarkSync(operation) {
   return median(samples);
 }
 
-async function benchmarkAsync(operation) {
+async function benchmarkAsync(operation: AsyncOperation): Promise<number> {
   for (let index = 0; index < 2000; index++) {
     await operation();
   }
@@ -361,7 +383,7 @@ async function benchmarkAsync(operation) {
     iterations *= 2;
   }
 
-  const samples = [];
+  const samples: number[] = [];
 
   for (let sample = 0; sample < SAMPLES; sample++) {
     const elapsed = await measureAsyncMs(operation, iterations);
@@ -372,7 +394,7 @@ async function benchmarkAsync(operation) {
   return median(samples);
 }
 
-function measureSyncMs(operation, iterations) {
+function measureSyncMs(operation: SyncOperation, iterations: number): number {
   const start = performance.now();
 
   for (let index = 0; index < iterations; index++) {
@@ -382,7 +404,10 @@ function measureSyncMs(operation, iterations) {
   return performance.now() - start;
 }
 
-async function measureAsyncMs(operation, iterations) {
+async function measureAsyncMs(
+  operation: AsyncOperation,
+  iterations: number,
+): Promise<number> {
   const start = performance.now();
 
   for (let index = 0; index < iterations; index++) {
@@ -392,7 +417,7 @@ async function measureAsyncMs(operation, iterations) {
   return performance.now() - start;
 }
 
-function scaledIterations(iterations, elapsed) {
+function scaledIterations(iterations: number, elapsed: number): number {
   return Math.max(
     1,
 
@@ -400,16 +425,29 @@ function scaledIterations(iterations, elapsed) {
   );
 }
 
-function median(values) {
+function median(values: number[]): number {
   const sorted = [...values].sort((a, b) => a - b);
 
   const middle = Math.floor(sorted.length / 2);
 
   if (sorted.length % 2 === 1) {
-    return sorted[middle];
+    const value = sorted[middle];
+
+    if (value === undefined) {
+      throw new Error("Cannot compute median of an empty sample set");
+    }
+
+    return value;
   }
 
-  return (sorted[middle - 1] + sorted[middle]) / 2;
+  const left = sorted[middle - 1];
+  const right = sorted[middle];
+
+  if (left === undefined || right === undefined) {
+    throw new Error("Cannot compute median of an empty sample set");
+  }
+
+  return (left + right) / 2;
 }
 
 void sink;

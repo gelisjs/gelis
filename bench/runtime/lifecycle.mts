@@ -28,6 +28,12 @@ const ASYNC_WARMUP_ITERATIONS = 5_000;
 
 const TARGET_INDEX = ROUTES - 1;
 
+interface LifecycleOverheadRow extends RuntimeResultRow {
+  baseline: string | null;
+  overheadNs: number | null;
+  overheadPercent: number | null;
+}
+
 const OK_RESPONSE = new Response("ok");
 
 const EARLY_RESPONSE = new Response("early");
@@ -152,9 +158,9 @@ mkdirSync(RESULTS_DIR, {
   recursive: true,
 });
 
-const rows = [];
+const rows: RuntimeResultRow[] = [];
 
-let sink;
+let sink: unknown;
 
 for (const benchmarkCase of benchmarkCases) {
   const app = buildApp(benchmarkCase.name);
@@ -237,7 +243,7 @@ writeFileSync(
 
 console.log("\nRaw results: " + "bench/runtime/results/latest-lifecycle.json");
 
-function buildApp(scenario) {
+function buildApp(scenario: string): Gelis {
   const app = new Gelis();
 
   for (let index = 0; index < ROUTES; index++) {
@@ -372,7 +378,11 @@ function buildApp(scenario) {
   return app;
 }
 
-function benchmarkSyncCase(scenario, app, request) {
+function benchmarkSyncCase(
+  scenario: string,
+  app: Gelis,
+  request: Request,
+): RuntimeResultRow {
   const operation = () => {
     const result = app.fetch(request);
 
@@ -389,7 +399,7 @@ function benchmarkSyncCase(scenario, app, request) {
 
   const iterations = calibrateSync(operation);
 
-  const samples = [];
+  const samples: number[] = [];
 
   for (let sample = 0; sample < SAMPLES; sample++) {
     const elapsed = measureSync(operation, iterations);
@@ -414,7 +424,11 @@ function benchmarkSyncCase(scenario, app, request) {
   };
 }
 
-async function benchmarkAsyncCase(scenario, app, request) {
+async function benchmarkAsyncCase(
+  scenario: string,
+  app: Gelis,
+  request: Request,
+): Promise<RuntimeResultRow> {
   const operation = async () => {
     sink = await app.fetch(request);
   };
@@ -425,7 +439,7 @@ async function benchmarkAsyncCase(scenario, app, request) {
 
   const iterations = await calibrateAsync(operation);
 
-  const samples = [];
+  const samples: number[] = [];
 
   for (let sample = 0; sample < SAMPLES; sample++) {
     const elapsed = await measureAsync(operation, iterations);
@@ -450,7 +464,7 @@ async function benchmarkAsyncCase(scenario, app, request) {
   };
 }
 
-function calibrateSync(operation) {
+function calibrateSync(operation: SyncOperation): number {
   let iterations = 1000;
 
   while (true) {
@@ -468,7 +482,7 @@ function calibrateSync(operation) {
   }
 }
 
-async function calibrateAsync(operation) {
+async function calibrateAsync(operation: AsyncOperation): Promise<number> {
   let iterations = 100;
 
   while (true) {
@@ -486,7 +500,7 @@ async function calibrateAsync(operation) {
   }
 }
 
-function measureSync(operation, iterations) {
+function measureSync(operation: SyncOperation, iterations: number): number {
   const start = performance.now();
 
   for (let index = 0; index < iterations; index++) {
@@ -496,7 +510,10 @@ function measureSync(operation, iterations) {
   return performance.now() - start;
 }
 
-async function measureAsync(operation, iterations) {
+async function measureAsync(
+  operation: AsyncOperation,
+  iterations: number,
+): Promise<number> {
   const start = performance.now();
 
   for (let index = 0; index < iterations; index++) {
@@ -506,10 +523,10 @@ async function measureAsync(operation, iterations) {
   return performance.now() - start;
 }
 
-function addOverhead(rows) {
+function addOverhead(rows: RuntimeResultRow[]): LifecycleOverheadRow[] {
   const byScenario = new Map(rows.map((row) => [row.scenario, row]));
 
-  const baselines = {
+  const baselines: Record<string, string | null> = {
     "plain-sync": null,
 
     "before-sync": "plain-sync",
@@ -568,7 +585,7 @@ function addOverhead(rows) {
   });
 }
 
-function isPromiseLike(value) {
+function isPromiseLike(value: unknown): value is PromiseLike<unknown> {
   if (
     value === null ||
     (typeof value !== "object" && typeof value !== "function")
@@ -576,22 +593,41 @@ function isPromiseLike(value) {
     return false;
   }
 
-  return typeof value.then === "function";
+  return (
+    typeof (
+      value as {
+        then?: unknown;
+      }
+    ).then === "function"
+  );
 }
 
-function median(values) {
+function median(values: number[]): number {
   const sorted = [...values].sort((a, b) => a - b);
 
   const middle = Math.floor(sorted.length / 2);
 
   if (sorted.length % 2 === 1) {
-    return sorted[middle];
+    const value = sorted[middle];
+
+    if (value === undefined) {
+      throw new Error("Cannot compute median of an empty sample set");
+    }
+
+    return value;
   }
 
-  return (sorted[middle - 1] + sorted[middle]) / 2;
+  const left = sorted[middle - 1];
+  const right = sorted[middle];
+
+  if (left === undefined || right === undefined) {
+    throw new Error("Cannot compute median of an empty sample set");
+  }
+
+  return (left + right) / 2;
 }
 
-function round(value, digits) {
+function round(value: number, digits: number): number {
   const factor = 10 ** digits;
 
   return Math.round(value * factor) / factor;

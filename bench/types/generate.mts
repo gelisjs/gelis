@@ -1,6 +1,25 @@
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 
-const SIZES = [100, 500, 1000, 5000];
+const SIZES = [100, 500, 1000, 5000] as const;
+
+type BenchmarkSize = (typeof SIZES)[number];
+
+type ClientProbeMode = "sparse" | "module" | "all";
+
+interface RouteChunk {
+  start: number;
+  end: number;
+}
+
+interface GeneratedModule {
+  moduleName: string;
+  fileName: string;
+}
+
+interface RouteLocation {
+  moduleName: string;
+  routeName: string;
+}
 
 const ROUTES_PER_FILE = 50;
 
@@ -28,7 +47,7 @@ for (const size of SIZES) {
   generateClient(size, "client", "all");
 }
 
-function caseDir(name, size) {
+function caseDir(name: string, size: BenchmarkSize): URL {
   const directory = new URL(`./generated/${name}-${size}/`, import.meta.url);
 
   mkdirSync(directory, {
@@ -40,7 +59,7 @@ function caseDir(name, size) {
   return directory;
 }
 
-function writeTsconfig(directory) {
+function writeTsconfig(directory: URL): void {
   const config = {
     extends: "../../../../tsconfig.json",
 
@@ -59,8 +78,8 @@ function writeTsconfig(directory) {
   );
 }
 
-function chunks(size) {
-  const result = [];
+function chunks(size: BenchmarkSize): RouteChunk[] {
+  const result: RouteChunk[] = [];
 
   for (let start = 0; start < size; start += ROUTES_PER_FILE) {
     result.push({
@@ -73,10 +92,10 @@ function chunks(size) {
   return result;
 }
 
-function generateBaseline(size) {
+function generateBaseline(size: BenchmarkSize): void {
   const directory = caseDir("baseline", size);
 
-  const imports = [];
+  const imports: string[] = [];
 
   for (const [fileIndex, { start, end }] of chunks(size).entries()) {
     const name = `routes-${String(fileIndex).padStart(3, "0")}.ts`;
@@ -111,10 +130,10 @@ function generateBaseline(size) {
   );
 }
 
-function generateRoutes(size) {
+function generateRoutes(size: BenchmarkSize): void {
   const directory = caseDir("routes", size);
 
-  const imports = [];
+  const imports: string[] = [];
 
   writeFileSync(
     new URL("app.ts", directory),
@@ -170,11 +189,11 @@ function generateRoutes(size) {
   );
 }
 
-function generateContract(size) {
+function generateContract(size: BenchmarkSize): void {
   const directory = caseDir("contract", size);
 
-  const modules = [];
-  const routeLocations = [];
+  const modules: GeneratedModule[] = [];
+  const routeLocations: RouteLocation[] = [];
 
   for (const [moduleIndex, { start, end }] of chunks(size).entries()) {
     const moduleName = `module${moduleIndex}`;
@@ -266,7 +285,7 @@ function generateContract(size) {
   );
 }
 
-function generateRichContract(size) {
+function generateRichContract(size: BenchmarkSize): void {
   const directory = caseDir("rich-contract", size);
 
   writeFileSync(
@@ -318,8 +337,8 @@ function generateRichContract(size) {
     ].join("\n"),
   );
 
-  const modules = [];
-  const routeLocations = [];
+  const modules: GeneratedModule[] = [];
+  const routeLocations: RouteLocation[] = [];
 
   for (const [moduleIndex, { start, end }] of chunks(size).entries()) {
     const moduleName = `module${moduleIndex}`;
@@ -446,11 +465,15 @@ function generateRichContract(size) {
   );
 }
 
-function generateClient(size, scenario, probeMode) {
+function generateClient(
+  size: BenchmarkSize,
+  scenario: string,
+  probeMode: ClientProbeMode,
+): void {
   const directory = caseDir(scenario, size);
 
-  const modules = [];
-  const routeLocations = [];
+  const modules: GeneratedModule[] = [];
+  const routeLocations: RouteLocation[] = [];
 
   for (const [moduleIndex, { start, end }] of chunks(size).entries()) {
     const moduleName = `module${moduleIndex}`;
@@ -553,7 +576,10 @@ function generateClient(size, scenario, probeMode) {
   );
 }
 
-function selectClientProbes(routes, mode) {
+function selectClientProbes(
+  routes: RouteLocation[],
+  mode: ClientProbeMode,
+): RouteLocation[] {
   if (mode === "all") {
     return routes;
   }
@@ -579,7 +605,13 @@ function selectClientProbes(routes, mode) {
       (_, index) => {
         const position = Math.round((index * lastIndex) / (count - 1));
 
-        return routes[position];
+        const route = routes[position];
+
+        if (!route) {
+          throw new Error(`Missing generated client probe at ${position}`);
+        }
+
+        return route;
       },
     );
   }

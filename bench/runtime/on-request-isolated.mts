@@ -12,41 +12,43 @@ const ROOT = resolve(HERE, "../..");
 
 const RESULTS_DIR = resolve(HERE, "results");
 
-const CHILD = resolve(HERE, "on-error.mjs");
+const CHILD = resolve(HERE, "on-request.mts");
 
 const cases = [
   "plain-sync",
 
-  "on-error-unused-sync",
+  "on-request-sync",
 
-  "two-on-error-unused-sync",
+  "two-on-request-sync",
 
-  "three-on-error-unused-sync",
+  "three-on-request-sync",
 
-  "handler-error-handled-sync",
+  "late-on-request-sync",
 
-  "handler-error-unhandled-sync",
+  "early-return",
 
-  "handler-error-async-on-error",
+  "validation-only",
+
+  "validation-on-request",
 
   "plain-async-handler",
 
-  "on-error-unused-async-handler",
+  "on-request-async",
 
-  "async-handler-error-handled",
+  "async-early-return",
+] as const;
 
-  "on-request-error-handled",
+mkdirSync(
+  RESULTS_DIR,
 
-  "normalization-error-handled",
-];
+  {
+    recursive: true,
+  },
+);
 
-mkdirSync(RESULTS_DIR, {
-  recursive: true,
-});
+const runtimeRows: RuntimeResultRow[] = [];
 
-const runtimeRows = [];
-
-console.log("\nGelis isolated onError runtime benchmark");
+console.log("\nGelis isolated onRequest runtime benchmark");
 
 console.log(`Runtime:     bun ${Bun.version}`);
 
@@ -67,17 +69,13 @@ for (let index = 0; index < cases.length; index++) {
 
   await runIsolatedCase(scenario);
 
-  const file = resolve(RESULTS_DIR, `latest-on-error-${scenario}.json`);
+  const file = resolve(
+    RESULTS_DIR,
 
-  const data = JSON.parse(readFileSync(file, "utf8"));
+    `latest-on-request-${scenario}.json`,
+  );
 
-  const row = data.runtime?.[0];
-
-  if (!row) {
-    throw new Error(`Missing runtime result for ${scenario}`);
-  }
-
-  runtimeRows.push(row);
+  runtimeRows.push(readRuntimeRow(file, scenario));
 }
 
 const comparisons = createComparisons(runtimeRows);
@@ -133,16 +131,16 @@ const output = {
 };
 
 writeFileSync(
-  resolve(RESULTS_DIR, "latest-on-error-isolated.json"),
+  resolve(RESULTS_DIR, "latest-on-request-isolated.json"),
 
   `${JSON.stringify(output, null, 2)}\n`,
 );
 
 console.log(
-  "\nRaw results: " + "bench/runtime/results/latest-on-error-isolated.json",
+  "\nRaw results: " + "bench/runtime/results/latest-on-request-isolated.json",
 );
 
-async function runIsolatedCase(scenario) {
+async function runIsolatedCase(scenario: string): Promise<void> {
   const child = Bun.spawn(
     [process.execPath, CHILD, `--cases=${scenario}`],
 
@@ -170,24 +168,69 @@ async function runIsolatedCase(scenario) {
   }
 }
 
-function createComparisons(rows) {
+function readRuntimeRow(file: string, scenario: string): RuntimeResultRow {
+  const data: unknown = JSON.parse(readFileSync(file, "utf8"));
+
+  if (
+    data === null ||
+    typeof data !== "object" ||
+    !("runtime" in data) ||
+    !Array.isArray(data.runtime)
+  ) {
+    throw new Error(`Missing runtime result for ${scenario}`);
+  }
+
+  const row: unknown = data.runtime[0];
+
+  if (!isRuntimeResultRow(row)) {
+    throw new Error(`Invalid runtime result for ${scenario}`);
+  }
+
+  return row;
+}
+
+function isRuntimeResultRow(value: unknown): value is RuntimeResultRow {
+  return (
+    value !== null &&
+    typeof value === "object" &&
+    "scenario" in value &&
+    typeof value.scenario === "string" &&
+    "mode" in value &&
+    (value.mode === "sync" ||
+      value.mode === "sync-throw" ||
+      value.mode === "async") &&
+    "iterations" in value &&
+    typeof value.iterations === "number" &&
+    "nsPerOp" in value &&
+    typeof value.nsPerOp === "number" &&
+    "opsPerSecond" in value &&
+    typeof value.opsPerSecond === "number" &&
+    "samples" in value &&
+    Array.isArray(value.samples) &&
+    value.samples.every((sample) => typeof sample === "number")
+  );
+}
+
+function createComparisons(rows: RuntimeResultRow[]): RuntimeComparisonRow[] {
   const byScenario = new Map(rows.map((row) => [row.scenario, row]));
 
-  const pairs = [
-    ["on-error-unused-sync", "plain-sync"],
+  const pairs: Array<readonly [string, string]> = [
+    ["on-request-sync", "plain-sync"],
 
-    ["two-on-error-unused-sync", "on-error-unused-sync"],
+    ["two-on-request-sync", "on-request-sync"],
 
-    ["three-on-error-unused-sync", "two-on-error-unused-sync"],
+    ["three-on-request-sync", "two-on-request-sync"],
 
-    ["handler-error-handled-sync", "handler-error-unhandled-sync"],
+    ["late-on-request-sync", "on-request-sync"],
 
-    ["handler-error-async-on-error", "handler-error-handled-sync"],
+    ["validation-on-request", "validation-only"],
 
-    ["on-error-unused-async-handler", "plain-async-handler"],
+    ["on-request-async", "plain-async-handler"],
+
+    ["async-early-return", "on-request-async"],
   ];
 
-  const comparisons = [];
+  const comparisons: RuntimeComparisonRow[] = [];
 
   for (const [scenarioName, referenceName] of pairs) {
     const scenario = byScenario.get(scenarioName);
@@ -218,7 +261,7 @@ function createComparisons(rows) {
   return comparisons;
 }
 
-function round(value, digits) {
+function round(value: number, digits: number): number {
   const factor = 10 ** digits;
 
   return Math.round(value * factor) / factor;
