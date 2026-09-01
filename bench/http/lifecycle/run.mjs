@@ -104,6 +104,37 @@ const cases = [
   },
 ];
 
+const requestedCases = readListArgument("--cases");
+
+const selectedCases =
+  requestedCases.length === 0
+    ? cases
+    : cases.filter((benchmarkCase) =>
+        requestedCases.includes(benchmarkCase.name),
+      );
+
+if (
+  requestedCases.length !== 0 &&
+  selectedCases.length !== requestedCases.length
+) {
+  const knownCases = new Set(cases.map((benchmarkCase) => benchmarkCase.name));
+
+  const unknownCases = requestedCases.filter((name) => !knownCases.has(name));
+
+  throw new Error(
+    `Unknown lifecycle benchmark case(s): ${unknownCases.join(", ")}`,
+  );
+}
+
+const selectedCaseNames = selectedCases.map(
+  (benchmarkCase) => benchmarkCase.name,
+);
+
+const resultFileName =
+  requestedCases.length === 0
+    ? "latest-lifecycle.json"
+    : `latest-lifecycle-${selectedCaseNames.join("-")}.json`;
+
 mkdirSync(RESULTS_DIR, {
   recursive: true,
 });
@@ -114,10 +145,20 @@ mkdirSync(GENERATED_DIR, {
 
 await ensureOha();
 
+console.log(`Lifecycle cases: ${selectedCaseNames.join(", ")}`);
+
+console.log(
+  requestedCases.length === 0
+    ? "Benchmark mode: full"
+    : "Benchmark mode: filtered",
+);
+
+console.log("");
+
 const rawResults = [];
 
-for (let caseIndex = 0; caseIndex < cases.length; caseIndex++) {
-  const benchmarkCase = cases[caseIndex];
+for (let caseIndex = 0; caseIndex < selectedCases.length; caseIndex++) {
+  const benchmarkCase = selectedCases[caseIndex];
 
   if (!benchmarkCase) {
     continue;
@@ -170,7 +211,9 @@ console.log(`Routes:      ${ROUTES}`);
 
 console.log(`Connections: ${CONNECTIONS}`);
 
-console.log(`Samples:     ${SAMPLES}\n`);
+console.log(`Samples:     ${SAMPLES}`);
+
+console.log(`Cases:       ${selectedCaseNames.join(", ")}\n`);
 
 console.table(
   rows.map((row) => ({
@@ -216,6 +259,12 @@ const output = {
 
     duration: DURATION,
 
+    warmupDuration: WARMUP_DURATION,
+
+    cases: selectedCaseNames,
+
+    filtered: requestedCases.length !== 0,
+
     versions: {
       hono: packageVersion("hono"),
 
@@ -231,12 +280,12 @@ const output = {
 };
 
 writeFileSync(
-  resolve(RESULTS_DIR, "latest-lifecycle.json"),
+  resolve(RESULTS_DIR, resultFileName),
 
   `${JSON.stringify(output, null, 2)}\n`,
 );
 
-console.log("\nRaw results: " + "bench/http/results/latest-lifecycle.json");
+console.log(`\nRaw results: bench/http/results/${resultFileName}`);
 
 function generateUrls(benchmarkCase) {
   const urls = [];
@@ -662,6 +711,22 @@ function packageVersion(name) {
   } catch {
     return "unknown";
   }
+}
+
+function readListArgument(name) {
+  const prefix = `${name}=`;
+
+  const argument = process.argv.find((value) => value.startsWith(prefix));
+
+  if (!argument) {
+    return [];
+  }
+
+  return argument
+    .slice(prefix.length)
+    .split(",")
+    .map((value) => value.trim())
+    .filter(Boolean);
 }
 
 function sleep(milliseconds) {
