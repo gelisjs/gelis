@@ -10,7 +10,7 @@ import { normalizeResponse, runtimeReply } from "./runtime/response";
 
 import { compileAfterHandle, compileBeforeHandle } from "./runtime/lifecycle";
 
-import { compileOnRequest, createOnRequestFetch } from "./runtime/on-request";
+import { compileOnRequestFetch } from "./runtime/on-request";
 
 import type { OnRequest } from "./request";
 
@@ -128,11 +128,6 @@ export class Gelis extends RouteBuilder<""> {
 
     let hooks = state.onRequestHooks;
 
-    /*
-     * Capture the untouched routed fetch only
-     * once, before this instance gets its own
-     * onRequest fetch property.
-     */
     if (hooks === undefined) {
       hooks = [hook];
 
@@ -149,25 +144,12 @@ export class Gelis extends RouteBuilder<""> {
       throw new Error("Missing Gelis routed fetch");
     }
 
-    const plan = compileOnRequest(hooks);
-
-    if (plan === undefined) {
-      throw new Error("Missing Gelis onRequest plan");
-    }
-
-    /*
-     * Shadow the prototype fetch only for apps
-     * that actually enable onRequest.
-     *
-     * Apps without onRequest continue using the
-     * existing prototype fetch exactly as before.
-     */
     Object.defineProperty(this, "fetch", {
       configurable: true,
 
       writable: true,
 
-      value: createOnRequestFetch(plan, routedFetch),
+      value: compileOnRequestFetch(hooks, routedFetch),
     });
 
     return this;
