@@ -103,6 +103,19 @@ function runSingleErrorHook(
     error,
   });
 
+  /*
+   * Response is the common handled-error fast path.
+   *
+   * normalizeResponse() would perform the same
+   * instanceof check as its first operation, so
+   * returning it directly preserves semantics while
+   * avoiding PromiseLike inspection and an additional
+   * normalization call.
+   */
+  if (result instanceof Response) {
+    return result;
+  }
+
   if (isPromiseLike(result)) {
     return Promise.resolve(result).then((handled) => {
       if (handled !== undefined) {
