@@ -371,6 +371,134 @@ describe("Gelis global lifecycle runtime", () => {
 
     expect(appAGlobalCalls).toBe(1);
   });
+
+  test("supports asynchronous hook inside triple beforeHandle plan", async () => {
+    const events: string[] = [];
+
+    const app = new Gelis();
+
+    app.onBeforeHandle(() => {
+      events.push("before-1");
+    });
+
+    app.onBeforeHandle(async () => {
+      await Promise.resolve();
+
+      events.push("before-2");
+    });
+
+    app.onBeforeHandle(() => {
+      events.push("before-3");
+    });
+
+    app.get(
+      "/triple-before-async",
+
+      () => {
+        events.push("handler");
+
+        return "ok";
+      },
+    );
+
+    const result = app.fetch(
+      new Request("http://gelis.test/triple-before-async"),
+    );
+
+    expect(result).toBeInstanceOf(Promise);
+
+    const response = await result;
+
+    expect(await response.text()).toBe("ok");
+
+    expect(events).toEqual(["before-1", "before-2", "before-3", "handler"]);
+  });
+
+  test("short-circuits asynchronous middle hook in triple beforeHandle plan", async () => {
+    const events: string[] = [];
+
+    const app = new Gelis();
+
+    app.onBeforeHandle(() => {
+      events.push("before-1");
+    });
+
+    app.onBeforeHandle(async () => {
+      await Promise.resolve();
+
+      events.push("before-2");
+
+      return new Response("blocked", {
+        status: 403,
+      });
+    });
+
+    app.onBeforeHandle(() => {
+      events.push("before-3");
+    });
+
+    app.get(
+      "/triple-before-early",
+
+      () => {
+        events.push("handler");
+
+        return "handler";
+      },
+    );
+
+    const response = await app.fetch(
+      new Request("http://gelis.test/triple-before-early"),
+    );
+
+    expect(response.status).toBe(403);
+
+    expect(await response.text()).toBe("blocked");
+
+    expect(events).toEqual(["before-1", "before-2"]);
+  });
+
+  test("supports asynchronous hook inside triple afterHandle plan", async () => {
+    const events: string[] = [];
+
+    const app = new Gelis();
+
+    app.onAfterHandle(() => {
+      events.push("after-1");
+    });
+
+    app.onAfterHandle(async () => {
+      await Promise.resolve();
+
+      events.push("after-2");
+    });
+
+    app.onAfterHandle(() => {
+      events.push("after-3");
+    });
+
+    app.get(
+      "/triple-after-async",
+
+      () => {
+        events.push("handler");
+
+        return "ok";
+      },
+    );
+
+    const result = app.fetch(
+      new Request("http://gelis.test/triple-after-async"),
+    );
+
+    expect(result).toBeInstanceOf(Promise);
+
+    const response = await result;
+
+    expect(await response.text()).toBe("ok");
+
+    expect(events).toEqual(["handler", "after-1", "after-2", "after-3"]);
+  });
 });
 
 function createSchema<Input = unknown, Output = Input>(
