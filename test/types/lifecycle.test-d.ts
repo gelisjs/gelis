@@ -91,15 +91,41 @@ const route = app.post(
 
       const normalized: true = body.normalized;
 
-      const status: 201 = result.status;
-
-      const id: string = result.body.id;
-
       void teamId;
       void page;
       void normalized;
+
+      /*
+       * Raw Response remains an opaque escape hatch
+       * in the explicit handler result algebra.
+       */
+      if (result instanceof Response) {
+        return;
+      }
+
+      /*
+       * Explicit-route afterHandle sees the
+       * conservative producer result union rather
+       * than one implementation-specific handler
+       * return type.
+       */
+      if (result.status === 201) {
+        const status: 201 = result.status;
+
+        const id: string = result.body.id;
+
+        void status;
+        void id;
+
+        return;
+      }
+
+      const status: 401 = result.status;
+
+      const code: "UNAUTHORIZED" = result.body.code;
+
       void status;
-      void id;
+      void code;
     },
   },
 );
@@ -148,6 +174,10 @@ type Responses = Expect<
   >
 >;
 
+/*
+ * Implicit routes still retain exact
+ * implementation-result inference.
+ */
 const inferredResult = app.get(
   "/after-result",
 

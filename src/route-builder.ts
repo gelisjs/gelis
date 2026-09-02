@@ -67,6 +67,12 @@ export class RouteBuilder<Prefix extends string = ""> {
     this.#register = register;
   }
 
+  /*
+   * GET without options.
+   *
+   * Handler result is inferred naturally and
+   * becomes the implicit public response contract.
+   */
   get<const Path extends string, Result>(
     path: Path & ValidRoutePath<Path>,
 
@@ -86,6 +92,12 @@ export class RouteBuilder<Prefix extends string = ""> {
     InferImplicitResponses<Result>
   >;
 
+  /*
+   * GET with options but without an explicit
+   * response contract.
+   *
+   * Result inference remains implementation-driven.
+   */
   get<
     const Path extends string,
     const Query extends StandardSchemaV1 | undefined = undefined,
@@ -120,13 +132,27 @@ export class RouteBuilder<Prefix extends string = ""> {
     RouteResponsesFor<RouteOptionsFor<Query, Body, undefined>, Result>
   >;
 
+  /*
+   * GET with an explicit response contract.
+   *
+   * The response contract directly contextually
+   * types the handler result. We intentionally do
+   * not infer an implementation-specific Result
+   * generic here.
+   *
+   * This keeps literal schema outputs such as
+   * `normalized: true` intact without requiring
+   * `as const`.
+   *
+   * afterHandle receives the conservative producer
+   * result algebra represented by the response
+   * contract.
+   */
   get<
     const Path extends string,
     const Responses extends ResponseContractMap,
     const Query extends StandardSchemaV1 | undefined = undefined,
     const Body extends StandardSchemaV1 | undefined = undefined,
-    const Result extends RouteHandlerResultFor<Responses> =
-      RouteHandlerResultFor<Responses>,
   >(
     path: Path & ValidRoutePath<Path>,
 
@@ -139,14 +165,14 @@ export class RouteBuilder<Prefix extends string = ""> {
         JoinRoutePath<Prefix, Path>,
         RouteOptionsFor<Query, Body, Responses>
       >,
-    ) => Result,
+    ) => RouteHandlerResultFor<Responses>,
 
     lifecycle?: RouteLifecycleFor<
       JoinRoutePath<Prefix, Path>,
       Query,
       Body,
       Responses,
-      Result
+      RouteHandlerResultFor<Responses>
     >,
   ): RouteRef<
     "GET",
@@ -155,7 +181,10 @@ export class RouteBuilder<Prefix extends string = ""> {
       JoinRoutePath<Prefix, Path>,
       RouteOptionsFor<Query, Body, Responses>
     >,
-    RouteResponsesFor<RouteOptionsFor<Query, Body, Responses>, Result>
+    RouteResponsesFor<
+      RouteOptionsFor<Query, Body, Responses>,
+      RouteHandlerResultFor<Responses>
+    >
   >;
 
   get(
@@ -176,6 +205,9 @@ export class RouteBuilder<Prefix extends string = ""> {
     );
   }
 
+  /*
+   * POST without options.
+   */
   post<const Path extends string, Result>(
     path: Path & ValidRoutePath<Path>,
 
@@ -195,6 +227,10 @@ export class RouteBuilder<Prefix extends string = ""> {
     InferImplicitResponses<Result>
   >;
 
+  /*
+   * POST with options but without an explicit
+   * response contract.
+   */
   post<
     const Path extends string,
     const Query extends StandardSchemaV1 | undefined = undefined,
@@ -229,13 +265,14 @@ export class RouteBuilder<Prefix extends string = ""> {
     RouteResponsesFor<RouteOptionsFor<Query, Body, undefined>, Result>
   >;
 
+  /*
+   * POST with an explicit response contract.
+   */
   post<
     const Path extends string,
     const Responses extends ResponseContractMap,
     const Query extends StandardSchemaV1 | undefined = undefined,
     const Body extends StandardSchemaV1 | undefined = undefined,
-    const Result extends RouteHandlerResultFor<Responses> =
-      RouteHandlerResultFor<Responses>,
   >(
     path: Path & ValidRoutePath<Path>,
 
@@ -248,14 +285,14 @@ export class RouteBuilder<Prefix extends string = ""> {
         JoinRoutePath<Prefix, Path>,
         RouteOptionsFor<Query, Body, Responses>
       >,
-    ) => Result,
+    ) => RouteHandlerResultFor<Responses>,
 
     lifecycle?: RouteLifecycleFor<
       JoinRoutePath<Prefix, Path>,
       Query,
       Body,
       Responses,
-      Result
+      RouteHandlerResultFor<Responses>
     >,
   ): RouteRef<
     "POST",
@@ -264,7 +301,10 @@ export class RouteBuilder<Prefix extends string = ""> {
       JoinRoutePath<Prefix, Path>,
       RouteOptionsFor<Query, Body, Responses>
     >,
-    RouteResponsesFor<RouteOptionsFor<Query, Body, Responses>, Result>
+    RouteResponsesFor<
+      RouteOptionsFor<Query, Body, Responses>,
+      RouteHandlerResultFor<Responses>
+    >
   >;
 
   post(
