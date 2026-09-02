@@ -248,99 +248,52 @@ function compileResponseEntry(
 function compileResponseFinalizer(
   entries: readonly RuntimeResponsePlanEntry[],
 ): RuntimeResponseFinalizer {
-  /*
-   * Compile every declared status exactly once.
-   *
-   * Direct handler results have canonical statuses:
-   *
-   * body      -> 200
-   * undefined -> 204
-   *
-   * Only reply.status() requires dynamic status
-   * dispatch.
-   */
-  const compiled = entries.map(compileResponseStatusEntry);
-
-  const finalizeManaged = compileManagedResponseFinalizer(compiled);
-
-  let finalize200: RuntimeStatusFinalizer | undefined;
-
-  let finalize204: RuntimeStatusFinalizer | undefined;
-
-  for (const entry of compiled) {
-    if (entry.status === 200) {
-      finalize200 = entry.finalize;
-    } else if (entry.status === 204) {
-      finalize204 = entry.finalize;
-    }
-  }
-
-  /*
-   * Registration-time fallback functions keep
-   * undeclared-status checks out of the successful
-   * direct-result path.
-   */
-  const finalizeDirect200 =
-    finalize200 ??
-    (() => {
-      throw undeclaredStatusError(200);
-    });
-
-  const finalizeDirect204 =
-    finalize204 ??
-    (() => {
-      throw undeclaredStatusError(204);
-    });
+  const finalizeManaged = compileManagedResponseFinalizer(entries);
 
   return (value) => {
     /*
-     * Raw Response remains the first and cheapest
-     * escape hatch.
+     * Direct raw Response bypasses the complete
+     * managed response plan.
      */
     if (value instanceof Response) {
       return value;
     }
 
-    /*
-     * Explicit reply.status() is the only managed
-     * result whose status must be dispatched at
-     * request time.
-     */
     if (isRuntimeReplyResult(value)) {
       return finalizeManaged(value.status, value.body);
     }
 
     /*
-     * Direct undefined has canonical HTTP 204
-     * semantics.
+     * Direct undefined always means 204.
+     *
+     * It does not become status 200 merely because
+     * a `200: undefined` contract exists.
      */
     if (value === undefined) {
-      return finalizeDirect204(undefined);
+      return finalizeManaged(204, undefined);
     }
 
     /*
-     * Every other direct managed value has
-     * canonical HTTP 200 semantics.
-     *
-     * Do not enter the dynamic status dispatcher.
+     * Every other direct managed handler result
+     * selects HTTP 200.
      */
-    return finalizeDirect200(value);
+    return finalizeManaged(200, value);
   };
 }
 
 function compileManagedResponseFinalizer(
-  compiled: readonly CompiledResponseEntry[],
+  entries: readonly RuntimeResponsePlanEntry[],
 ): RuntimeManagedResponseFinalizer {
-  if (compiled.length === 0) {
+  if (entries.length === 0) {
     throw new Error("Executable Gelis response plan has no response entries");
   }
 
+  const compiled = entries.map(compileResponseStatusEntry);
+
   /*
-   * Small explicit-status contracts avoid Map
-   * lookup.
-   *
-   * This dispatcher is now used only for
-   * reply.status(), not ordinary direct results.
+   * Small response contracts are expected to be the
+   * common case. Avoid Map lookup for one to three
+   * declared statuses.
    */
   if (compiled.length === 1) {
     const first = compiled[0];
@@ -409,8 +362,9 @@ function compileManagedResponseFinalizer(
   }
 
   /*
-   * Larger explicit-status contracts use a
-   * registration-time Map.
+   * Larger contracts use a registration-time Map.
+   * Descriptor interpretation is still completely
+   * absent from request execution.
    */
   const byStatus = new Map<number, RuntimeStatusFinalizer>();
 
