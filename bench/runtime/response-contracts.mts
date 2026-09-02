@@ -28,6 +28,8 @@ const JSON_INIT = {
   status: 200,
 };
 
+const JSON_CONTENT_TYPE = "application/json;charset=utf-8";
+
 const TEXT_INIT = {
   status: 200,
 
@@ -548,7 +550,7 @@ function createJsonPair(): PairDefinition {
 
     expectedBody: JSON.stringify(PAYLOAD),
 
-    expectedContentType: "application/json",
+    expectedContentType: JSON_CONTENT_TYPE,
   };
 }
 
@@ -643,7 +645,7 @@ function createValidateAutoPair(): PairDefinition {
 
     expectedBody: JSON.stringify(VALIDATED_PAYLOAD),
 
-    expectedContentType: "application/json",
+    expectedContentType: JSON_CONTENT_TYPE,
   };
 }
 
@@ -698,7 +700,7 @@ function createValidateJsonPair(): PairDefinition {
 
     expectedBody: JSON.stringify(VALIDATED_PAYLOAD),
 
-    expectedContentType: "application/json",
+    expectedContentType: JSON_CONTENT_TYPE,
   };
 }
 
@@ -746,7 +748,7 @@ function createReplyStatusPair(): PairDefinition {
 
     expectedBody: JSON.stringify(PAYLOAD),
 
-    expectedContentType: "application/json",
+    expectedContentType: JSON_CONTENT_TYPE,
   };
 }
 
