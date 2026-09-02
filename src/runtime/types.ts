@@ -2,6 +2,8 @@ import type { HttpMethod, ResponseContractMap } from "../route";
 
 import type { RuntimeInputPlan } from "./input";
 
+import type { RuntimeResponsePlan } from "./response-plan";
+
 export const RUNTIME_ROUTE_PLAIN = 0;
 export const RUNTIME_ROUTE_INPUT = 1;
 export const RUNTIME_ROUTE_BEFORE_HANDLE = 2;
@@ -69,6 +71,16 @@ export interface RuntimeRouteRecord {
   flags: number;
 
   readonly input: RuntimeInputPlan | undefined;
+
+  /*
+   * Present only when at least one declared response
+   * entry activates executable response behavior.
+   *
+   * Metadata-only and plain routes deliberately omit
+   * this property so their runtime record shape does
+   * not gain response-plan state unnecessarily.
+   */
+  readonly responsePlan?: RuntimeResponsePlan;
 
   beforeHandle: RuntimeBeforeHandle | undefined;
 

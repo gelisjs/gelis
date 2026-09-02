@@ -30,8 +30,11 @@ import type {
   RuntimeAfterHandle,
   RuntimeBeforeHandle,
   RuntimeRouteHandler,
+  RuntimeRouteRecord,
   RuntimeRouteRegister,
 } from "./runtime/types";
+
+import { createRuntimeResponsePlan } from "./runtime/response-plan";
 
 export type JoinRoutePath<
   Prefix extends string,
@@ -418,6 +421,13 @@ export class RouteBuilder<Prefix extends string = ""> {
 
     const input = createRuntimeInputPlan(options);
 
+    const responses = options?.responses;
+
+    const responsePlan =
+      responses === undefined
+        ? undefined
+        : createRuntimeResponsePlan(responses);
+
     const beforeHandle = lifecycle?.beforeHandle;
 
     const afterHandle = lifecycle?.afterHandle;
@@ -436,7 +446,7 @@ export class RouteBuilder<Prefix extends string = ""> {
       flags |= RUNTIME_ROUTE_AFTER_HANDLE;
     }
 
-    this.#register({
+    const runtimeRoute: RuntimeRouteRecord = {
       method,
       path: fullPath,
 
@@ -450,8 +460,18 @@ export class RouteBuilder<Prefix extends string = ""> {
 
       afterHandle,
 
-      responses: options?.responses,
-    });
+      responses,
+    };
+
+    if (responsePlan === undefined) {
+      this.#register(runtimeRoute);
+    } else {
+      this.#register({
+        ...runtimeRoute,
+
+        responsePlan,
+      });
+    }
 
     return {
       method,
