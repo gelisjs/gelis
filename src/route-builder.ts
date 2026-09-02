@@ -22,6 +22,7 @@ import {
   RUNTIME_ROUTE_AFTER_HANDLE,
   RUNTIME_ROUTE_BEFORE_HANDLE,
   RUNTIME_ROUTE_INPUT,
+  RUNTIME_ROUTE_RESPONSE,
 } from "./runtime/types";
 
 import type { InferPathParams, ValidRoutePath } from "./types/path";
@@ -444,6 +445,10 @@ export class RouteBuilder<Prefix extends string = ""> {
 
     if (afterHandle !== undefined) {
       flags |= RUNTIME_ROUTE_AFTER_HANDLE;
+    }
+
+    if (responsePlan !== undefined) {
+      flags |= RUNTIME_ROUTE_RESPONSE;
     }
 
     const runtimeRoute: RuntimeRouteRecord = {

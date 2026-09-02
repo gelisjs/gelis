@@ -32,13 +32,21 @@ import {
 
 import {
   RUNTIME_ROUTE_AFTER_HANDLE,
+  RUNTIME_ROUTE_AFTER_HANDLE_RESPONSE,
   RUNTIME_ROUTE_BEFORE_AFTER_HANDLE,
+  RUNTIME_ROUTE_BEFORE_AFTER_HANDLE_RESPONSE,
   RUNTIME_ROUTE_BEFORE_HANDLE,
+  RUNTIME_ROUTE_BEFORE_HANDLE_RESPONSE,
   RUNTIME_ROUTE_INPUT,
   RUNTIME_ROUTE_INPUT_AFTER_HANDLE,
+  RUNTIME_ROUTE_INPUT_AFTER_HANDLE_RESPONSE,
   RUNTIME_ROUTE_INPUT_BEFORE_AFTER_HANDLE,
+  RUNTIME_ROUTE_INPUT_BEFORE_AFTER_HANDLE_RESPONSE,
   RUNTIME_ROUTE_INPUT_BEFORE_HANDLE,
+  RUNTIME_ROUTE_INPUT_BEFORE_HANDLE_RESPONSE,
+  RUNTIME_ROUTE_INPUT_RESPONSE,
   RUNTIME_ROUTE_PLAIN,
+  RUNTIME_ROUTE_RESPONSE,
 } from "./runtime/types";
 
 import type { ModuleRef, ModuleRoutes } from "./module";
@@ -344,6 +352,86 @@ export class Gelis extends RouteBuilder<""> {
         );
       }
 
+      case RUNTIME_ROUTE_RESPONSE: {
+        return invokeResponseRoute(
+          route,
+          request,
+          params,
+          undefined,
+          undefined,
+        );
+      }
+
+      case RUNTIME_ROUTE_INPUT_RESPONSE: {
+        return runInputPlan(
+          route,
+          request,
+          params,
+
+          invokeResponseRoute,
+        );
+      }
+
+      case RUNTIME_ROUTE_BEFORE_HANDLE_RESPONSE: {
+        return invokeBeforeHandleResponseRoute(
+          route,
+          request,
+          params,
+          undefined,
+          undefined,
+        );
+      }
+
+      case RUNTIME_ROUTE_INPUT_BEFORE_HANDLE_RESPONSE: {
+        return runInputPlan(
+          route,
+          request,
+          params,
+
+          invokeBeforeHandleResponseRoute,
+        );
+      }
+
+      case RUNTIME_ROUTE_AFTER_HANDLE_RESPONSE: {
+        return invokeAfterHandleResponseRoute(
+          route,
+          request,
+          params,
+          undefined,
+          undefined,
+        );
+      }
+
+      case RUNTIME_ROUTE_INPUT_AFTER_HANDLE_RESPONSE: {
+        return runInputPlan(
+          route,
+          request,
+          params,
+
+          invokeAfterHandleResponseRoute,
+        );
+      }
+
+      case RUNTIME_ROUTE_BEFORE_AFTER_HANDLE_RESPONSE: {
+        return invokeBeforeAfterHandleResponseRoute(
+          route,
+          request,
+          params,
+          undefined,
+          undefined,
+        );
+      }
+
+      case RUNTIME_ROUTE_INPUT_BEFORE_AFTER_HANDLE_RESPONSE: {
+        return runInputPlan(
+          route,
+          request,
+          params,
+
+          invokeBeforeAfterHandleResponseRoute,
+        );
+      }
+
       default:
         throw new Error("Invalid Gelis runtime route flags");
     }
@@ -421,6 +509,15 @@ function applyLifecyclePlan(
 
   if (afterHandle !== undefined) {
     flags |= RUNTIME_ROUTE_AFTER_HANDLE;
+  }
+
+  /*
+   * Global lifecycle recompilation must never erase
+   * executable response behavior compiled at route
+   * registration.
+   */
+  if (route.responsePlan !== undefined) {
+    flags |= RUNTIME_ROUTE_RESPONSE;
   }
 
   route.flags = flags;
@@ -624,6 +721,24 @@ function invokeHandlerRoute(
   );
 }
 
+function invokeResponseRoute(
+  route: RuntimeRouteRecord,
+
+  request: Request,
+
+  params: Record<string, string>,
+
+  query: unknown,
+
+  body: unknown,
+): Response | Promise<Response> {
+  return invokeHandlerWithResponsePlan(
+    route,
+
+    createRuntimeContext(request, params, query, body),
+  );
+}
+
 function invokeBeforeHandleRoute(
   route: RuntimeRouteRecord,
 
@@ -662,6 +777,49 @@ function invokeBeforeHandleRoute(
   return invokeHandlerWithContext(route.handler, context);
 }
 
+function invokeBeforeHandleResponseRoute(
+  route: RuntimeRouteRecord,
+
+  request: Request,
+
+  params: Record<string, string>,
+
+  query: unknown,
+
+  body: unknown,
+): Response | Promise<Response> {
+  const beforeHandle = route.beforeHandle;
+
+  if (beforeHandle === undefined) {
+    throw new Error("Missing Gelis beforeHandle hook");
+  }
+
+  const context = createRuntimeContext(request, params, query, body);
+
+  const result = beforeHandle(context);
+
+  if (isPromiseLike(result)) {
+    return Promise.resolve(result).then((early) => {
+      /*
+       * beforeHandle is an infrastructure short
+       * circuit and intentionally bypasses the
+       * handler response plan.
+       */
+      if (early !== undefined) {
+        return normalizeResponse(early);
+      }
+
+      return invokeHandlerWithResponsePlan(route, context);
+    });
+  }
+
+  if (result !== undefined) {
+    return normalizeResponse(result);
+  }
+
+  return invokeHandlerWithResponsePlan(route, context);
+}
+
 function invokeAfterHandleRoute(
   route: RuntimeRouteRecord,
 
@@ -676,6 +834,22 @@ function invokeAfterHandleRoute(
   const context = createRuntimeContext(request, params, query, body);
 
   return invokeHandlerThenAfter(route, context);
+}
+
+function invokeAfterHandleResponseRoute(
+  route: RuntimeRouteRecord,
+
+  request: Request,
+
+  params: Record<string, string>,
+
+  query: unknown,
+
+  body: unknown,
+): Response | Promise<Response> {
+  const context = createRuntimeContext(request, params, query, body);
+
+  return invokeHandlerThenAfterResponsePlan(route, context);
 }
 
 function invokeBeforeAfterHandleRoute(
@@ -716,6 +890,44 @@ function invokeBeforeAfterHandleRoute(
   return invokeHandlerThenAfter(route, context);
 }
 
+function invokeBeforeAfterHandleResponseRoute(
+  route: RuntimeRouteRecord,
+
+  request: Request,
+
+  params: Record<string, string>,
+
+  query: unknown,
+
+  body: unknown,
+): Response | Promise<Response> {
+  const beforeHandle = route.beforeHandle;
+
+  if (beforeHandle === undefined) {
+    throw new Error("Missing Gelis beforeHandle hook");
+  }
+
+  const context = createRuntimeContext(request, params, query, body);
+
+  const result = beforeHandle(context);
+
+  if (isPromiseLike(result)) {
+    return Promise.resolve(result).then((early) => {
+      if (early !== undefined) {
+        return normalizeResponse(early);
+      }
+
+      return invokeHandlerThenAfterResponsePlan(route, context);
+    });
+  }
+
+  if (result !== undefined) {
+    return normalizeResponse(result);
+  }
+
+  return invokeHandlerThenAfterResponsePlan(route, context);
+}
+
 function invokeHandlerThenAfter(
   route: RuntimeRouteRecord,
 
@@ -754,6 +966,50 @@ function invokeAfterHandleWithResult(
   return normalizeResponse(result);
 }
 
+function invokeHandlerThenAfterResponsePlan(
+  route: RuntimeRouteRecord,
+
+  context: RuntimeRouteContext,
+): Response | Promise<Response> {
+  const result = route.handler(context);
+
+  if (isPromiseLike(result)) {
+    return Promise.resolve(result).then((resolved) =>
+      invokeAfterHandleWithResultResponsePlan(route, context, resolved),
+    );
+  }
+
+  return invokeAfterHandleWithResultResponsePlan(route, context, result);
+}
+
+function invokeAfterHandleWithResultResponsePlan(
+  route: RuntimeRouteRecord,
+
+  context: RuntimeRouteContext,
+
+  result: unknown,
+): Response | Promise<Response> {
+  const afterHandle = route.afterHandle;
+
+  if (afterHandle === undefined) {
+    throw new Error("Missing Gelis afterHandle hook");
+  }
+
+  /*
+   * afterHandle observes the raw handler value,
+   * before validation/transformation/serialization.
+   */
+  const after = afterHandle(context, result);
+
+  const finalize = route.responsePlan!.finalize;
+
+  if (isPromiseLike(after)) {
+    return Promise.resolve(after).then(() => finalize(result));
+  }
+
+  return finalize(result);
+}
+
 function invokeHandlerWithContext(
   handler: RuntimeRouteHandler,
 
@@ -766,6 +1022,22 @@ function invokeHandlerWithContext(
   }
 
   return normalizeResponse(result);
+}
+
+function invokeHandlerWithResponsePlan(
+  route: RuntimeRouteRecord,
+
+  context: RuntimeRouteContext,
+): Response | Promise<Response> {
+  const result = route.handler(context);
+
+  const finalize = route.responsePlan!.finalize;
+
+  if (isPromiseLike(result)) {
+    return Promise.resolve(result).then(finalize);
+  }
+
+  return finalize(result);
 }
 
 function createRuntimeContext(
