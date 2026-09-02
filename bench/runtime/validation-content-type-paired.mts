@@ -438,12 +438,6 @@ function isJsonContentTypeCurrent(request: Request): boolean {
   );
 }
 
-/*
- * Candidate:
- *
- * optimize the overwhelmingly common canonical
- * Content-Type without changing fallback semantics.
- */
 function isJsonContentTypeFast(request: Request): boolean {
   const contentType = request.headers.get("content-type");
 
@@ -451,7 +445,7 @@ function isJsonContentTypeFast(request: Request): boolean {
     return false;
   }
 
-  if (contentType === "application/json") {
+  if (contentType.length === 16 && contentType === "application/json") {
     return true;
   }
 
