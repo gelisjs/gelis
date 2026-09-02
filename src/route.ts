@@ -161,6 +161,30 @@ interface Reply<Responses extends RouteResponses> {
   ): ReplyResult<Status, Responses[Status]>;
 }
 
+type StatusReplyResult<Responses extends RouteResponses> = {
+  [Status in ReplyStatus<Responses>]: ReplyResult<Status, Responses[Status]>;
+}[ReplyStatus<Responses>];
+
+type DirectManagedHandlerResult<Responses extends RouteResponses> =
+  | (200 extends keyof Responses ? Exclude<Responses[200], undefined> : never)
+  | (204 extends keyof Responses ? undefined : never);
+
+type ManagedHandlerResult<Responses extends RouteResponses> =
+  | DirectManagedHandlerResult<Responses>
+  | StatusReplyResult<Responses>;
+
+type ExplicitHandlerResolvedResult<Responses extends ResponseContractMap> =
+  | ManagedHandlerResult<InferResponseProducers<Responses>>
+  | Response;
+
+export type RouteHandlerResultFor<
+  Responses extends ResponseContractMap | undefined,
+> = Responses extends ResponseContractMap
+  ?
+      | ExplicitHandlerResolvedResult<Responses>
+      | PromiseLike<ExplicitHandlerResolvedResult<Responses>>
+  : unknown;
+
 export interface RouteContext<
   Path extends string,
   Query = never,
@@ -306,17 +330,40 @@ export type RouteHandlerContextFor<Path extends string, Options> = RouteContext<
   DeclaredRouteProducerResponsesFor<Options>
 >;
 
+type ImplicitResolvedResult<Result> = Awaited<Result>;
+
+type ImplicitBody<Value> = Exclude<Value, undefined | void>;
+
+type ImplicitBodyless<Value> = Extract<Value, undefined | void>;
+
+type InferManagedImplicitResponses<Value> = [Value] extends [never]
+  ? RouteResponses
+  : [ImplicitBody<Value>] extends [never]
+    ? {
+        204: undefined;
+      }
+    : [ImplicitBodyless<Value>] extends [never]
+      ? {
+          200: ImplicitBody<Value>;
+        }
+      : {
+          200: ImplicitBody<Value>;
+          204: undefined;
+        };
+
+export type InferImplicitResponses<Result> = [
+  Extract<ImplicitResolvedResult<Result>, Response>,
+] extends [never]
+  ? InferManagedImplicitResponses<ImplicitResolvedResult<Result>>
+  : RouteResponses;
+
 export type RouteResponsesFor<Options, Result> = Options extends {
   readonly responses?: infer Responses;
 }
   ? Responses extends ResponseContractMap
     ? InferResponseContracts<Responses>
-    : {
-        200: Awaited<Result>;
-      }
-  : {
-      200: Awaited<Result>;
-    };
+    : InferImplicitResponses<Result>
+  : InferImplicitResponses<Result>;
 
 declare const routeRefBrand: unique symbol;
 

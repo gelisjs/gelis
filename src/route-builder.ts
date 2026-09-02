@@ -1,8 +1,10 @@
 import type {
   HttpMethod,
+  InferImplicitResponses,
   ResponseContractMap,
   RouteHandler,
   RouteHandlerContextFor,
+  RouteHandlerResultFor,
   RouteLifecycleFor,
   RouteOptions,
   RouteOptionsFor,
@@ -81,9 +83,7 @@ export class RouteBuilder<Prefix extends string = ""> {
     "GET",
     JoinRoutePath<Prefix, Path>,
     RouteRequestContract<InferPathParams<JoinRoutePath<Prefix, Path>>>,
-    {
-      200: Awaited<Result>;
-    }
+    InferImplicitResponses<Result>
   >;
 
   get<
@@ -91,7 +91,8 @@ export class RouteBuilder<Prefix extends string = ""> {
     const Query extends StandardSchemaV1 | undefined = undefined,
     const Body extends StandardSchemaV1 | undefined = undefined,
     const Responses extends ResponseContractMap | undefined = undefined,
-    Result = unknown,
+    Result extends RouteHandlerResultFor<Responses> =
+      RouteHandlerResultFor<Responses>,
   >(
     path: Path & ValidRoutePath<Path>,
 
@@ -155,9 +156,7 @@ export class RouteBuilder<Prefix extends string = ""> {
     "POST",
     JoinRoutePath<Prefix, Path>,
     RouteRequestContract<InferPathParams<JoinRoutePath<Prefix, Path>>>,
-    {
-      200: Awaited<Result>;
-    }
+    InferImplicitResponses<Result>
   >;
 
   post<
@@ -165,7 +164,8 @@ export class RouteBuilder<Prefix extends string = ""> {
     const Query extends StandardSchemaV1 | undefined = undefined,
     const Body extends StandardSchemaV1 | undefined = undefined,
     const Responses extends ResponseContractMap | undefined = undefined,
-    Result = unknown,
+    Result extends RouteHandlerResultFor<Responses> =
+      RouteHandlerResultFor<Responses>,
   >(
     path: Path & ValidRoutePath<Path>,
 
@@ -231,9 +231,7 @@ export class RouteBuilder<Prefix extends string = ""> {
     Method,
     JoinRoutePath<Prefix, Path>,
     RouteRequestContract<InferPathParams<JoinRoutePath<Prefix, Path>>>,
-    {
-      200: Awaited<Result>;
-    }
+    InferImplicitResponses<Result>
   >;
 
   route(
