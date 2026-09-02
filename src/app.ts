@@ -498,7 +498,7 @@ function runQueryRoute(
   const validation = schema["~standard"].validate(rawQuery);
 
   if (isPromiseLike(validation)) {
-    return Promise.resolve(validation).then((result) => {
+    return validation.then((result) => {
       if (result.issues !== undefined) {
         return validationErrorResponse("query", result.issues);
       }

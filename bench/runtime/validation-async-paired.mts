@@ -22,6 +22,7 @@ const RAW_QUERY = {
 
 const pairs = [
   "current-to-direct",
+  "current-to-schema-promise",
   "current-to-native-fast",
   "direct-to-trusted",
   "direct-to-await",
@@ -298,6 +299,24 @@ function createPair(pair: PairName): PairDefinition {
         candidate: directNativeThen,
       };
 
+    case "current-to-schema-promise":
+      return {
+        baselineName: "current-resolve-then",
+        candidateName: "schema-promise-direct",
+
+        baseline: currentResolveThen,
+        candidate: schemaPromiseDirect,
+      };
+
+    case "current-to-native-fast":
+      return {
+        baselineName: "current-resolve-then",
+        candidateName: "native-fast-fallback",
+
+        baseline: currentResolveThen,
+        candidate: nativeFastFallback,
+      };
+
     case "direct-to-trusted":
       return {
         baselineName: "direct-native-then",
@@ -314,15 +333,6 @@ function createPair(pair: PairName): PairDefinition {
 
         baseline: directNativeThen,
         candidate: asyncAwait,
-      };
-
-    case "current-to-native-fast":
-      return {
-        baselineName: "current-resolve-then",
-        candidateName: "native-fast-fallback",
-
-        baseline: currentResolveThen,
-        candidate: nativeFastFallback,
       };
   }
 }
@@ -397,6 +407,22 @@ function directNativeThen(): Promise<QueryOutput> {
   }
 
   return (validation as Promise<ValidationResult>).then(consumeResult);
+}
+
+function schemaPromiseDirect(): Promise<QueryOutput> {
+  const validation = queryAsyncSchema["~standard"].validate(RAW_QUERY);
+
+  if (isSchemaPromise(validation)) {
+    return validation.then((result) =>
+      consumeResult(result as ValidationResult),
+    );
+  }
+
+  return Promise.resolve(consumeResult(validation as ValidationResult));
+}
+
+function isSchemaPromise<T>(value: T | Promise<T>): value is Promise<T> {
+  return isPromiseLike(value);
 }
 
 /*
