@@ -57,19 +57,12 @@ type TypedRouteHandler<
   Query extends StandardSchemaV1 | undefined,
   Body extends StandardSchemaV1 | undefined,
   Responses extends ResponseContractMap | undefined,
-  Result,
-> = ((
+> = (
   context: RouteHandlerContextFor<
     Path,
     RouteOptionsFor<Query, Body, Responses>
   >,
-) => Result) &
-  ((
-    context: RouteHandlerContextFor<
-      Path,
-      RouteOptionsFor<Query, Body, Responses>
-    >,
-  ) => RouteHandlerResultFor<Responses>);
+) => RouteHandlerResultFor<Responses>;
 
 export class RouteBuilder<Prefix extends string = ""> {
   readonly #prefix: Prefix;
@@ -110,26 +103,25 @@ export class RouteBuilder<Prefix extends string = ""> {
     const Query extends StandardSchemaV1 | undefined = undefined,
     const Body extends StandardSchemaV1 | undefined = undefined,
     const Responses extends ResponseContractMap | undefined = undefined,
-    Result = unknown,
+    const Handler extends TypedRouteHandler<
+      JoinRoutePath<Prefix, Path>,
+      Query,
+      Body,
+      Responses
+    > = TypedRouteHandler<JoinRoutePath<Prefix, Path>, Query, Body, Responses>,
   >(
     path: Path & ValidRoutePath<Path>,
 
     options: RouteOptionsFor<Query, Body, Responses>,
 
-    handler: TypedRouteHandler<
-      JoinRoutePath<Prefix, Path>,
-      Query,
-      Body,
-      Responses,
-      Result
-    >,
+    handler: Handler,
 
     lifecycle?: RouteLifecycleFor<
       JoinRoutePath<Prefix, Path>,
       Query,
       Body,
       Responses,
-      Result
+      ReturnType<Handler>
     >,
   ): RouteRef<
     "GET",
@@ -138,7 +130,10 @@ export class RouteBuilder<Prefix extends string = ""> {
       JoinRoutePath<Prefix, Path>,
       RouteOptionsFor<Query, Body, Responses>
     >,
-    RouteResponsesFor<RouteOptionsFor<Query, Body, Responses>, Result>
+    RouteResponsesFor<
+      RouteOptionsFor<Query, Body, Responses>,
+      ReturnType<Handler>
+    >
   >;
 
   get(
@@ -183,26 +178,25 @@ export class RouteBuilder<Prefix extends string = ""> {
     const Query extends StandardSchemaV1 | undefined = undefined,
     const Body extends StandardSchemaV1 | undefined = undefined,
     const Responses extends ResponseContractMap | undefined = undefined,
-    Result = unknown,
+    const Handler extends TypedRouteHandler<
+      JoinRoutePath<Prefix, Path>,
+      Query,
+      Body,
+      Responses
+    > = TypedRouteHandler<JoinRoutePath<Prefix, Path>, Query, Body, Responses>,
   >(
     path: Path & ValidRoutePath<Path>,
 
     options: RouteOptionsFor<Query, Body, Responses>,
 
-    handler: TypedRouteHandler<
-      JoinRoutePath<Prefix, Path>,
-      Query,
-      Body,
-      Responses,
-      Result
-    >,
+    handler: Handler,
 
     lifecycle?: RouteLifecycleFor<
       JoinRoutePath<Prefix, Path>,
       Query,
       Body,
       Responses,
-      Result
+      ReturnType<Handler>
     >,
   ): RouteRef<
     "POST",
@@ -211,7 +205,10 @@ export class RouteBuilder<Prefix extends string = ""> {
       JoinRoutePath<Prefix, Path>,
       RouteOptionsFor<Query, Body, Responses>
     >,
-    RouteResponsesFor<RouteOptionsFor<Query, Body, Responses>, Result>
+    RouteResponsesFor<
+      RouteOptionsFor<Query, Body, Responses>,
+      ReturnType<Handler>
+    >
   >;
 
   post(
