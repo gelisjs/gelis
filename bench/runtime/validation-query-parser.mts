@@ -18,14 +18,17 @@ const scenarios = [
   "current-basic",
   "raw-basic",
   "global-fast-basic",
+  "marker-cursor-basic",
   "url-search-params-basic",
 
   "current-encoded",
   "global-fast-encoded",
+  "marker-cursor-encoded",
 
   "current-duplicates",
   "raw-duplicates",
   "global-fast-duplicates",
+  "marker-cursor-duplicates",
 ] as const;
 
 type Scenario = (typeof scenarios)[number];
@@ -93,6 +96,15 @@ async function runParent(): Promise<void> {
   const rawDuplicates = requireResult(values, "raw-duplicates");
   const globalFastDuplicates = requireResult(values, "global-fast-duplicates");
 
+  const markerCursorBasic = requireResult(values, "marker-cursor-basic");
+
+  const markerCursorEncoded = requireResult(values, "marker-cursor-encoded");
+
+  const markerCursorDuplicates = requireResult(
+    values,
+    "marker-cursor-duplicates",
+  );
+
   console.log("\nComparisons\n");
 
   console.table([
@@ -112,6 +124,21 @@ async function runParent(): Promise<void> {
     comparison(
       "global fast duplicates vs current",
       globalFastDuplicates,
+      currentDuplicates,
+    ),
+    comparison(
+      "marker cursor basic vs current",
+      markerCursorBasic,
+      currentBasic,
+    ),
+    comparison(
+      "marker cursor encoded vs current",
+      markerCursorEncoded,
+      currentEncoded,
+    ),
+    comparison(
+      "marker cursor duplicates vs current",
+      markerCursorDuplicates,
       currentDuplicates,
     ),
   ]);
@@ -275,7 +302,135 @@ function createOperation(scenario: Scenario): () => void {
 
         sink = parseWithUrlSearchParams(url);
       };
+
+    case "marker-cursor-basic":
+    case "marker-cursor-encoded":
+    case "marker-cursor-duplicates":
+      return () => {
+        const url = urls[cursor];
+
+        cursor = (cursor + 1) & (URL_COUNT - 1);
+
+        if (url === undefined) {
+          throw new Error("Missing benchmark URL");
+        }
+
+        sink = parseQueryMarkerCursor(url);
+      };
   }
+}
+
+function parseQueryMarkerCursor(
+  url: string,
+): Record<string, string | string[]> {
+  const result = Object.create(null) as Record<string, string | string[]>;
+
+  const queryStart = url.indexOf("?");
+
+  if (queryStart === -1) {
+    return result;
+  }
+
+  const hashStart = url.indexOf("#", queryStart + 1);
+  const queryEnd = hashStart === -1 ? url.length : hashStart;
+
+  let nextPlus = url.indexOf("+", queryStart + 1);
+
+  if (nextPlus >= queryEnd) {
+    nextPlus = -1;
+  }
+
+  let nextPercent = url.indexOf("%", queryStart + 1);
+
+  if (nextPercent >= queryEnd) {
+    nextPercent = -1;
+  }
+
+  let pairStart = queryStart + 1;
+
+  while (pairStart < queryEnd) {
+    let pairEnd = url.indexOf("&", pairStart);
+
+    if (pairEnd === -1 || pairEnd > queryEnd) {
+      pairEnd = queryEnd;
+    }
+
+    if (pairEnd > pairStart) {
+      let equals = url.indexOf("=", pairStart);
+
+      if (equals === -1 || equals > pairEnd) {
+        equals = pairEnd;
+      }
+
+      const keyNeedsDecode =
+        markerInRange(nextPlus, pairStart, equals) ||
+        markerInRange(nextPercent, pairStart, equals);
+
+      const valueStart = equals < pairEnd ? equals + 1 : pairEnd;
+
+      const valueNeedsDecode =
+        markerInRange(nextPlus, valueStart, pairEnd) ||
+        markerInRange(nextPercent, valueStart, pairEnd);
+
+      let key = url.slice(pairStart, equals);
+
+      if (keyNeedsDecode) {
+        key = decodeMarkedQueryComponent(key);
+      }
+
+      let value = equals < pairEnd ? url.slice(valueStart, pairEnd) : "";
+
+      if (valueNeedsDecode) {
+        value = decodeMarkedQueryComponent(value);
+      }
+
+      const existing = result[key];
+
+      if (existing === undefined) {
+        result[key] = value;
+      } else if (Array.isArray(existing)) {
+        existing.push(value);
+      } else {
+        result[key] = [existing, value];
+      }
+    }
+
+    pairStart = pairEnd + 1;
+
+    if (nextPlus !== -1 && nextPlus < pairStart) {
+      nextPlus = url.indexOf("+", pairStart);
+
+      if (nextPlus >= queryEnd) {
+        nextPlus = -1;
+      }
+    }
+
+    if (nextPercent !== -1 && nextPercent < pairStart) {
+      nextPercent = url.indexOf("%", pairStart);
+
+      if (nextPercent >= queryEnd) {
+        nextPercent = -1;
+      }
+    }
+  }
+
+  return result;
+}
+
+function markerInRange(marker: number, start: number, end: number): boolean {
+  return marker !== -1 && marker >= start && marker < end;
+}
+
+function decodeMarkedQueryComponent(value: string): string {
+  if (value.includes("+")) {
+    value = value.replace(/\+/g, " ");
+  }
+
+  if (value.includes("%")) {
+    value = decodeURIComponent(value);
+  }
+
+  return value;
 }
 
 function createUrls(kind: "basic" | "encoded" | "duplicates"): string[] {
