@@ -205,6 +205,9 @@ app.get(
 
 /*
  * Contract-only direct result must already be Schema Output.
+ *
+ * `satisfies` preserves literal schema outputs when the
+ * legal handler-result algebra is a union.
  */
 app.get(
   "/explicit-contract-output",
@@ -213,16 +216,17 @@ app.get(
       200: TransformUser,
     },
   },
-  () => ({
-    id: "user-1",
-    name: "John",
-    normalized: true,
-  }),
+  () =>
+    ({
+      id: "user-1",
+      name: "John",
+      normalized: true,
+    }) satisfies StandardSchemaV1.InferOutput<typeof TransformUser>,
 );
 
 /*
- * Async direct contract output keeps contextual
- * literal output without requiring `as const`.
+ * Async direct contract output uses the same
+ * checked literal-preservation boundary.
  */
 app.get(
   "/explicit-contract-output-async",
@@ -231,11 +235,12 @@ app.get(
       200: TransformUser,
     },
   },
-  async () => ({
-    id: "user-1",
-    name: "John",
-    normalized: true,
-  }),
+  async () =>
+    ({
+      id: "user-1",
+      name: "John",
+      normalized: true,
+    }) satisfies StandardSchemaV1.InferOutput<typeof TransformUser>,
 );
 
 app.get(
