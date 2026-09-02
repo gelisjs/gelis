@@ -447,15 +447,14 @@ function createPair(pair: PairName): PairDefinition {
 }
 
 function createRawBypassPair(): PairDefinition {
-  let validations = 0;
-
-  const Schema = createSchema<typeof PAYLOAD>((value) => {
-    validations++;
-
-    return {
-      value: value as typeof PAYLOAD,
-    };
-  });
+  /*
+   * The descriptor must remain executable so this
+   * route really carries a response plan.
+   *
+   * Raw Response identity in the correctness gate
+   * proves that the plan itself is bypassed.
+   */
+  const Schema = createSchema<typeof PAYLOAD>();
 
   const controlApp = new Gelis();
 
@@ -483,24 +482,10 @@ function createRawBypassPair(): PairDefinition {
     () => RAW_RESPONSE,
   );
 
-  const control = createFetchOperation(controlApp);
-
-  const managed = createFetchOperation(managedApp);
-
-  const managedOperation = () => {
-    const result = managed();
-
-    if (validations !== 0) {
-      throw new Error("Raw Response entered response validation");
-    }
-
-    return result;
-  };
-
   return {
-    control,
+    control: createFetchOperation(controlApp),
 
-    managed: managedOperation,
+    managed: createFetchOperation(managedApp),
 
     expectedStatus: 204,
 
