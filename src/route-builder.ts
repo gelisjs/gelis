@@ -52,6 +52,25 @@ interface RuntimeRouteLifecycle {
   readonly afterHandle?: RuntimeAfterHandle;
 }
 
+type TypedRouteHandler<
+  Path extends string,
+  Query extends StandardSchemaV1 | undefined,
+  Body extends StandardSchemaV1 | undefined,
+  Responses extends ResponseContractMap | undefined,
+  Result,
+> = ((
+  context: RouteHandlerContextFor<
+    Path,
+    RouteOptionsFor<Query, Body, Responses>
+  >,
+) => Result) &
+  ((
+    context: RouteHandlerContextFor<
+      Path,
+      RouteOptionsFor<Query, Body, Responses>
+    >,
+  ) => RouteHandlerResultFor<Responses>);
+
 export class RouteBuilder<Prefix extends string = ""> {
   readonly #prefix: Prefix;
 
@@ -91,19 +110,19 @@ export class RouteBuilder<Prefix extends string = ""> {
     const Query extends StandardSchemaV1 | undefined = undefined,
     const Body extends StandardSchemaV1 | undefined = undefined,
     const Responses extends ResponseContractMap | undefined = undefined,
-    Result extends RouteHandlerResultFor<Responses> =
-      RouteHandlerResultFor<Responses>,
+    Result = unknown,
   >(
     path: Path & ValidRoutePath<Path>,
 
     options: RouteOptionsFor<Query, Body, Responses>,
 
-    handler: (
-      context: RouteHandlerContextFor<
-        JoinRoutePath<Prefix, Path>,
-        RouteOptionsFor<Query, Body, Responses>
-      >,
-    ) => Result,
+    handler: TypedRouteHandler<
+      JoinRoutePath<Prefix, Path>,
+      Query,
+      Body,
+      Responses,
+      Result
+    >,
 
     lifecycle?: RouteLifecycleFor<
       JoinRoutePath<Prefix, Path>,
@@ -164,19 +183,19 @@ export class RouteBuilder<Prefix extends string = ""> {
     const Query extends StandardSchemaV1 | undefined = undefined,
     const Body extends StandardSchemaV1 | undefined = undefined,
     const Responses extends ResponseContractMap | undefined = undefined,
-    Result extends RouteHandlerResultFor<Responses> =
-      RouteHandlerResultFor<Responses>,
+    Result = unknown,
   >(
     path: Path & ValidRoutePath<Path>,
 
     options: RouteOptionsFor<Query, Body, Responses>,
 
-    handler: (
-      context: RouteHandlerContextFor<
-        JoinRoutePath<Prefix, Path>,
-        RouteOptionsFor<Query, Body, Responses>
-      >,
-    ) => Result,
+    handler: TypedRouteHandler<
+      JoinRoutePath<Prefix, Path>,
+      Query,
+      Body,
+      Responses,
+      Result
+    >,
 
     lifecycle?: RouteLifecycleFor<
       JoinRoutePath<Prefix, Path>,

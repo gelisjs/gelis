@@ -38,15 +38,17 @@ const createUser = app.post(
     },
   },
 
-  ({ body }) => {
+  ({ body, reply }) => {
     const normalized: true = body.normalized;
 
     const name: string = body.name;
 
-    return {
-      normalized,
+    void normalized;
+
+    return reply.status(201, {
+      id: "user-1",
       name,
-    };
+    });
   },
 );
 
