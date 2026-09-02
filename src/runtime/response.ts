@@ -6,7 +6,7 @@ const TEXT_HEADERS = {
   "content-type": "text/plain; charset=utf-8",
 };
 
-interface RuntimeReplyResult {
+export interface RuntimeReplyResult {
   readonly [replyResultBrand]: true;
 
   readonly status: number;
@@ -26,32 +26,36 @@ export const runtimeReply: RuntimeReply = {
 };
 
 export function normalizeResponse(value: unknown): Response {
+  /*
+   * Raw Response is caller-owned and must remain
+   * the cheapest escape hatch.
+   */
   if (value instanceof Response) {
     return value;
   }
 
+  if (isRuntimeReplyResult(value)) {
+    return normalizeResponseWithStatus(value.status, value.body);
+  }
+
+  /*
+   * Direct undefined has its existing special
+   * meaning: implicit HTTP 204.
+   */
   if (value === undefined) {
     return new Response(null, {
       status: 204,
     });
   }
 
-  if (typeof value === "string") {
-    return new Response(value, {
-      headers: TEXT_HEADERS,
-    });
-  }
-
-  if (isReplyResult(value)) {
-    return normalizeReplyResult(value);
-  }
-
-  return Response.json(value);
+  return normalizeResponseWithStatus(200, value);
 }
 
-function normalizeReplyResult(result: RuntimeReplyResult): Response {
-  const { status, body } = result;
+export function normalizeResponseWithStatus(
+  status: number,
 
+  body: unknown,
+): Response {
   if (isBodylessStatus(status)) {
     return new Response(null, {
       status,
@@ -85,7 +89,9 @@ function normalizeReplyResult(result: RuntimeReplyResult): Response {
   });
 }
 
-function isReplyResult(value: unknown): value is RuntimeReplyResult {
+export function isRuntimeReplyResult(
+  value: unknown,
+): value is RuntimeReplyResult {
   return (
     typeof value === "object" &&
     value !== null &&

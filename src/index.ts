@@ -4,6 +4,8 @@ export { defineContract } from "./contract";
 
 export { defineModule } from "./module";
 
+export { ResponseContractError } from "./error";
+
 export type { StandardSchemaV1 } from "./schema";
 
 export type {
@@ -35,4 +37,9 @@ export type { InferPathParams } from "./types/path";
 
 export type { OnRequest, OnRequestContext } from "./request";
 
-export type { OnError, OnErrorContext } from "./error";
+export type {
+  OnError,
+  OnErrorContext,
+  ResponseContractErrorKind,
+  ResponseContractErrorOptions,
+} from "./error";
