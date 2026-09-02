@@ -749,6 +749,58 @@ describe("Gelis response contract runtime", () => {
       status: 201,
     });
   });
+
+  test("keeps metadata-only response contracts completely non-executable", async () => {
+    let validations = 0;
+
+    const Output = createSchema<{
+      id: string;
+    }>((value) => {
+      validations++;
+
+      return {
+        value: value as {
+          id: string;
+        },
+      };
+    });
+
+    const app = new Gelis();
+
+    app.get(
+      "/metadata-only",
+
+      {
+        responses: {
+          200: Output,
+        },
+      },
+
+      () => ({
+        id: "user-1",
+      }),
+    );
+
+    const result = app.fetch(new Request("http://gelis.test/metadata-only"));
+
+    /*
+     * Metadata-only contracts must not introduce
+     * Promise execution or response validation.
+     */
+    expect(result).toBeInstanceOf(Response);
+
+    expect(validations).toBe(0);
+
+    if (!(result instanceof Response)) {
+      throw new Error("Expected synchronous Response");
+    }
+
+    expect(await result.json()).toEqual({
+      id: "user-1",
+    });
+
+    expect(validations).toBe(0);
+  });
 });
 
 function createSchema<Input = unknown, Output = Input>(

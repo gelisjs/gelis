@@ -42,7 +42,8 @@
     "bench:http:on-request": "bun bench/http/on-request/run.mts",
     "bench:runtime:on-error": "bun bench/runtime/on-error.mts",
     "bench:runtime:on-error:isolated": "bun bench/runtime/on-error-isolated.mts",
-    "bench:http:on-error": "bun bench/http/on-error/run.mts"
+    "bench:http:on-error": "bun bench/http/on-error/run.mts",
+    "bench:runtime:response:zero-unused": "bun bench/runtime/response-zero-unused.mts"
   },
   "devDependencies": {
     "@hono/standard-validator": "^0.4.0",
