@@ -259,8 +259,8 @@ const invalid304 = {
 void invalid304;
 
 const uselessDescriptor = {
+  // @ts-expect-error descriptor requires validation or serializer behavior
   200: {
-    // @ts-expect-error descriptor requires validation or serializer behavior
     schema: User,
 
     // No executable response behavior.
