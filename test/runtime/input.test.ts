@@ -84,6 +84,42 @@ describe("Gelis input runtime", () => {
     });
   });
 
+  test("preserves encoded and repeated query semantics", async () => {
+    const Query = createSchema<Record<string, string | string[]>>((value) => ({
+      value: value as Record<string, string | string[]>,
+    }));
+
+    const app = new Gelis();
+
+    app.get(
+      "/encoded-query",
+      {
+        query: Query,
+      },
+      ({ query }) => query,
+    );
+
+    const response = await app.fetch(
+      new Request(
+        [
+          "http://gelis.test/encoded-query",
+          "?hello%20world=foo+bar",
+          "&tag=x%2By",
+          "&tag=z+q",
+          "&token=a=b=c",
+        ].join(""),
+      ),
+    );
+
+    expect(await response.json()).toEqual({
+      "hello world": "foo bar",
+
+      tag: ["x+y", "z q"],
+
+      token: "a=b=c",
+    });
+  });
+
   test("returns 422 for invalid query", async () => {
     const Query = createSchema<Record<string, string | string[]>>(() => ({
       issues: [
