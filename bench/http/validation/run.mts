@@ -121,6 +121,16 @@ const cases = [
   },
 ] as const satisfies readonly ValidationHttpCase[];
 
+const CASE_FILTER = process.env.BENCH_CASE?.trim();
+
+const selectedCases = CASE_FILTER
+  ? cases.filter((benchmarkCase) => benchmarkCase.name === CASE_FILTER)
+  : [...cases];
+
+if (selectedCases.length === 0) {
+  throw new Error(`Unknown validation benchmark case: ${CASE_FILTER}`);
+}
+
 mkdirSync(RESULTS_DIR, {
   recursive: true,
 });
@@ -133,8 +143,8 @@ await ensureOha();
 
 const rawResults: HttpCaseResultRow[] = [];
 
-for (let caseIndex = 0; caseIndex < cases.length; caseIndex++) {
-  const benchmarkCase = cases[caseIndex];
+for (let caseIndex = 0; caseIndex < selectedCases.length; caseIndex++) {
+  const benchmarkCase = selectedCases[caseIndex];
 
   if (!benchmarkCase) {
     continue;
