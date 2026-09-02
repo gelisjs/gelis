@@ -64,27 +64,72 @@ export function parseQueryFromUrl(
 
   let pairStart = queryStart + 1;
 
-  while (pairStart < queryEnd) {
-    let pairEnd = url.indexOf("&", pairStart);
+  if (pairStart >= queryEnd) {
+    return result;
+  }
 
-    if (pairEnd === -1 || pairEnd > queryEnd) {
-      pairEnd = queryEnd;
-    }
+  let equals = -1;
 
-    if (pairEnd > pairStart) {
-      let equals = url.indexOf("=", pairStart);
+  let keyHasPlus = false;
+  let keyHasPercent = false;
 
-      if (equals === -1 || equals > pairEnd) {
-        equals = pairEnd;
+  let valueHasPlus = false;
+  let valueHasPercent = false;
+
+  for (let index = pairStart; index <= queryEnd; index++) {
+    const atEnd = index === queryEnd;
+
+    if (!atEnd) {
+      const code = url.charCodeAt(index);
+
+      if (code === 61 && equals === -1) {
+        equals = index;
+        continue;
       }
 
-      const rawKey = url.slice(pairStart, equals);
+      if (code === 43) {
+        if (equals === -1) {
+          keyHasPlus = true;
+        } else {
+          valueHasPlus = true;
+        }
 
-      const rawValue = equals < pairEnd ? url.slice(equals + 1, pairEnd) : "";
+        continue;
+      }
 
-      const key = decodeQueryComponent(rawKey);
+      if (code === 37) {
+        if (equals === -1) {
+          keyHasPercent = true;
+        } else {
+          valueHasPercent = true;
+        }
 
-      const value = decodeQueryComponent(rawValue);
+        continue;
+      }
+
+      if (code !== 38) {
+        continue;
+      }
+    }
+
+    const pairEnd = index;
+
+    if (pairEnd > pairStart) {
+      const actualEquals = equals === -1 ? pairEnd : equals;
+
+      const valueStart = actualEquals < pairEnd ? actualEquals + 1 : pairEnd;
+
+      let key = url.slice(pairStart, actualEquals);
+
+      if (keyHasPlus || keyHasPercent) {
+        key = decodeKnownQueryComponent(key, keyHasPlus, keyHasPercent);
+      }
+
+      let value = actualEquals < pairEnd ? url.slice(valueStart, pairEnd) : "";
+
+      if (valueHasPlus || valueHasPercent) {
+        value = decodeKnownQueryComponent(value, valueHasPlus, valueHasPercent);
+      }
 
       const existing = result[key];
 
@@ -98,6 +143,14 @@ export function parseQueryFromUrl(
     }
 
     pairStart = pairEnd + 1;
+
+    equals = -1;
+
+    keyHasPlus = false;
+    keyHasPercent = false;
+
+    valueHasPlus = false;
+    valueHasPercent = false;
   }
 
   return result;
@@ -195,18 +248,20 @@ export function invalidQueryEncodingResponse(): Response {
   );
 }
 
-function decodeQueryComponent(value: string): string {
-  let decoded = value;
-
-  if (decoded.includes("+")) {
-    decoded = decoded.replace(/\+/g, " ");
+function decodeKnownQueryComponent(
+  value: string,
+  hasPlus: boolean,
+  hasPercent: boolean,
+): string {
+  if (hasPlus) {
+    value = value.replace(/\+/g, " ");
   }
 
-  if (decoded.includes("%")) {
-    decoded = decodeURIComponent(decoded);
+  if (hasPercent) {
+    value = decodeURIComponent(value);
   }
 
-  return decoded;
+  return value;
 }
 
 function serializeIssue(issue: StandardSchemaV1.Issue): {
