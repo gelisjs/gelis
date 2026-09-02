@@ -454,6 +454,94 @@ describe("Gelis input runtime", () => {
       name: "Gelis",
     });
   });
+
+  test("accepts JSON content type parameters", async () => {
+    const Body = createSchema<{
+      name: string;
+      count: number;
+    }>((value) => ({
+      value: value as {
+        name: string;
+        count: number;
+      },
+    }));
+
+    const app = new Gelis();
+
+    app.post(
+      "/body",
+      {
+        body: Body,
+      },
+      ({ body }) => body,
+    );
+
+    const response = await app.fetch(
+      new Request("http://gelis.test/body", {
+        method: "POST",
+
+        headers: {
+          "content-type": "application/json; charset=utf-8",
+        },
+
+        body: JSON.stringify({
+          name: "Gelis",
+          count: 42,
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(200);
+
+    expect(await response.json()).toEqual({
+      name: "Gelis",
+      count: 42,
+    });
+  });
+
+  test("accepts structured JSON media types", async () => {
+    const Body = createSchema<{
+      name: string;
+      count: number;
+    }>((value) => ({
+      value: value as {
+        name: string;
+        count: number;
+      },
+    }));
+
+    const app = new Gelis();
+
+    app.post(
+      "/body",
+      {
+        body: Body,
+      },
+      ({ body }) => body,
+    );
+
+    const response = await app.fetch(
+      new Request("http://gelis.test/body", {
+        method: "POST",
+
+        headers: {
+          "content-type": "application/problem+json",
+        },
+
+        body: JSON.stringify({
+          name: "Gelis",
+          count: 42,
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(200);
+
+    expect(await response.json()).toEqual({
+      name: "Gelis",
+      count: 42,
+    });
+  });
 });
 
 function createSchema<Input = unknown, Output = Input>(
