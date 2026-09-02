@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { Gelis, ResponseContractError } from "../../src";
+import { defineModule, Gelis, ResponseContractError } from "../../src";
 
 import type { StandardSchemaV1 } from "../../src";
 
@@ -493,6 +493,260 @@ describe("Gelis response contract runtime", () => {
       name: "Gelis",
 
       normalized: true,
+    });
+  });
+
+  test("preserves executable response plans through module mounting", async () => {
+    const Output = createSchema<
+      {
+        name: string;
+      },
+      {
+        name: string;
+        normalized: true;
+      }
+    >((value) => {
+      const input = value as {
+        name: string;
+      };
+
+      return {
+        value: {
+          name: input.name.trim(),
+          normalized: true,
+        },
+      };
+    });
+
+    const module = defineModule(
+      "/api",
+
+      (route) => ({
+        user: route.get(
+          "/module-response",
+
+          {
+            responses: {
+              200: {
+                schema: Output,
+                validate: true,
+              },
+            },
+          },
+
+          () => ({
+            name: " Gelis ",
+          }),
+        ),
+      }),
+    );
+
+    const app = new Gelis();
+
+    app.mount(module);
+
+    const response = await app.fetch(
+      new Request("http://gelis.test/api/module-response"),
+    );
+
+    expect(await response.json()).toEqual({
+      name: "Gelis",
+      normalized: true,
+    });
+  });
+
+  test("supports explicit 205 and 304 inside an executable response plan", async () => {
+    const Output = createSchema<{
+      ok: boolean;
+    }>();
+
+    const app = new Gelis();
+
+    app.get(
+      "/reset-content",
+
+      {
+        responses: {
+          200: {
+            schema: Output,
+            validate: true,
+          },
+
+          205: undefined,
+        },
+      },
+
+      ({ reply }) => reply.status(205),
+    );
+
+    app.get(
+      "/not-modified",
+
+      {
+        responses: {
+          200: {
+            schema: Output,
+            validate: true,
+          },
+
+          304: undefined,
+        },
+      },
+
+      ({ reply }) => reply.status(304),
+    );
+
+    const reset = await app.fetch(
+      new Request("http://gelis.test/reset-content"),
+    );
+
+    expect(reset.status).toBe(205);
+    expect(await reset.text()).toBe("");
+
+    const notModified = await app.fetch(
+      new Request("http://gelis.test/not-modified"),
+    );
+
+    expect(notModified.status).toBe(304);
+    expect(await notModified.text()).toBe("");
+  });
+
+  test("routes explicit JSON serialization failures through onError", async () => {
+    const BigIntValue = createSchema<bigint>();
+
+    const app = new Gelis();
+
+    app.onError(({ error }) => {
+      if (error instanceof ResponseContractError) {
+        return {
+          kind: error.kind,
+          status: error.status,
+          hasCause: error.cause !== undefined,
+        };
+      }
+
+      return undefined;
+    });
+
+    app.get(
+      "/json-failure",
+
+      {
+        responses: {
+          200: {
+            schema: BigIntValue,
+            serialize: "json",
+          },
+        },
+      },
+
+      () => 1n,
+    );
+
+    const response = await app.fetch(
+      new Request("http://gelis.test/json-failure"),
+    );
+
+    expect(await response.json()).toEqual({
+      kind: "serialization",
+      status: 200,
+      hasCause: true,
+    });
+  });
+
+  test("preserves asynchronous validator rejection identity through onError", async () => {
+    const failure = new Error("response validator exploded");
+
+    const Output = createSchema<{
+      id: string;
+    }>(async () => {
+      throw failure;
+    });
+
+    const app = new Gelis();
+
+    app.onError(({ error }) => ({
+      sameError: error === failure,
+    }));
+
+    app.get(
+      "/async-validator-failure",
+
+      {
+        responses: {
+          200: {
+            schema: Output,
+            validate: true,
+          },
+        },
+      },
+
+      () => ({
+        id: "user-1",
+      }),
+    );
+
+    const response = await app.fetch(
+      new Request("http://gelis.test/async-validator-failure"),
+    );
+
+    expect(await response.json()).toEqual({
+      sameError: true,
+    });
+  });
+
+  test("rejects undeclared managed statuses at runtime on executable routes", async () => {
+    const Output = createSchema<{
+      id: string;
+    }>();
+
+    const app = new Gelis();
+
+    app.onError(({ error }) => {
+      if (error instanceof ResponseContractError) {
+        return {
+          kind: error.kind,
+          status: error.status,
+        };
+      }
+
+      return undefined;
+    });
+
+    app.get(
+      "/undeclared-status",
+
+      {
+        responses: {
+          200: {
+            schema: Output,
+            validate: true,
+          },
+        },
+      },
+
+      ({ reply }) => {
+        /*
+         * Deliberately simulate JavaScript / unsafe
+         * consumer code bypassing the TypeScript API.
+         */
+        const unsafeReply = reply as unknown as {
+          status(status: number, body: unknown): never;
+        };
+
+        return unsafeReply.status(201, {
+          id: "user-1",
+        });
+      },
+    );
+
+    const response = await app.fetch(
+      new Request("http://gelis.test/undeclared-status"),
+    );
+
+    expect(await response.json()).toEqual({
+      kind: "status",
+      status: 201,
     });
   });
 });

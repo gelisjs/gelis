@@ -76,6 +76,8 @@ export function createRuntimeResponsePlan(
     return undefined;
   }
 
+  validateResponseContracts(responses);
+
   if (!hasExecutableResponse(responses)) {
     return undefined;
   }
@@ -99,6 +101,80 @@ export function createRuntimeResponsePlan(
 
     finalize: compileResponseFinalizer(entries),
   };
+}
+
+function validateResponseContracts(responses: ResponseContractMap): void {
+  for (const statusText in responses) {
+    if (!Object.prototype.hasOwnProperty.call(responses, statusText)) {
+      continue;
+    }
+
+    const status = Number(statusText);
+
+    const entry = responses[status];
+
+    if (isBodylessStatus(status)) {
+      if (entry !== undefined) {
+        throw new TypeError(
+          `Gelis response status ${status} must use an undefined body contract`,
+        );
+      }
+
+      continue;
+    }
+
+    if (entry === undefined || isStandardSchema(entry)) {
+      continue;
+    }
+
+    validateResponseDescriptor(status, entry);
+  }
+}
+
+function validateResponseDescriptor(
+  status: number,
+
+  descriptor: ResponseDescriptor,
+): void {
+  if (!isStandardSchemaValue(descriptor.schema)) {
+    throw new TypeError(
+      `Gelis response descriptor for status ${status} requires a Standard Schema`,
+    );
+  }
+
+  if (descriptor.validate !== undefined && descriptor.validate !== true) {
+    throw new TypeError(
+      `Gelis response descriptor for status ${status} has an invalid validate option`,
+    );
+  }
+
+  const serialize = descriptor.serialize;
+
+  if (serialize !== undefined && serialize !== "json" && serialize !== "text") {
+    throw new TypeError(
+      `Gelis response descriptor for status ${status} has an invalid serializer`,
+    );
+  }
+
+  if (descriptor.contentType !== undefined && serialize === undefined) {
+    throw new TypeError(
+      `Gelis response descriptor for status ${status} requires an explicit serializer when contentType is set`,
+    );
+  }
+
+  if (descriptor.validate !== true && serialize === undefined) {
+    throw new TypeError(
+      `Gelis response descriptor for status ${status} enables no executable response behavior`,
+    );
+  }
+}
+
+function isBodylessStatus(status: number): boolean {
+  return status === 204 || status === 205 || status === 304;
+}
+
+function isStandardSchemaValue(value: unknown): value is StandardSchemaV1 {
+  return typeof value === "object" && value !== null && "~standard" in value;
 }
 
 function hasExecutableResponse(responses: ResponseContractMap): boolean {

@@ -522,6 +522,56 @@ describe("Gelis response plan compilation", () => {
 
     expect(await response.text()).toBe("");
   });
+
+  test("rejects body-bearing contracts for bodyless statuses at registration", () => {
+    const User = createSchema<{
+      id: string;
+    }>();
+
+    for (const status of [204, 205, 304]) {
+      expect(() =>
+        createRuntimeResponsePlan({
+          [status]: User,
+        } as unknown as ResponseContractMap),
+      ).toThrow(
+        `Gelis response status ${status} must use an undefined body contract`,
+      );
+    }
+  });
+
+  test("rejects descriptors without executable behavior at registration", () => {
+    const User = createSchema<{
+      id: string;
+    }>();
+
+    expect(() =>
+      createRuntimeResponsePlan({
+        200: {
+          schema: User,
+        },
+      } as unknown as ResponseContractMap),
+    ).toThrow(
+      "Gelis response descriptor for status 200 enables no executable response behavior",
+    );
+  });
+
+  test("rejects contentType without an explicit serializer at registration", () => {
+    const User = createSchema<{
+      id: string;
+    }>();
+
+    expect(() =>
+      createRuntimeResponsePlan({
+        200: {
+          schema: User,
+          validate: true,
+          contentType: "application/problem+json",
+        },
+      } as unknown as ResponseContractMap),
+    ).toThrow(
+      "Gelis response descriptor for status 200 requires an explicit serializer when contentType is set",
+    );
+  });
 });
 
 function createSchema<Input = unknown, Output = Input>(
