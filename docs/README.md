@@ -16,6 +16,7 @@ This directory records accepted architectural decisions, reproducible benchmark 
 - [`benchmarks/type-system-baseline-v0.1.md`](benchmarks/type-system-baseline-v0.1.md)
 - [`benchmarks/runtime-baseline-v0.1.md`](benchmarks/runtime-baseline-v0.1.md)
 - [`benchmarks/http-comparison-baseline-v0.1.md`](benchmarks/http-comparison-baseline-v0.1.md)
+- [`benchmarks/validation-v0.1.md`](benchmarks/validation-v0.1.md)
 - [`benchmarks/on-request-v0.1.md`](benchmarks/on-request-v0.1.md)
 - [`benchmarks/on-error-v0.1.md`](benchmarks/on-error-v0.1.md)
 

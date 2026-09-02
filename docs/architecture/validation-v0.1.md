@@ -1,6 +1,6 @@
 # Gelis Validation Architecture v0.1
 
-**Status:** Correctness and plain-route regression accepted; comparative validation benchmark in progress.
+**Status:** Architecture, correctness, performance verification, and optimization rewind accepted.
 
 ## Goals
 
@@ -109,8 +109,20 @@ Covered behavior:
 
 Milestone result:
 
+The validation-specific behavior remains covered by the framework runtime suite.
+
+Latest complete framework gate after Validation Optimization Rewind v0.1:
+
 ```text
-31 pass
+90 pass
+0 fail
+182 expect() calls
+```
+
+Dedicated query-parser correctness verification additionally covers:
+
+```text
+50,060 pass
 0 fail
 ```
 
@@ -127,20 +139,19 @@ Gelis static JSON    16,105 req/s
 Gelis dynamic JSON   15,913 req/s
 ```
 
-## Current milestone
+## Performance verification
 
-Validation Performance Benchmark v0.1 compares equivalent Standard Schema workloads across:
+Validation Performance v0.1 is accepted and recorded in:
 
-- Gelis;
-- Hono + `@hono/standard-validator`;
-- Elysia;
-- Elysia precompile.
+[`../benchmarks/validation-v0.1.md`](../benchmarks/validation-v0.1.md)
 
-Cases:
+Accepted production optimizations are:
 
-- query-sync;
-- query-async;
-- body-sync;
-- query-body.
+```text
+fused query parser
+canonical application/json fast path
+```
 
-The benchmark deliberately uses static routes so known dynamic-router differences do not contaminate validation integration results.
+A dedicated zero-unused benchmark verifies that a measured plain route remains effectively neutral even when the same application contains 4,999 validation-enabled routes.
+
+Validation architecture remains frozen at this checkpoint until new correctness requirements or profiling evidence justify reopening it.
