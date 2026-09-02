@@ -22,6 +22,7 @@ const RAW_QUERY = {
 
 const pairs = [
   "current-to-direct",
+  "current-to-native-fast",
   "direct-to-trusted",
   "direct-to-await",
 ] as const;
@@ -314,7 +315,49 @@ function createPair(pair: PairName): PairDefinition {
         baseline: directNativeThen,
         candidate: asyncAwait,
       };
+
+    case "current-to-native-fast":
+      return {
+        baselineName: "current-resolve-then",
+        candidateName: "native-fast-fallback",
+
+        baseline: currentResolveThen,
+        candidate: nativeFastFallback,
+      };
   }
+}
+
+function nativeFastFallback(): Promise<QueryOutput> {
+  const validation = queryAsyncSchema["~standard"].validate(RAW_QUERY);
+
+  /*
+   * Standard Schema V1 specifies Promise<Result>
+   * for asynchronous validation.
+   *
+   * A same-realm native Promise can therefore skip
+   * Promise.resolve() entirely.
+   */
+  if (validation instanceof Promise) {
+    return validation.then((result) =>
+      consumeResult(result as ValidationResult),
+    );
+  }
+
+  /*
+   * Defensive compatibility path.
+   *
+   * This is broader than the Standard Schema
+   * contract, but preserves Gelis' existing
+   * tolerance for PromiseLike implementations
+   * and cross-realm Promise-like values.
+   */
+  if (isPromiseLike(validation)) {
+    return Promise.resolve(validation).then((result) =>
+      consumeResult(result as ValidationResult),
+    );
+  }
+
+  return Promise.resolve(consumeResult(validation as ValidationResult));
 }
 
 /*
