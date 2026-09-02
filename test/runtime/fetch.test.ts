@@ -176,9 +176,9 @@ describe("Gelis runtime", () => {
   });
 
   test("supports reply.status", async () => {
-    const Created = {} as StandardSchemaV1<{
+    const Created = createSchema<{
       id: string;
-    }>;
+    }>();
 
     const app = new Gelis();
 
@@ -291,7 +291,7 @@ describe("Gelis runtime", () => {
   });
 
   test("supports text reply.status", async () => {
-    const Text = {} as StandardSchemaV1<string>;
+    const Text = createSchema<string>();
 
     const app = new Gelis();
 
@@ -356,3 +356,22 @@ describe("Gelis runtime", () => {
     expect(response.status).toBe(404);
   });
 });
+
+function createSchema<Input = unknown, Output = Input>(): StandardSchemaV1<
+  Input,
+  Output
+> {
+  return {
+    "~standard": {
+      version: 1,
+
+      vendor: "gelis-test",
+
+      validate(value) {
+        return {
+          value: value as Output,
+        };
+      },
+    },
+  } as StandardSchemaV1<Input, Output>;
+}
