@@ -20,18 +20,21 @@ const scenarios = [
   "global-fast-basic",
   "marker-cursor-basic",
   "hybrid-basic",
+  "fused-basic",
   "url-search-params-basic",
 
   "current-encoded",
   "global-fast-encoded",
   "marker-cursor-encoded",
   "hybrid-encoded",
+  "fused-encoded",
 
   "current-duplicates",
   "raw-duplicates",
   "global-fast-duplicates",
   "marker-cursor-duplicates",
   "hybrid-duplicates",
+  "fused-duplicates",
 ] as const;
 
 type Scenario = (typeof scenarios)[number];
@@ -114,6 +117,12 @@ async function runParent(): Promise<void> {
 
   const hybridDuplicates = requireResult(values, "hybrid-duplicates");
 
+  const fusedBasic = requireResult(values, "fused-basic");
+
+  const fusedEncoded = requireResult(values, "fused-encoded");
+
+  const fusedDuplicates = requireResult(values, "fused-duplicates");
+
   console.log("\nComparisons\n");
 
   console.table([
@@ -157,6 +166,16 @@ async function runParent(): Promise<void> {
       hybridDuplicates,
       currentDuplicates,
     ),
+    comparison("fused basic vs current", fusedBasic, currentBasic),
+    comparison("fused encoded vs current", fusedEncoded, currentEncoded),
+    comparison(
+      "fused duplicates vs current",
+      fusedDuplicates,
+      currentDuplicates,
+    ),
+    comparison("fused basic vs hybrid", fusedBasic, hybridBasic),
+    comparison("fused encoded vs hybrid", fusedEncoded, hybridEncoded),
+    comparison("fused duplicates vs hybrid", fusedDuplicates, hybridDuplicates),
   ]);
 
   console.log("\nPotential query-fetch impact\n");
@@ -348,7 +367,132 @@ function createOperation(scenario: Scenario): () => void {
 
         sink = parseQueryHybrid(url);
       };
+
+    case "fused-basic":
+    case "fused-encoded":
+    case "fused-duplicates":
+      return () => {
+        const url = urls[cursor];
+
+        cursor = (cursor + 1) & (URL_COUNT - 1);
+
+        if (url === undefined) {
+          throw new Error("Missing benchmark URL");
+        }
+
+        sink = parseQueryFused(url);
+      };
   }
+}
+
+function parseQueryFused(url: string): Record<string, string | string[]> {
+  const result = Object.create(null) as Record<string, string | string[]>;
+
+  const queryStart = url.indexOf("?");
+
+  if (queryStart === -1) {
+    return result;
+  }
+
+  const hashStart = url.indexOf("#", queryStart + 1);
+  const queryEnd = hashStart === -1 ? url.length : hashStart;
+
+  let pairStart = queryStart + 1;
+
+  if (pairStart >= queryEnd) {
+    return result;
+  }
+
+  let equals = -1;
+
+  let keyHasPlus = false;
+  let keyHasPercent = false;
+
+  let valueHasPlus = false;
+  let valueHasPercent = false;
+
+  for (let index = pairStart; index <= queryEnd; index++) {
+    const atEnd = index === queryEnd;
+
+    if (!atEnd) {
+      const code = url.charCodeAt(index);
+
+      // =
+      if (code === 61 && equals === -1) {
+        equals = index;
+        continue;
+      }
+
+      // +
+      if (code === 43) {
+        if (equals === -1) {
+          keyHasPlus = true;
+        } else {
+          valueHasPlus = true;
+        }
+
+        continue;
+      }
+
+      // %
+      if (code === 37) {
+        if (equals === -1) {
+          keyHasPercent = true;
+        } else {
+          valueHasPercent = true;
+        }
+
+        continue;
+      }
+
+      // &
+      if (code !== 38) {
+        continue;
+      }
+    }
+
+    const pairEnd = index;
+
+    if (pairEnd > pairStart) {
+      const actualEquals = equals === -1 ? pairEnd : equals;
+
+      const valueStart = actualEquals < pairEnd ? actualEquals + 1 : pairEnd;
+
+      let key = url.slice(pairStart, actualEquals);
+
+      if (keyHasPlus || keyHasPercent) {
+        key = decodeKnownQueryComponent(key, keyHasPlus, keyHasPercent);
+      }
+
+      let value = actualEquals < pairEnd ? url.slice(valueStart, pairEnd) : "";
+
+      if (valueHasPlus || valueHasPercent) {
+        value = decodeKnownQueryComponent(value, valueHasPlus, valueHasPercent);
+      }
+
+      const existing = result[key];
+
+      if (existing === undefined) {
+        result[key] = value;
+      } else if (Array.isArray(existing)) {
+        existing.push(value);
+      } else {
+        result[key] = [existing, value];
+      }
+    }
+
+    pairStart = pairEnd + 1;
+
+    equals = -1;
+
+    keyHasPlus = false;
+    keyHasPercent = false;
+
+    valueHasPlus = false;
+    valueHasPercent = false;
+  }
+
+  return result;
 }
 
 function parseQueryHybrid(url: string): Record<string, string | string[]> {
