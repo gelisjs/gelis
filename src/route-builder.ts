@@ -140,9 +140,9 @@ export class RouteBuilder<Prefix extends string = ""> {
    * not infer an implementation-specific Result
    * generic here.
    *
-   * This keeps literal schema outputs such as
-   * `normalized: true` intact without requiring
-   * `as const`.
+   * Handler output is checked directly against the
+   * declared producer-result algebra without adding
+   * implementation-specific result inference here.
    *
    * afterHandle receives the conservative producer
    * result algebra represented by the response

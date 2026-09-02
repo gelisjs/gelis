@@ -31,6 +31,15 @@ declare const TransformUser: StandardSchemaV1<
 
 declare const TextValue: StandardSchemaV1<string>;
 
+declare const UndefinedOutput: StandardSchemaV1<string, undefined>;
+
+declare const MaybeUndefinedOutput: StandardSchemaV1<
+  string,
+  string | undefined
+>;
+
+declare const NullOutput: StandardSchemaV1<unknown, null>;
+
 const contractOnly = {
   200: User,
   404: NotFound,
@@ -39,7 +48,70 @@ const contractOnly = {
 
 void contractOnly;
 
+/*
+ * null remains a legitimate body-bearing JSON value.
+ */
+const nullContract = {
+  200: NullOutput,
+} satisfies ResponseContractMap;
+
+void nullContract;
+
+/*
+ * A schema entry always represents a body-bearing
+ * response. Top-level undefined must use the explicit
+ * `undefined` response entry instead.
+ */
+const undefinedSchemaOutput = {
+  // @ts-expect-error response schema output cannot be top-level undefined
+  200: UndefinedOutput,
+} satisfies ResponseContractMap;
+
+void undefinedSchemaOutput;
+
+/*
+ * A body-bearing schema also cannot merely include
+ * undefined as one possible top-level output.
+ */
+const maybeUndefinedSchemaOutput = {
+  // @ts-expect-error response schema output cannot include top-level undefined
+  200: MaybeUndefinedOutput,
+} satisfies ResponseContractMap;
+
+void maybeUndefinedSchemaOutput;
+
+/*
+ * Validation does not turn an undefined schema output
+ * into a bodyless response contract.
+ */
+const undefinedValidatedOutput = {
+  // @ts-expect-error validated response schema must remain body-bearing
+  200: { schema: UndefinedOutput, validate: true },
+} satisfies ResponseContractMap;
+
+void undefinedValidatedOutput;
+
+/*
+ * Explicit JSON serialization has the same invariant.
+ */
+const undefinedJsonOutput = {
+  // @ts-expect-error serialized response schema must remain body-bearing
+  200: { schema: MaybeUndefinedOutput, serialize: "json" },
+} satisfies ResponseContractMap;
+
+void undefinedJsonOutput;
+
 const app = new Gelis();
+
+app.get(
+  "/null-response",
+  {
+    responses: {
+      200: NullOutput,
+    },
+  },
+  () => null,
+);
 
 const contractRoute = app.get(
   "/contract",

@@ -23,8 +23,22 @@ export interface RouteRequestContract<
 
 export type RouteResponses = Readonly<Record<number, unknown>>;
 
+/*
+ * A schema/descriptor response entry always represents
+ * a body-bearing response.
+ *
+ * `{}` includes every non-nullish JavaScript value,
+ * while `| null` explicitly keeps JSON null valid.
+ *
+ * The resulting type therefore excludes top-level
+ * `undefined` and `void` without recursive type logic.
+ */
+type ResponseBodyOutput = {} | null;
+
+type BodyBearingSchema = StandardSchemaV1<unknown, ResponseBodyOutput>;
+
 type ValidatedAutoResponse = {
-  readonly schema: StandardSchemaV1;
+  readonly schema: BodyBearingSchema;
 
   readonly validate: true;
 
@@ -34,7 +48,7 @@ type ValidatedAutoResponse = {
 };
 
 type JsonResponse = {
-  readonly schema: StandardSchemaV1;
+  readonly schema: BodyBearingSchema;
 
   readonly serialize: "json";
 
@@ -59,7 +73,7 @@ export type ResponseDescriptor =
   | TextResponse;
 
 export type ResponseContract =
-  | StandardSchemaV1
+  | BodyBearingSchema
   | ResponseDescriptor
   | undefined;
 
