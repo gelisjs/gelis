@@ -1,4 +1,4 @@
-import type { HttpMethod, ResponseSchemaMap } from "../route";
+import type { HttpMethod, ResponseContractMap } from "../route";
 
 import type { RuntimeInputPlan } from "./input";
 
@@ -74,7 +74,7 @@ export interface RuntimeRouteRecord {
 
   afterHandle: RuntimeAfterHandle | undefined;
 
-  readonly responses: ResponseSchemaMap | undefined;
+  readonly responses: ResponseContractMap | undefined;
 }
 
 export type RuntimeRouteRegister = (route: RuntimeRouteRecord) => void;
