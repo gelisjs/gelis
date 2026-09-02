@@ -220,6 +220,24 @@ app.get(
   }),
 );
 
+/*
+ * Async direct contract output keeps contextual
+ * literal output without requiring `as const`.
+ */
+app.get(
+  "/explicit-contract-output-async",
+  {
+    responses: {
+      200: TransformUser,
+    },
+  },
+  async () => ({
+    id: "user-1",
+    name: "John",
+    normalized: true,
+  }),
+);
+
 app.get(
   "/invalid-contract-input",
   {
@@ -319,6 +337,25 @@ app.get(
     }),
 );
 
+const implicitWithOptions = app.get("/implicit-with-options", {}, () => ({
+  ok: true,
+  count: 1,
+}));
+
+type ImplicitWithOptionsContract = RouteContractOf<typeof implicitWithOptions>;
+
+type ImplicitWithOptionsResponse = Expect<
+  Equal<
+    ImplicitWithOptionsContract["responses"],
+    {
+      200: {
+        ok: boolean;
+        count: number;
+      };
+    }
+  >
+>;
+
 export type {
   ImplicitAsyncUndefinedResponse,
   ImplicitMixedRawResponse,
@@ -327,4 +364,5 @@ export type {
   ImplicitUndefinedResponse,
   ImplicitUnionResponse,
   ImplicitVoidResponse,
+  ImplicitWithOptionsResponse,
 };
