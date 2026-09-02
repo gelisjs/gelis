@@ -254,14 +254,6 @@ export class Gelis extends RouteBuilder<""> {
 
     const { route, params } = matched;
 
-    /*
-     * Critical fast path.
-     *
-     * Applications/routes with no validation
-     * and no effective lifecycle hooks retain
-     * one route-plan comparison followed by
-     * direct handler invocation.
-     */
     if (route.flags === RUNTIME_ROUTE_PLAIN) {
       const result = route.handler({
         request,
@@ -279,6 +271,38 @@ export class Gelis extends RouteBuilder<""> {
       }
 
       return normalizeResponse(result);
+    }
+
+    /*
+     * Response-only routes are the second critical
+     * execution shape after completely plain routes.
+     *
+     * Promote them ahead of the generic route-plan
+     * switch so executable response contracts do not
+     * pay generic lifecycle dispatch overhead.
+     *
+     * Plain routes return above, so this comparison
+     * adds no cost to the zero-unused fast path.
+     */
+    if (route.flags === RUNTIME_ROUTE_RESPONSE) {
+      const result = route.handler({
+        request,
+        params,
+
+        query: undefined,
+
+        body: undefined,
+
+        reply: runtimeReply,
+      });
+
+      const finalize = route.responsePlan!.finalize;
+
+      if (isPromiseLike(result)) {
+        return Promise.resolve(result).then(finalize);
+      }
+
+      return finalize(result);
     }
 
     switch (route.flags) {
@@ -350,35 +374,6 @@ export class Gelis extends RouteBuilder<""> {
 
           invokeBeforeAfterHandleRoute,
         );
-      }
-
-      case RUNTIME_ROUTE_RESPONSE: {
-        /*
-         * Response-only routes are common enough to
-         * deserve the same direct invocation shape as
-         * the plain-route fast path.
-         *
-         * Avoid the generic route invoker/context helper
-         * chain when no input or lifecycle phase exists.
-         */
-        const result = route.handler({
-          request,
-          params,
-
-          query: undefined,
-
-          body: undefined,
-
-          reply: runtimeReply,
-        });
-
-        const finalize = route.responsePlan!.finalize;
-
-        if (isPromiseLike(result)) {
-          return Promise.resolve(result).then(finalize);
-        }
-
-        return finalize(result);
       }
 
       case RUNTIME_ROUTE_INPUT_RESPONSE: {
