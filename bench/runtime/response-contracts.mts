@@ -78,7 +78,10 @@ const pairs = [
   "text",
   "validate-auto",
   "validate-json",
-  "reply-status",
+  "reply-status-1",
+  "reply-status-2",
+  "reply-status-3",
+  "reply-status-4",
 ] as const;
 
 type PairName = (typeof pairs)[number];
@@ -441,8 +444,17 @@ function createPair(pair: PairName): PairDefinition {
     case "validate-json":
       return createValidateJsonPair();
 
-    case "reply-status":
-      return createReplyStatusPair();
+    case "reply-status-1":
+      return createReplyStatus1Pair();
+
+    case "reply-status-2":
+      return createReplyStatus2Pair();
+
+    case "reply-status-3":
+      return createReplyStatus3Pair();
+
+    case "reply-status-4":
+      return createReplyStatus4Pair();
   }
 }
 
@@ -689,7 +701,7 @@ function createValidateJsonPair(): PairDefinition {
   };
 }
 
-function createReplyStatusPair(): PairDefinition {
+function createReplyStatus1Pair(): PairDefinition {
   const Schema = createSchema<typeof PAYLOAD>();
 
   const controlApp = new Gelis();
@@ -730,6 +742,189 @@ function createReplyStatusPair(): PairDefinition {
     managed: createFetchOperation(managedApp),
 
     expectedStatus: 201,
+
+    expectedBody: JSON.stringify(PAYLOAD),
+
+    expectedContentType: JSON_CONTENT_TYPE,
+  };
+}
+
+function createReplyStatus2Pair(): PairDefinition {
+  const Schema = createSchema<typeof PAYLOAD>();
+
+  const controlApp = new Gelis();
+
+  controlApp.get(
+    "/bench",
+
+    {
+      responses: {
+        200: Schema,
+
+        201: Schema,
+      },
+    },
+
+    ({ reply }) => reply.status(201, PAYLOAD),
+  );
+
+  const managedApp = new Gelis();
+
+  managedApp.get(
+    "/bench",
+
+    {
+      responses: {
+        200: Schema,
+
+        /*
+         * Target status intentionally appears
+         * second so the two-entry dispatcher
+         * exercises both comparisons.
+         */
+        201: {
+          schema: Schema,
+
+          serialize: "json",
+        },
+      },
+    },
+
+    ({ reply }) => reply.status(201, PAYLOAD),
+  );
+
+  return {
+    control: createFetchOperation(controlApp),
+
+    managed: createFetchOperation(managedApp),
+
+    expectedStatus: 201,
+
+    expectedBody: JSON.stringify(PAYLOAD),
+
+    expectedContentType: JSON_CONTENT_TYPE,
+  };
+}
+
+function createReplyStatus3Pair(): PairDefinition {
+  const Schema = createSchema<typeof PAYLOAD>();
+
+  const controlApp = new Gelis();
+
+  controlApp.get(
+    "/bench",
+
+    {
+      responses: {
+        200: Schema,
+
+        201: Schema,
+
+        400: Schema,
+      },
+    },
+
+    ({ reply }) => reply.status(400, PAYLOAD),
+  );
+
+  const managedApp = new Gelis();
+
+  managedApp.get(
+    "/bench",
+
+    {
+      responses: {
+        200: Schema,
+
+        201: Schema,
+
+        /*
+         * Target is deliberately the third entry
+         * to measure the complete three-comparison
+         * small-contract path.
+         */
+        400: {
+          schema: Schema,
+
+          serialize: "json",
+        },
+      },
+    },
+
+    ({ reply }) => reply.status(400, PAYLOAD),
+  );
+
+  return {
+    control: createFetchOperation(controlApp),
+
+    managed: createFetchOperation(managedApp),
+
+    expectedStatus: 400,
+
+    expectedBody: JSON.stringify(PAYLOAD),
+
+    expectedContentType: JSON_CONTENT_TYPE,
+  };
+}
+
+function createReplyStatus4Pair(): PairDefinition {
+  const Schema = createSchema<typeof PAYLOAD>();
+
+  const controlApp = new Gelis();
+
+  controlApp.get(
+    "/bench",
+
+    {
+      responses: {
+        200: Schema,
+
+        201: Schema,
+
+        400: Schema,
+
+        404: Schema,
+      },
+    },
+
+    ({ reply }) => reply.status(404, PAYLOAD),
+  );
+
+  const managedApp = new Gelis();
+
+  managedApp.get(
+    "/bench",
+
+    {
+      responses: {
+        200: Schema,
+
+        201: Schema,
+
+        400: Schema,
+
+        /*
+         * Four declared statuses switch the
+         * runtime plan to its Map-backed
+         * dispatcher.
+         */
+        404: {
+          schema: Schema,
+
+          serialize: "json",
+        },
+      },
+    },
+
+    ({ reply }) => reply.status(404, PAYLOAD),
+  );
+
+  return {
+    control: createFetchOperation(controlApp),
+
+    managed: createFetchOperation(managedApp),
+
+    expectedStatus: 404,
 
     expectedBody: JSON.stringify(PAYLOAD),
 
