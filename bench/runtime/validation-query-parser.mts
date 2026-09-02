@@ -19,16 +19,19 @@ const scenarios = [
   "raw-basic",
   "global-fast-basic",
   "marker-cursor-basic",
+  "hybrid-basic",
   "url-search-params-basic",
 
   "current-encoded",
   "global-fast-encoded",
   "marker-cursor-encoded",
+  "hybrid-encoded",
 
   "current-duplicates",
   "raw-duplicates",
   "global-fast-duplicates",
   "marker-cursor-duplicates",
+  "hybrid-duplicates",
 ] as const;
 
 type Scenario = (typeof scenarios)[number];
@@ -105,6 +108,12 @@ async function runParent(): Promise<void> {
     "marker-cursor-duplicates",
   );
 
+  const hybridBasic = requireResult(values, "hybrid-basic");
+
+  const hybridEncoded = requireResult(values, "hybrid-encoded");
+
+  const hybridDuplicates = requireResult(values, "hybrid-duplicates");
+
   console.log("\nComparisons\n");
 
   console.table([
@@ -139,6 +148,13 @@ async function runParent(): Promise<void> {
     comparison(
       "marker cursor duplicates vs current",
       markerCursorDuplicates,
+      currentDuplicates,
+    ),
+    comparison("hybrid basic vs current", hybridBasic, currentBasic),
+    comparison("hybrid encoded vs current", hybridEncoded, currentEncoded),
+    comparison(
+      "hybrid duplicates vs current",
+      hybridDuplicates,
       currentDuplicates,
     ),
   ]);
@@ -317,7 +333,151 @@ function createOperation(scenario: Scenario): () => void {
 
         sink = parseQueryMarkerCursor(url);
       };
+
+    case "hybrid-basic":
+    case "hybrid-encoded":
+    case "hybrid-duplicates":
+      return () => {
+        const url = urls[cursor];
+
+        cursor = (cursor + 1) & (URL_COUNT - 1);
+
+        if (url === undefined) {
+          throw new Error("Missing benchmark URL");
+        }
+
+        sink = parseQueryHybrid(url);
+      };
   }
+}
+
+function parseQueryHybrid(url: string): Record<string, string | string[]> {
+  const queryStart = url.indexOf("?");
+
+  if (queryStart === -1) {
+    return Object.create(null) as Record<string, string | string[]>;
+  }
+
+  const hashStart = url.indexOf("#", queryStart + 1);
+  const queryEnd = hashStart === -1 ? url.length : hashStart;
+  const valueStart = queryStart + 1;
+
+  if (valueStart >= queryEnd) {
+    return Object.create(null) as Record<string, string | string[]>;
+  }
+
+  let nextPlus = findMarker(url, "+", valueStart, queryEnd);
+
+  let nextPercent = findMarker(url, "%", valueStart, queryEnd);
+
+  if (nextPlus === -1 && nextPercent === -1) {
+    return parseRawQueryRange(url, valueStart, queryEnd);
+  }
+
+  const result = Object.create(null) as Record<string, string | string[]>;
+
+  let pairStart = valueStart;
+
+  while (pairStart < queryEnd) {
+    let pairEnd = url.indexOf("&", pairStart);
+
+    if (pairEnd === -1 || pairEnd > queryEnd) {
+      pairEnd = queryEnd;
+    }
+
+    if (pairEnd > pairStart) {
+      let equals = url.indexOf("=", pairStart);
+
+      if (equals === -1 || equals > pairEnd) {
+        equals = pairEnd;
+      }
+
+      const rawValueStart = equals < pairEnd ? equals + 1 : pairEnd;
+
+      const keyHasPlus = markerInRange(nextPlus, pairStart, equals);
+
+      const keyHasPercent = markerInRange(nextPercent, pairStart, equals);
+
+      let key = url.slice(pairStart, equals);
+
+      if (keyHasPlus || keyHasPercent) {
+        key = decodeKnownQueryComponent(key, keyHasPlus, keyHasPercent);
+
+        if (keyHasPlus) {
+          nextPlus = findMarker(url, "+", rawValueStart, queryEnd);
+        }
+
+        if (keyHasPercent) {
+          nextPercent = findMarker(url, "%", rawValueStart, queryEnd);
+        }
+      }
+
+      const valueHasPlus = markerInRange(nextPlus, rawValueStart, pairEnd);
+
+      const valueHasPercent = markerInRange(
+        nextPercent,
+        rawValueStart,
+        pairEnd,
+      );
+
+      let value = equals < pairEnd ? url.slice(rawValueStart, pairEnd) : "";
+
+      if (valueHasPlus || valueHasPercent) {
+        value = decodeKnownQueryComponent(value, valueHasPlus, valueHasPercent);
+
+        const nextPairStart = pairEnd + 1;
+
+        if (valueHasPlus) {
+          nextPlus = findMarker(url, "+", nextPairStart, queryEnd);
+        }
+
+        if (valueHasPercent) {
+          nextPercent = findMarker(url, "%", nextPairStart, queryEnd);
+        }
+      }
+
+      const existing = result[key];
+
+      if (existing === undefined) {
+        result[key] = value;
+      } else if (Array.isArray(existing)) {
+        existing.push(value);
+      } else {
+        result[key] = [existing, value];
+      }
+    }
+
+    pairStart = pairEnd + 1;
+  }
+
+  return result;
+}
+
+function findMarker(
+  source: string,
+  marker: string,
+  start: number,
+  end: number,
+): number {
+  const index = source.indexOf(marker, start);
+
+  return index !== -1 && index < end ? index : -1;
+}
+
+function decodeKnownQueryComponent(
+  value: string,
+  hasPlus: boolean,
+  hasPercent: boolean,
+): string {
+  if (hasPlus) {
+    value = value.replace(/\+/g, " ");
+  }
+
+  if (hasPercent) {
+    value = decodeURIComponent(value);
+  }
+
+  return value;
 }
 
 function parseQueryMarkerCursor(
