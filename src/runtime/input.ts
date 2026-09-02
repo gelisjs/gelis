@@ -159,8 +159,12 @@ export function parseQueryFromUrl(
 export function isJsonContentType(request: Request): boolean {
   const contentType = request.headers.get("content-type");
 
-  if (!contentType) {
+  if (contentType === null) {
     return false;
+  }
+
+  if (contentType.length === 16 && contentType === "application/json") {
+    return true;
   }
 
   const separator = contentType.indexOf(";");
@@ -171,11 +175,10 @@ export function isJsonContentType(request: Request): boolean {
     .trim()
     .toLowerCase();
 
-  if (mediaType === "application/json") {
-    return true;
-  }
-
-  return mediaType.startsWith("application/") && mediaType.endsWith("+json");
+  return (
+    mediaType === "application/json" ||
+    (mediaType.startsWith("application/") && mediaType.endsWith("+json"))
+  );
 }
 
 export function validationErrorResponse(
