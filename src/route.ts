@@ -23,14 +23,62 @@ export interface RouteRequestContract<
 
 export type RouteResponses = Readonly<Record<number, unknown>>;
 
-export type ResponseSchemaMap = Readonly<Record<number, StandardSchemaV1>>;
+type ValidatedAutoResponse = {
+  readonly schema: StandardSchemaV1;
+
+  readonly validate: true;
+
+  readonly serialize?: never;
+
+  readonly contentType?: never;
+};
+
+type JsonResponse = {
+  readonly schema: StandardSchemaV1;
+
+  readonly serialize: "json";
+
+  readonly validate?: true;
+
+  readonly contentType?: string;
+};
+
+type TextResponse = {
+  readonly schema: StandardSchemaV1<unknown, string>;
+
+  readonly serialize: "text";
+
+  readonly validate?: true;
+
+  readonly contentType?: string;
+};
+
+export type ResponseDescriptor =
+  | ValidatedAutoResponse
+  | JsonResponse
+  | TextResponse;
+
+export type ResponseContract =
+  | StandardSchemaV1
+  | ResponseDescriptor
+  | undefined;
+
+export type ResponseContractMap = Readonly<
+  Record<number, ResponseContract> & {
+    readonly 204?: undefined;
+
+    readonly 205?: undefined;
+
+    readonly 304?: undefined;
+  }
+>;
 
 export interface RouteOptions {
   readonly query?: StandardSchemaV1;
 
   readonly body?: StandardSchemaV1;
 
-  readonly responses?: ResponseSchemaMap;
+  readonly responses?: ResponseContractMap;
 }
 
 type SchemaInput<Schema> = Schema extends StandardSchemaV1
@@ -41,15 +89,50 @@ type SchemaOutput<Schema> = Schema extends StandardSchemaV1
   ? StandardSchemaV1.InferOutput<Schema>
   : never;
 
-export type InferResponseSchemas<Schemas extends ResponseSchemaMap> = {
-  -readonly [Status in keyof Schemas]: SchemaOutput<Schemas[Status]>;
+type ResponseSchema<Entry> = Entry extends StandardSchemaV1
+  ? Entry
+  : Entry extends {
+        readonly schema: infer Schema;
+      }
+    ? Schema extends StandardSchemaV1
+      ? Schema
+      : never
+    : never;
+
+type ResponseWireBody<Entry> = [Entry] extends [undefined]
+  ? undefined
+  : SchemaOutput<ResponseSchema<Entry>>;
+
+type ResponseProducerBody<Entry> = Entry extends {
+  readonly schema: infer Schema;
+  readonly validate: true;
+}
+  ? SchemaInput<Schema>
+  : ResponseWireBody<Entry>;
+
+export type InferResponseContracts<Responses extends ResponseContractMap> = {
+  -readonly [Status in keyof Responses]: ResponseWireBody<Responses[Status]>;
 };
 
-type DeclaredRouteResponsesFor<Options> = Options extends {
+type InferResponseProducers<Responses extends ResponseContractMap> = {
+  -readonly [Status in keyof Responses]: ResponseProducerBody<
+    Responses[Status]
+  >;
+};
+
+type DeclaredRouteWireResponsesFor<Options> = Options extends {
   readonly responses?: infer Responses;
 }
-  ? Responses extends ResponseSchemaMap
-    ? InferResponseSchemas<Responses>
+  ? Responses extends ResponseContractMap
+    ? InferResponseContracts<Responses>
+    : Record<never, never>
+  : Record<never, never>;
+
+type DeclaredRouteProducerResponsesFor<Options> = Options extends {
+  readonly responses?: infer Responses;
+}
+  ? Responses extends ResponseContractMap
+    ? InferResponseProducers<Responses>
     : Record<never, never>
   : Record<never, never>;
 
@@ -58,19 +141,23 @@ type ReplyStatus<Responses extends RouteResponses> = Extract<
   number
 >;
 
+declare const replyResultBrand: unique symbol;
+
 interface ReplyResult<Status extends number, Body> {
   readonly status: Status;
 
   readonly body: Body;
 
-  readonly "~gelisReply"?: true;
+  readonly [replyResultBrand]: true;
 }
+
+type ReplyBodyArguments<Body> = [Body] extends [undefined] ? [] : [body: Body];
 
 interface Reply<Responses extends RouteResponses> {
   status<const Status extends ReplyStatus<Responses>>(
     status: Status,
 
-    body: Responses[Status],
+    ...body: ReplyBodyArguments<Responses[Status]>
   ): ReplyResult<Status, Responses[Status]>;
 }
 
@@ -106,7 +193,7 @@ export interface GlobalRouteContext {
   body: unknown;
 
   reply: {
-    status(status: number, body: unknown): unknown;
+    status(status: number, body?: unknown): unknown;
   };
 }
 
@@ -151,7 +238,7 @@ export type GlobalAfterHandle = (
 export type RouteOptionsFor<
   QuerySchema extends StandardSchemaV1 | undefined = undefined,
   BodySchema extends StandardSchemaV1 | undefined = undefined,
-  Responses extends ResponseSchemaMap | undefined = undefined,
+  Responses extends ResponseContractMap | undefined = undefined,
 > = {
   readonly query?: QuerySchema;
 
@@ -164,15 +251,15 @@ export type RouteLifecycleFor<
   Path extends string,
   QuerySchema extends StandardSchemaV1 | undefined = undefined,
   BodySchema extends StandardSchemaV1 | undefined = undefined,
-  Responses extends ResponseSchemaMap | undefined = undefined,
+  Responses extends ResponseContractMap | undefined = undefined,
   Result = unknown,
 > = {
   readonly beforeHandle?: RouteBeforeHandle<
     Path,
     SchemaOutput<QuerySchema>,
     SchemaOutput<BodySchema>,
-    Responses extends ResponseSchemaMap
-      ? InferResponseSchemas<Responses>
+    Responses extends ResponseContractMap
+      ? InferResponseContracts<Responses>
       : Record<never, never>
   >;
 
@@ -180,8 +267,8 @@ export type RouteLifecycleFor<
     Path,
     SchemaOutput<QuerySchema>,
     SchemaOutput<BodySchema>,
-    Responses extends ResponseSchemaMap
-      ? InferResponseSchemas<Responses>
+    Responses extends ResponseContractMap
+      ? InferResponseContracts<Responses>
       : Record<never, never>,
     Result
   >;
@@ -216,14 +303,14 @@ export type RouteHandlerContextFor<Path extends string, Options> = RouteContext<
   }
     ? SchemaOutput<Body>
     : never,
-  DeclaredRouteResponsesFor<Options>
+  DeclaredRouteProducerResponsesFor<Options>
 >;
 
 export type RouteResponsesFor<Options, Result> = Options extends {
   readonly responses?: infer Responses;
 }
-  ? Responses extends ResponseSchemaMap
-    ? InferResponseSchemas<Responses>
+  ? Responses extends ResponseContractMap
+    ? InferResponseContracts<Responses>
     : {
         200: Awaited<Result>;
       }
