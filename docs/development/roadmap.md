@@ -1,7 +1,7 @@
 # Gelis Engineering Roadmap
 
 **Status:** Active working roadmap  
-**Current milestone:** Response Contracts & Serialization Architecture v0.1
+**Current milestone:** Response Contracts & Serialization Correctness v0.1
 
 This roadmap records engineering order and architectural priorities, not release dates.
 
@@ -338,62 +338,107 @@ Applications without the lifecycle feature continue to retain the plain executio
 
 ## Current milestone
 
-### 13. Response Contracts & Serialization Architecture v0.1
+### 13. Response Contracts & Serialization v0.1
 
-The next architecture milestone defines how Gelis represents, validates, serializes, and exposes response contracts without forcing generic serialization machinery onto every route.
+**Architecture status:** Accepted and frozen.  
+**Current phase:** Correctness implementation.
 
-Questions to resolve include:
+The accepted architecture is recorded in:
+
+[`../architecture/response-contracts-v0.1.md`](../architecture/response-contracts-v0.1.md)
+
+The architecture establishes:
 
 ```text
-How are response contracts represented?
-
-How do status-specific response schemas interact with:
-reply.status(...)
-
-When is output validation performed?
-
-Should output validation be opt-in, development-oriented,
-or part of selected route contracts?
-
-How are serializers selected?
-
-Can serialization plans be compiled at registration time?
-
-How are Response objects passed through?
-
-How are strings, JSON values, undefined, and typed status results handled?
-
-How are serialization failures exposed to onError?
-
-How are runtime response contracts reused by OpenAPI
-and typed-client tooling?
+contract-only response metadata
+optional runtime response validation
+Standard Schema Input → Output response transformation
+bodyless response contracts
+explicit JSON/text serialization
+raw Response escape hatch
+compiled executable response plans
+response-contract error integration
+compact wire-only public contracts
+typed-client response projection
+zero-unused response capability
 ```
 
-The architecture must preserve current behavior for routes that do not enable additional response-contract capabilities.
+Key runtime invariant:
+
+> Response metadata alone must not create request-time response machinery.
+
+Routes that do not enable executable response behavior must preserve the existing response normalization path.
+
+Executable capabilities are introduced only when selected, including:
+
+```text
+validate: true
+serialize: "json"
+serialize: "text"
+```
+
+Response execution must preserve synchronous behavior when all participating operations are synchronous.
+
+### Current correctness phase
+
+Implementation now proceeds in this order:
+
+```text
+public response-contract types
+  ↓
+producer / wire projections
+  ↓
+reply.status bodyless semantics
+  ↓
+runtime response-plan representation
+  ↓
+registration-time response compilation
+  ↓
+response validation
+  ↓
+explicit serializers
+  ↓
+lifecycle / onError integration
+  ↓
+implicit response inference
+  ↓
+typed-client verification
+```
+
+Correctness comes before optimization.
 
 ### Acceptance requirements
 
-Response-contract architecture must satisfy:
+The implementation must satisfy:
 
 1. existing response semantics remain correct;
-2. typed status results remain predictable;
-3. plain `Response` pass-through remains cheap;
-4. plain JSON routes do not gain unnecessary generic dispatch;
-5. serializers are selected or compiled outside the request hot path where practical;
-6. response-validation capability does not imply mandatory response validation;
-7. errors integrate consistently with the accepted `onError` lifecycle;
-8. runtime contracts remain portable;
-9. OpenAPI metadata requirements do not contaminate runtime-only schemas;
-10. type-system growth remains bounded.
+2. contract-only response declarations introduce no executable response work;
+3. validated response contracts honor Standard Schema Input → Output semantics;
+4. successful validation serializes `result.value`;
+5. synchronous validators preserve synchronous execution;
+6. asynchronous validators are supported;
+7. bodyless responses remain unambiguous;
+8. raw `Response` remains a direct escape hatch;
+9. `beforeHandle` early responses retain lifecycle bypass semantics;
+10. `afterHandle` observes the pre-validation handler result;
+11. response-contract failures integrate with `onError`;
+12. handled `onError` results do not recursively enter route response plans;
+13. explicit JSON/text serializers behave deterministically;
+14. typed-client contracts expose wire output only;
+15. implicit route response inference matches actual runtime normalization;
+16. type-system growth remains bounded.
 
 ### Acceptance process
 
 ```text
 architecture
-  ↓
-correctness tests
+  ✓
+
+correctness implementation
   ↓
 type tests
+  ↓
+runtime tests
   ↓
 zero-unused regression
   ↓
@@ -401,10 +446,14 @@ runtime benchmark
   ↓
 HTTP benchmark
   ↓
+optimization rewind
+  ↓
 accept / revise
 ```
 
-No optimization should be added before a measurable cost or architectural need has been demonstrated.
+No optimization is accepted merely because it appears theoretically faster.
+
+Registration-time specialization should be implemented where architecture already requires it, but further specialization must be justified by measurement.
 
 ## Next milestones
 
