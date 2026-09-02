@@ -353,13 +353,32 @@ export class Gelis extends RouteBuilder<""> {
       }
 
       case RUNTIME_ROUTE_RESPONSE: {
-        return invokeResponseRoute(
-          route,
+        /*
+         * Response-only routes are common enough to
+         * deserve the same direct invocation shape as
+         * the plain-route fast path.
+         *
+         * Avoid the generic route invoker/context helper
+         * chain when no input or lifecycle phase exists.
+         */
+        const result = route.handler({
           request,
           params,
-          undefined,
-          undefined,
-        );
+
+          query: undefined,
+
+          body: undefined,
+
+          reply: runtimeReply,
+        });
+
+        const finalize = route.responsePlan!.finalize;
+
+        if (isPromiseLike(result)) {
+          return Promise.resolve(result).then(finalize);
+        }
+
+        return finalize(result);
       }
 
       case RUNTIME_ROUTE_INPUT_RESPONSE: {
