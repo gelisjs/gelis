@@ -1,6 +1,6 @@
 import type {
   HttpMethod,
-  ResponseSchemaMap,
+  ResponseContractMap,
   RouteHandler,
   RouteHandlerContextFor,
   RouteLifecycleFor,
@@ -90,7 +90,7 @@ export class RouteBuilder<Prefix extends string = ""> {
     const Path extends string,
     const Query extends StandardSchemaV1 | undefined = undefined,
     const Body extends StandardSchemaV1 | undefined = undefined,
-    const Responses extends ResponseSchemaMap | undefined = undefined,
+    const Responses extends ResponseContractMap | undefined = undefined,
     Result = unknown,
   >(
     path: Path & ValidRoutePath<Path>,
@@ -164,7 +164,7 @@ export class RouteBuilder<Prefix extends string = ""> {
     const Path extends string,
     const Query extends StandardSchemaV1 | undefined = undefined,
     const Body extends StandardSchemaV1 | undefined = undefined,
-    const Responses extends ResponseSchemaMap | undefined = undefined,
+    const Responses extends ResponseContractMap | undefined = undefined,
     Result = unknown,
   >(
     path: Path & ValidRoutePath<Path>,
