@@ -19,6 +19,10 @@ export const RUNTIME_RESPONSE_TEXT = 4;
 const RUNTIME_RESPONSE_SERIALIZER =
   RUNTIME_RESPONSE_JSON | RUNTIME_RESPONSE_TEXT;
 
+const AUTO_TEXT_HEADERS = {
+  "content-type": "text/plain; charset=utf-8",
+};
+
 export type RuntimeResponseFinalizer = (
   value: unknown,
 ) => Response | Promise<Response>;
@@ -425,6 +429,55 @@ function compileResponseStatusEntry(
 }
 
 function compileAutoSerializer(status: number): RuntimeStatusFinalizer {
+  /*
+   * HTTP 200 is the canonical direct-result status
+   * and the common AUTO response path.
+   *
+   * Its status is already known at registration
+   * time, so avoid re-checking bodyless status
+   * semantics on every request.
+   */
+  if (status === 200) {
+    const init: ResponseInit = {
+      status: 200,
+    };
+
+    return (body) => {
+      /*
+       * Preserve AUTO response semantics exactly.
+       *
+       * Only the constant status dispatch and
+       * normalizeResponseWithStatus() function hop
+       * are specialized away.
+       */
+      if (body === undefined) {
+        return new Response(null, init);
+      }
+
+      if (body instanceof Response) {
+        return new Response(body.body, {
+          status: 200,
+
+          headers: body.headers,
+        });
+      }
+
+      if (typeof body === "string") {
+        return new Response(body, {
+          status: 200,
+
+          headers: AUTO_TEXT_HEADERS,
+        });
+      }
+
+      return Response.json(body, init);
+    };
+  }
+
+  /*
+   * Non-200 AUTO statuses retain the canonical
+   * normalization implementation.
+   */
   return (body) => normalizeResponseWithStatus(status, body);
 }
 
