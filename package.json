@@ -46,7 +46,8 @@
     "bench:runtime:response:zero-unused": "bun bench/runtime/response-zero-unused.mts",
     "bench:runtime:response": "bun bench/runtime/response-contracts.mts",
     "bench:http:response": "bun bench/http/response/run.mts",
-    "bench:http:response:compare": "bun bench/http/response-comparison/run.mts"
+    "bench:http:response:compare": "bun bench/http/response-comparison/run.mts",
+    "bench:runtime:contract:zero-unused": "bun bench/runtime/contract-zero-unused.mts"
   },
   "devDependencies": {
     "@hono/standard-validator": "^0.4.0",
