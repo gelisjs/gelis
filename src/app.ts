@@ -4,6 +4,15 @@ import { pathnameFromUrl } from "./runtime/url";
 
 import { RouteBuilder } from "./route-builder";
 
+import { GELIS_CONTRACT_SOURCE } from "./contract-source";
+
+import type {
+  ApplicationContractSnapshot,
+  ContractRouteSnapshot,
+} from "./contract-source";
+
+import { RUNTIME_ROUTE_CONTRACT_METADATA } from "./runtime/contract-metadata";
+
 import { Router } from "./runtime/router";
 
 import { normalizeResponse, runtimeReply } from "./runtime/response";
@@ -165,6 +174,36 @@ export class Gelis extends RouteBuilder<""> {
     );
 
     this.#state = state;
+  }
+
+  private [GELIS_CONTRACT_SOURCE](): ApplicationContractSnapshot {
+    const entries = this.#state.routes;
+
+    const routes = new Array<ContractRouteSnapshot>(entries.length);
+
+    for (let index = 0; index < entries.length; index++) {
+      const route = entries[index]!.route;
+
+      const input = route.input;
+
+      routes[index] = {
+        method: route.method,
+
+        path: route.path,
+
+        query: input?.query,
+
+        body: input?.body,
+
+        responses: route.responses,
+
+        openapi: route[RUNTIME_ROUTE_CONTRACT_METADATA]?.openapi,
+      };
+    }
+
+    return {
+      routes,
+    };
   }
 
   onRequest(hook: OnRequest): this {

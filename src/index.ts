@@ -1,5 +1,12 @@
 export { Gelis } from "./app";
 
+export { inspectContract } from "./contract-source";
+
+export type {
+  ApplicationContractSnapshot,
+  ContractRouteSnapshot,
+} from "./contract-source";
+
 export { defineContract } from "./contract";
 
 export { defineModule } from "./module";
