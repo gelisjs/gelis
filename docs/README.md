@@ -20,6 +20,7 @@ This directory records accepted architectural decisions, reproducible benchmark 
 - [`benchmarks/validation-v0.1.md`](benchmarks/validation-v0.1.md)
 - [`benchmarks/on-request-v0.1.md`](benchmarks/on-request-v0.1.md)
 - [`benchmarks/on-error-v0.1.md`](benchmarks/on-error-v0.1.md)
+- [`benchmarks/response-contracts-v0.1.md`](benchmarks/response-contracts-v0.1.md)
 
 ## Development
 
