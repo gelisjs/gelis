@@ -387,7 +387,7 @@ function createBenchmarkApp(
   const app = new Gelis();
 
   for (let index = 0; index < size; index++) {
-    const path = `/route-${index}`;
+    const path = `/route-${index}` as const;
 
     switch (workload) {
       case "plain": {
