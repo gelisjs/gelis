@@ -13,6 +13,18 @@ export type {
 } from "./schema";
 
 export type {
+  OpenAPIJSONSchema,
+  OpenAPIPathParameterMetadata,
+  OpenAPIQueryMetadata,
+  OpenAPIQueryParameter,
+  OpenAPIRequestBodyMetadata,
+  OpenAPIRequestMetadata,
+  OpenAPIResponseMetadata,
+  OpenAPIResponseMetadataMap,
+  OpenAPIRouteMetadata,
+} from "./openapi";
+
+export type {
   GlobalAfterHandle,
   GlobalBeforeHandle,
   GlobalRouteContext,

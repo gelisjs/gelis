@@ -1,5 +1,7 @@
 import type { StandardSchemaV1 } from "./schema";
 
+import type { OpenAPIRouteMetadata } from "./openapi";
+
 import type { InferPathParams } from "./types/path";
 
 export type HttpMethod =
@@ -93,6 +95,8 @@ export interface RouteOptions {
   readonly body?: StandardSchemaV1;
 
   readonly responses?: ResponseContractMap;
+
+  readonly openapi?: OpenAPIRouteMetadata | false;
 }
 
 type SchemaInput<Schema> = Schema extends StandardSchemaV1
@@ -283,6 +287,8 @@ export type RouteOptionsFor<
   readonly body?: BodySchema;
 
   readonly responses?: Responses;
+
+  readonly openapi?: OpenAPIRouteMetadata | false;
 };
 
 export type RouteLifecycleFor<
