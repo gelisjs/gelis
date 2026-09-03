@@ -1,5 +1,9 @@
 import type { HttpMethod, ResponseContractMap } from "../route";
 
+import { RUNTIME_ROUTE_CONTRACT_METADATA } from "./contract-metadata";
+
+import type { RuntimeRouteContractMetadata } from "./contract-metadata";
+
 import type { RuntimeInputPlan } from "./input";
 
 import type { RuntimeResponsePlan } from "./response-plan";
@@ -88,6 +92,18 @@ export interface RuntimeRouteRecord {
   readonly method: HttpMethod;
 
   readonly path: string;
+
+  /*
+   * Optional registration metadata used only by
+   * explicit contract/tooling inspection.
+   *
+   * The symbol-keyed property exists only on routes
+   * that declare contract metadata.
+   *
+   * It is deliberately enumerable so module route
+   * templates preserve it through object spread.
+   */
+  readonly [RUNTIME_ROUTE_CONTRACT_METADATA]?: RuntimeRouteContractMetadata;
 
   readonly handler: RuntimeRouteHandler;
 

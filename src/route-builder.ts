@@ -37,6 +37,11 @@ import type {
 
 import { createRuntimeResponsePlan } from "./runtime/response-plan";
 
+import {
+  createRuntimeRouteContractMetadata,
+  RUNTIME_ROUTE_CONTRACT_METADATA,
+} from "./runtime/contract-metadata";
+
 export type JoinRoutePath<
   Prefix extends string,
   Path extends string,
@@ -424,6 +429,10 @@ export class RouteBuilder<Prefix extends string = ""> {
 
     const responses = options?.responses;
 
+    const contractMetadata = createRuntimeRouteContractMetadata(
+      options?.openapi,
+    );
+
     const responsePlan =
       responses === undefined
         ? undefined
@@ -467,6 +476,14 @@ export class RouteBuilder<Prefix extends string = ""> {
 
       responses,
     };
+
+    if (contractMetadata !== undefined) {
+      Object.defineProperty(runtimeRoute, RUNTIME_ROUTE_CONTRACT_METADATA, {
+        enumerable: true,
+
+        value: contractMetadata,
+      });
+    }
 
     if (responsePlan === undefined) {
       this.#register(runtimeRoute);
