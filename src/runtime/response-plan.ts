@@ -392,6 +392,35 @@ function compileResponseStatusEntry(
 ): CompiledResponseEntry {
   const serializerFlags = entry.flags & RUNTIME_RESPONSE_SERIALIZER;
 
+  /*
+   * Validation + explicit JSON is a common
+   * production response shape.
+   *
+   * Compile it directly instead of creating a
+   * validation closure that calls a second JSON
+   * serializer closure on every successful request.
+   */
+  if (
+    (entry.flags & RUNTIME_RESPONSE_VALIDATE) !== 0 &&
+    serializerFlags === RUNTIME_RESPONSE_JSON
+  ) {
+    const schema = entry.schema;
+
+    if (schema === undefined) {
+      throw new Error("Missing schema for validated Gelis response");
+    }
+
+    return {
+      status: entry.status,
+
+      finalize: compileValidatedJsonResponse(
+        entry.status,
+        schema,
+        entry.contentType,
+      ),
+    };
+  }
+
   let finalize: RuntimeStatusFinalizer;
 
   switch (serializerFlags) {
@@ -509,6 +538,87 @@ function compileJsonSerializer(
         {
           kind: "serialization",
           status,
+          cause,
+        },
+      );
+    }
+  };
+}
+
+function compileValidatedJsonResponse(
+  status: number,
+
+  schema: StandardSchemaV1,
+
+  contentType: string | undefined,
+): RuntimeStatusFinalizer {
+  const init: ResponseInit =
+    contentType === undefined
+      ? {
+          status,
+        }
+      : {
+          status,
+
+          headers: {
+            "content-type": contentType,
+          },
+        };
+
+  return (body) => {
+    /*
+     * Validator throws intentionally remain
+     * unwrapped so Standard Schema exception
+     * identity is preserved.
+     */
+    const validation = schema["~standard"].validate(body);
+
+    if (isPromiseLike(validation)) {
+      return Promise.resolve(validation).then((result) => {
+        if (result.issues !== undefined) {
+          throw validationError(status, result.issues);
+        }
+
+        /*
+         * Transformation output is canonical.
+         *
+         * Serialize result.value directly instead
+         * of entering another request-time
+         * serializer closure.
+         */
+        try {
+          return Response.json(result.value, init);
+        } catch (cause) {
+          throw new ResponseContractError(
+            `Failed to serialize response for status ${status} as JSON`,
+
+            {
+              kind: "serialization",
+
+              status,
+
+              cause,
+            },
+          );
+        }
+      });
+    }
+
+    if (validation.issues !== undefined) {
+      throw validationError(status, validation.issues);
+    }
+
+    try {
+      return Response.json(validation.value, init);
+    } catch (cause) {
+      throw new ResponseContractError(
+        `Failed to serialize response for status ${status} as JSON`,
+
+        {
+          kind: "serialization",
+
+          status,
+
           cause,
         },
       );

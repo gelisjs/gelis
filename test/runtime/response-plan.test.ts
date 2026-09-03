@@ -391,6 +391,157 @@ describe("Gelis response plan compilation", () => {
     expect(thrown).toBe(failure);
   });
 
+  test("validates and transforms synchronously before explicit JSON serialization", async () => {
+    const User = createSchema<
+      {
+        name: string;
+      },
+      {
+        name: string;
+        normalized: true;
+      }
+    >((value) => {
+      const input = value as {
+        name: string;
+      };
+
+      return {
+        value: {
+          name: input.name.trim(),
+          normalized: true,
+        },
+      };
+    });
+
+    const plan = createRuntimeResponsePlan({
+      200: {
+        schema: User,
+        validate: true,
+        serialize: "json",
+        contentType: "application/problem+json",
+      },
+    });
+
+    if (plan === undefined) {
+      throw new Error("Expected response plan");
+    }
+
+    const result = plan.finalize({
+      name: " Gelis ",
+    });
+
+    /*
+     * Fused validation + JSON must preserve
+     * synchronous execution for synchronous
+     * Standard Schema validators.
+     */
+    expect(result).toBeInstanceOf(Response);
+
+    if (!(result instanceof Response)) {
+      throw new Error("Expected synchronous Response");
+    }
+
+    expect(result.status).toBe(200);
+
+    expect(result.headers.get("content-type")).toBe("application/problem+json");
+
+    expect(await result.json()).toEqual({
+      name: "Gelis",
+      normalized: true,
+    });
+  });
+
+  test("supports asynchronous validation before explicit JSON serialization", async () => {
+    const User = createSchema<
+      {
+        name: string;
+      },
+      {
+        name: string;
+        normalized: true;
+      }
+    >(async (value) => {
+      const input = value as {
+        name: string;
+      };
+
+      return {
+        value: {
+          name: input.name.trim(),
+          normalized: true,
+        },
+      };
+    });
+
+    const plan = createRuntimeResponsePlan({
+      200: {
+        schema: User,
+        validate: true,
+        serialize: "json",
+      },
+    });
+
+    if (plan === undefined) {
+      throw new Error("Expected response plan");
+    }
+
+    const response = await plan.finalize({
+      name: " Gelis ",
+    });
+
+    expect(response.status).toBe(200);
+
+    expect(await response.json()).toEqual({
+      name: "Gelis",
+      normalized: true,
+    });
+  });
+
+  test("wraps JSON serialization failure after successful response validation", () => {
+    const Value = createSchema<
+      unknown,
+      {
+        value: bigint;
+      }
+    >(() => ({
+      value: {
+        value: 1n,
+      },
+    }));
+
+    const plan = createRuntimeResponsePlan({
+      200: {
+        schema: Value,
+        validate: true,
+        serialize: "json",
+      },
+    });
+
+    if (plan === undefined) {
+      throw new Error("Expected response plan");
+    }
+
+    let thrown: unknown;
+
+    try {
+      plan.finalize({
+        value: "input",
+      });
+    } catch (error) {
+      thrown = error;
+    }
+
+    expect(thrown).toBeInstanceOf(ResponseContractError);
+
+    if (!(thrown instanceof ResponseContractError)) {
+      throw new Error("Expected ResponseContractError");
+    }
+
+    expect(thrown.kind).toBe("serialization");
+
+    expect(thrown.status).toBe(200);
+  });
+
   test("serializes strings as JSON when JSON is explicit", async () => {
     const Text = createSchema<string>();
 
