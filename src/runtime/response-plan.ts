@@ -252,6 +252,24 @@ function compileResponseEntry(
 function compileResponseFinalizer(
   entries: readonly RuntimeResponsePlanEntry[],
 ): RuntimeResponseFinalizer {
+  /*
+   * Single-status response contracts are the
+   * overwhelmingly common shape.
+   *
+   * Compile that shape into one finalizer instead
+   * of routing through an additional managed-status
+   * dispatcher closure on every request.
+   */
+  if (entries.length === 1) {
+    const entry = entries[0];
+
+    if (entry === undefined) {
+      throw new Error("Missing runtime response entry");
+    }
+
+    return compileSingleResponseFinalizer(compileResponseStatusEntry(entry));
+  }
+
   const finalizeManaged = compileManagedResponseFinalizer(entries);
 
   return (value) => {
@@ -282,6 +300,106 @@ function compileResponseFinalizer(
      * selects HTTP 200.
      */
     return finalizeManaged(200, value);
+  };
+}
+
+function compileSingleResponseFinalizer(
+  entry: CompiledResponseEntry,
+): RuntimeResponseFinalizer {
+  const status = entry.status;
+
+  const finalize = entry.finalize;
+
+  /*
+   * Status 200 is the canonical direct-body shape.
+   *
+   * Registration-time specialization removes both
+   * the generic managed-finalizer call and its
+   * redundant successful-status comparison.
+   */
+  if (status === 200) {
+    return (value) => {
+      if (value instanceof Response) {
+        return value;
+      }
+
+      if (isRuntimeReplyResult(value)) {
+        if (value.status === 200) {
+          return finalize(value.body);
+        }
+
+        throw undeclaredStatusError(value.status);
+      }
+
+      /*
+       * Direct undefined has canonical 204
+       * semantics, which is undeclared by this
+       * single-status 200 plan.
+       */
+      if (value === undefined) {
+        throw undeclaredStatusError(204);
+      }
+
+      return finalize(value);
+    };
+  }
+
+  /*
+   * Preserve canonical direct-undefined semantics
+   * for a bodyless 204 contract.
+   *
+   * A standalone executable 204 plan is not a
+   * common current shape, but keeping this branch
+   * makes the specialization algebra complete.
+   */
+  if (status === 204) {
+    return (value) => {
+      if (value instanceof Response) {
+        return value;
+      }
+
+      if (isRuntimeReplyResult(value)) {
+        if (value.status === 204) {
+          return finalize(value.body);
+        }
+
+        throw undeclaredStatusError(value.status);
+      }
+
+      if (value === undefined) {
+        return finalize(undefined);
+      }
+
+      throw undeclaredStatusError(200);
+    };
+  }
+
+  /*
+   * Other single-status contracts are normally
+   * reached through reply.status().
+   *
+   * Keep the status check in the same closure as
+   * the response-shape discrimination rather than
+   * entering a second dispatcher.
+   */
+  return (value) => {
+    if (value instanceof Response) {
+      return value;
+    }
+
+    if (isRuntimeReplyResult(value)) {
+      if (value.status === status) {
+        return finalize(value.body);
+      }
+
+      throw undeclaredStatusError(value.status);
+    }
+
+    if (value === undefined) {
+      throw undeclaredStatusError(204);
+    }
+
+    throw undeclaredStatusError(200);
   };
 }
 
