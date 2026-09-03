@@ -6,7 +6,11 @@ export { defineModule } from "./module";
 
 export { ResponseContractError } from "./error";
 
-export type { StandardSchemaV1 } from "./schema";
+export type {
+  StandardJSONSchemaV1,
+  StandardSchemaV1,
+  StandardTypedV1,
+} from "./schema";
 
 export type {
   GlobalAfterHandle,
