@@ -30,6 +30,8 @@ const RAW_RESPONSE = new Response(
   },
 );
 
+const BENCHMARK_HANDLER = () => RAW_RESPONSE;
+
 type WorkloadName = "plain" | "documented" | "hidden";
 
 interface Sample {
@@ -111,7 +113,9 @@ async function runParent(): Promise<void> {
 
   console.log("Comparison:  plain vs documented vs openapi:false");
 
-  console.log("Handler:     identical prebuilt raw Response");
+  console.log(
+    "Handler:     same function identity + same prebuilt raw Response",
+  );
 
   console.log("Execution:   RUNTIME_ROUTE_PLAIN-equivalent workload");
 
@@ -271,21 +275,19 @@ function runChild(): void {
 
   const hidden = createHiddenApp();
 
-  const operations: Record<WorkloadName, () => Response | Promise<Response>> = {
-    plain: () => plain.fetch(REQUEST),
-
-    documented: () => documented.fetch(REQUEST),
-
-    hidden: () => hidden.fetch(REQUEST),
+  const apps: Record<WorkloadName, Gelis> = {
+    plain,
+    documented,
+    hidden,
   };
 
-  warmup(operations.plain, WARMUP_ITERATIONS);
+  warmup(apps.plain, WARMUP_ITERATIONS);
 
-  warmup(operations.documented, WARMUP_ITERATIONS);
+  warmup(apps.documented, WARMUP_ITERATIONS);
 
-  warmup(operations.hidden, WARMUP_ITERATIONS);
+  warmup(apps.hidden, WARMUP_ITERATIONS);
 
-  const iterations = calibrate(operations);
+  const iterations = calibrate(apps);
 
   const samples: Sample[] = [];
 
@@ -295,7 +297,7 @@ function runChild(): void {
     const elapsed: Partial<Record<WorkloadName, number>> = {};
 
     for (const workload of order) {
-      elapsed[workload] = measure(operations[workload], iterations);
+      elapsed[workload] = measure(apps[workload], iterations);
     }
 
     const plainNs = millisecondsToNsPerOp(elapsed.plain!, iterations);
@@ -379,7 +381,7 @@ function createPlainApp(): Gelis {
   app.get(
     "/bench",
 
-    () => RAW_RESPONSE,
+    BENCHMARK_HANDLER,
   );
 
   return app;
@@ -399,7 +401,7 @@ function createDocumentedApp(): Gelis {
       },
     },
 
-    () => RAW_RESPONSE,
+    BENCHMARK_HANDLER,
   );
 
   return app;
@@ -415,32 +417,30 @@ function createHiddenApp(): Gelis {
       openapi: false,
     },
 
-    () => RAW_RESPONSE,
+    BENCHMARK_HANDLER,
   );
 
   return app;
 }
 
 function warmup(
-  operation: () => Response | Promise<Response>,
+  app: Gelis,
 
   iterations: number,
 ): void {
   for (let index = 0; index < iterations; index++) {
-    sink = operation();
+    sink = app.fetch(REQUEST);
   }
 }
 
-function calibrate(
-  operations: Record<WorkloadName, () => Response | Promise<Response>>,
-): number {
+function calibrate(apps: Record<WorkloadName, Gelis>): number {
   let iterations = 1000;
 
   while (true) {
     let slowest = 0;
 
     for (const workload of ["plain", "documented", "hidden"] as const) {
-      const elapsed = measure(operations[workload], iterations);
+      const elapsed = measure(apps[workload], iterations);
 
       slowest = Math.max(slowest, elapsed);
     }
@@ -458,14 +458,14 @@ function calibrate(
 }
 
 function measure(
-  operation: () => Response | Promise<Response>,
+  app: Gelis,
 
   iterations: number,
 ): number {
   const start = performance.now();
 
   for (let index = 0; index < iterations; index++) {
-    sink = operation();
+    sink = app.fetch(REQUEST);
   }
 
   return performance.now() - start;
