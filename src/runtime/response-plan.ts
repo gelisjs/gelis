@@ -564,25 +564,13 @@ function compileValidatedResponse(
 
   finalize: RuntimeStatusFinalizer,
 ): RuntimeStatusFinalizer {
-  /*
-   * Resolve the Standard Schema interface once at
-   * registration time.
-   *
-   * Calling standard.validate(body) preserves the
-   * same method receiver as
-   * schema["~standard"].validate(body), while
-   * removing one property lookup from every
-   * validated response.
-   */
-  const standard = schema["~standard"];
-
   return (body) => {
     /*
      * Deliberately do not wrap validator throws.
      * Schema exceptions retain their original
      * identity.
      */
-    const validation = standard.validate(body);
+    const validation = schema["~standard"].validate(body);
 
     if (isPromiseLike(validation)) {
       return Promise.resolve(validation).then((result) => {
