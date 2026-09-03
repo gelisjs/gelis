@@ -271,9 +271,9 @@ function runCorrectnessGate(): void {
 function runChild(): void {
   const plain = createPlainApp();
 
-  const documented = createDocumentedApp();
-
   const hidden = createHiddenApp();
+
+  const documented = createDocumentedApp();
 
   const apps: Record<WorkloadName, Gelis> = {
     plain,
@@ -283,9 +283,9 @@ function runChild(): void {
 
   warmup(apps.plain, WARMUP_ITERATIONS);
 
-  warmup(apps.documented, WARMUP_ITERATIONS);
-
   warmup(apps.hidden, WARMUP_ITERATIONS);
+
+  warmup(apps.documented, WARMUP_ITERATIONS);
 
   const iterations = calibrate(apps);
 
@@ -439,7 +439,7 @@ function calibrate(apps: Record<WorkloadName, Gelis>): number {
   while (true) {
     let slowest = 0;
 
-    for (const workload of ["plain", "documented", "hidden"] as const) {
+    for (const workload of ["plain", "hidden", "documented"] as const) {
       const elapsed = measure(apps[workload], iterations);
 
       slowest = Math.max(slowest, elapsed);
