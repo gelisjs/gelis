@@ -11,7 +11,7 @@ This directory records accepted architectural decisions, reproducible benchmark 
 - [`architecture/on-request-v0.1.md`](architecture/on-request-v0.1.md)
 - [`architecture/on-error-v0.1.md`](architecture/on-error-v0.1.md)
 - [`architecture/response-contracts-v0.1.md`](architecture/response-contracts-v0.1.md)
-- [`architecture/response-contracts-v0.1.md`](architecture/response-contracts-v0.1.md)
+- [`architecture/openapi-contract-serialization-v0.1.md`](architecture/openapi-contract-serialization-v0.1.md)
 
 ## Benchmarks
 
