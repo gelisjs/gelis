@@ -32,70 +32,65 @@ const RAW_RESPONSE = new Response(
 
 const BENCHMARK_HANDLER = () => RAW_RESPONSE;
 
-type WorkloadName = "plain" | "documented" | "hidden";
+type CandidateName = "control" | "documented" | "hidden";
 
-interface Sample {
-  readonly order: readonly WorkloadName[];
+type SetupOrder = "baseline-first" | "candidate-first";
 
-  readonly plainNs: number;
+interface PairSample {
+  readonly order: "baseline-first" | "candidate-first";
 
-  readonly documentedNs: number;
+  readonly baselineNs: number;
 
-  readonly hiddenNs: number;
+  readonly candidateNs: number;
 
-  readonly documentedDeltaNs: number;
+  readonly deltaNs: number;
 
-  readonly documentedDeltaPercent: number;
-
-  readonly hiddenDeltaNs: number;
-
-  readonly hiddenDeltaPercent: number;
+  readonly deltaPercent: number;
 }
 
-interface BenchmarkResult {
-  readonly plainMedianNs: number;
+interface PairResult {
+  readonly candidate: CandidateName;
 
-  readonly documentedMedianNs: number;
+  readonly setupOrder: SetupOrder;
 
-  readonly hiddenMedianNs: number;
+  readonly baselineMedianNs: number;
 
-  readonly documentedMedianDeltaNs: number;
+  readonly candidateMedianNs: number;
 
-  readonly documentedMedianDeltaPercent: number;
+  readonly pairedMedianDeltaNs: number;
 
-  readonly hiddenMedianDeltaNs: number;
+  readonly pairedMedianDeltaPercent: number;
 
-  readonly hiddenMedianDeltaPercent: number;
+  readonly baselineCv: number;
 
-  readonly plainCv: number;
+  readonly candidateCv: number;
 
-  readonly documentedCv: number;
-
-  readonly hiddenCv: number;
-
-  readonly documentedWins: number;
-
-  readonly hiddenWins: number;
+  readonly candidateWins: number;
 }
 
-const ORDERS: readonly (readonly WorkloadName[])[] = [
-  ["plain", "documented", "hidden"],
+const CANDIDATES: readonly CandidateName[] = [
+  "control",
+  "documented",
+  "hidden",
+];
 
-  ["plain", "hidden", "documented"],
-
-  ["documented", "plain", "hidden"],
-
-  ["documented", "hidden", "plain"],
-
-  ["hidden", "plain", "documented"],
-
-  ["hidden", "documented", "plain"],
+const SETUP_ORDERS: readonly SetupOrder[] = [
+  "baseline-first",
+  "candidate-first",
 ];
 
 let sink: Response | Promise<Response>;
 
-if (process.argv.includes("--child")) {
-  runChild();
+const childCandidate = readArgument("--candidate");
+
+const childSetupOrder = readArgument("--setup-order");
+
+if (childCandidate !== undefined || childSetupOrder !== undefined) {
+  if (!isCandidateName(childCandidate) || !isSetupOrder(childSetupOrder)) {
+    throw new Error("Invalid child benchmark arguments");
+  }
+
+  runChild(childCandidate, childSetupOrder);
 } else {
   await runParent();
 }
@@ -103,28 +98,107 @@ if (process.argv.includes("--child")) {
 async function runParent(): Promise<void> {
   runCorrectnessGate();
 
-  console.log("\nGelis contract-source zero-unused benchmark");
+  console.log("\nGelis contract-source zero-unused pairwise benchmark");
 
   console.log(`Runtime:     bun ${Bun.version}`);
 
   console.log(`CPU:         ${cpus()[0]?.model ?? "unknown"}`);
 
-  console.log(`Samples:     ${SAMPLES}`);
+  console.log(`Samples:     ${SAMPLES} per child`);
 
-  console.log("Comparison:  plain vs documented vs openapi:false");
+  console.log("Control:     plain vs independent plain");
+
+  console.log("Candidates:  documented, openapi:false");
 
   console.log(
     "Handler:     same function identity + same prebuilt raw Response",
   );
 
-  console.log("Execution:   RUNTIME_ROUTE_PLAIN-equivalent workload");
+  console.log("Setup:       both creation/warmup orders");
 
-  console.log("Ordering:    all 6 workload permutations");
+  console.log("Measurement: alternating pair order");
 
-  console.log("Isolation:   fresh child process\n");
+  console.log("Isolation:   fresh child process per pair/order\n");
 
+  const results: PairResult[] = [];
+
+  for (const candidate of CANDIDATES) {
+    for (const setupOrder of SETUP_ORDERS) {
+      results.push(await runPairChild(candidate, setupOrder));
+    }
+  }
+
+  console.log("Pair results\n");
+
+  console.table(
+    results.map((result) => ({
+      candidate: displayCandidate(result.candidate),
+
+      setup: result.setupOrder,
+
+      "baseline ns": round(result.baselineMedianNs, 2),
+
+      "candidate ns": round(result.candidateMedianNs, 2),
+
+      "Δ ns": round(result.pairedMedianDeltaNs, 2),
+
+      "Δ %": round(result.pairedMedianDeltaPercent, 2),
+
+      wins: `${result.candidateWins}/${SAMPLES}`,
+
+      "baseline CV %": round(result.baselineCv * 100, 2),
+
+      "candidate CV %": round(result.candidateCv * 100, 2),
+    })),
+  );
+
+  console.log("\nCombined setup-order summary\n");
+
+  console.table(
+    CANDIDATES.map((candidate) => {
+      const candidateResults = results.filter(
+        (result) => result.candidate === candidate,
+      );
+
+      const deltas = candidateResults.map(
+        (result) => result.pairedMedianDeltaPercent,
+      );
+
+      return {
+        candidate: displayCandidate(candidate),
+
+        "median Δ %": round(median(deltas), 2),
+
+        "min Δ %": round(Math.min(...deltas), 2),
+
+        "max Δ %": round(Math.max(...deltas), 2),
+      };
+    }),
+  );
+
+  console.log("\nPositive delta means candidate was slower.");
+
+  console.log(
+    "The plain-vs-plain control establishes the local JIT/noise floor.",
+  );
+
+  void sink;
+}
+
+async function runPairChild(
+  candidate: CandidateName,
+
+  setupOrder: SetupOrder,
+): Promise<PairResult> {
   const child = Bun.spawn(
-    [process.execPath, CHILD, "--child"],
+    [
+      process.execPath,
+      CHILD,
+      "--candidate",
+      candidate,
+      "--setup-order",
+      setupOrder,
+    ],
 
     {
       cwd: resolve(HERE, "../.."),
@@ -145,7 +219,11 @@ async function runParent(): Promise<void> {
 
   if (exitCode !== 0) {
     throw new Error(
-      ["Contract zero-unused benchmark failed", stdout, stderr].join("\n"),
+      [
+        `Contract zero-unused child failed: ${candidate}/${setupOrder}`,
+        stdout,
+        stderr,
+      ].join("\n"),
     );
   }
 
@@ -154,225 +232,165 @@ async function runParent(): Promise<void> {
     .find((value) => value.startsWith("RESULT "));
 
   if (line === undefined) {
-    throw new Error(`Missing benchmark result\n${stdout}`);
+    throw new Error(
+      `Missing benchmark result: ${candidate}/${setupOrder}\n${stdout}`,
+    );
   }
 
   const parsed: unknown = JSON.parse(line.slice("RESULT ".length));
 
-  if (!isBenchmarkResult(parsed)) {
-    throw new Error("Invalid benchmark result");
+  if (!isPairResult(parsed)) {
+    throw new Error(`Invalid benchmark result: ${candidate}/${setupOrder}`);
   }
 
-  console.log("Results\n");
-
-  console.table([
-    {
-      workload: "plain",
-
-      "median ns/op": round(parsed.plainMedianNs, 2),
-
-      "CV %": round(parsed.plainCv * 100, 2),
-    },
-
-    {
-      workload: "documented",
-
-      "median ns/op": round(parsed.documentedMedianNs, 2),
-
-      "CV %": round(parsed.documentedCv * 100, 2),
-    },
-
-    {
-      workload: "openapi:false",
-
-      "median ns/op": round(parsed.hiddenMedianNs, 2),
-
-      "CV %": round(parsed.hiddenCv * 100, 2),
-    },
-  ]);
-
-  console.log("\nPaired deltas vs plain\n");
-
-  console.table([
-    {
-      workload: "documented",
-
-      "Δ ns": round(parsed.documentedMedianDeltaNs, 2),
-
-      "Δ %": round(parsed.documentedMedianDeltaPercent, 2),
-
-      wins: `${parsed.documentedWins}/${SAMPLES}`,
-    },
-
-    {
-      workload: "openapi:false",
-
-      "Δ ns": round(parsed.hiddenMedianDeltaNs, 2),
-
-      "Δ %": round(parsed.hiddenMedianDeltaPercent, 2),
-
-      wins: `${parsed.hiddenWins}/${SAMPLES}`,
-    },
-  ]);
-
-  console.log("\nPositive delta means the metadata workload was slower.");
-
-  console.log(
-    "Acceptance is based on repeated paired results, variance, and absence of a stable directional regression.",
-  );
-
-  void sink;
+  return parsed;
 }
 
 function runCorrectnessGate(): void {
   const plain = createPlainApp();
 
+  const control = createPlainApp();
+
   const documented = createDocumentedApp();
 
   const hidden = createHiddenApp();
 
-  const plainResult = plain.fetch(REQUEST);
+  assert.equal(plain.fetch(REQUEST), RAW_RESPONSE);
 
-  const documentedResult = documented.fetch(REQUEST);
+  assert.equal(control.fetch(REQUEST), RAW_RESPONSE);
 
-  const hiddenResult = hidden.fetch(REQUEST);
+  assert.equal(documented.fetch(REQUEST), RAW_RESPONSE);
 
-  assert.equal(plainResult, RAW_RESPONSE);
+  assert.equal(hidden.fetch(REQUEST), RAW_RESPONSE);
 
-  assert.equal(documentedResult, RAW_RESPONSE);
+  assert.equal(inspectContract(plain).routes[0]?.openapi, undefined);
 
-  assert.equal(hiddenResult, RAW_RESPONSE);
+  assert.equal(inspectContract(control).routes[0]?.openapi, undefined);
 
-  assert.ok(plainResult instanceof Response);
-
-  assert.ok(documentedResult instanceof Response);
-
-  assert.ok(hiddenResult instanceof Response);
-
-  const plainContract = inspectContract(plain);
-
-  const documentedContract = inspectContract(documented);
-
-  const hiddenContract = inspectContract(hidden);
-
-  assert.equal(plainContract.routes[0]?.openapi, undefined);
-
-  assert.deepEqual(documentedContract.routes[0]?.openapi, {
+  assert.deepEqual(inspectContract(documented).routes[0]?.openapi, {
     summary: "Benchmark route",
 
     tags: ["Benchmark"],
   });
 
-  assert.equal(hiddenContract.routes[0]?.openapi, false);
+  assert.equal(inspectContract(hidden).routes[0]?.openapi, false);
 
   console.log("Correctness: PASS");
 }
 
-function runChild(): void {
-  const plain = createPlainApp();
+function runChild(
+  candidateName: CandidateName,
 
-  const hidden = createHiddenApp();
+  setupOrder: SetupOrder,
+): void {
+  let baseline: Gelis;
 
-  const documented = createDocumentedApp();
+  let candidate: Gelis;
 
-  const apps: Record<WorkloadName, Gelis> = {
-    plain,
-    documented,
-    hidden,
-  };
+  if (setupOrder === "baseline-first") {
+    baseline = createPlainApp();
 
-  warmup(apps.plain, WARMUP_ITERATIONS);
+    candidate = createCandidateApp(candidateName);
+  } else {
+    candidate = createCandidateApp(candidateName);
 
-  warmup(apps.hidden, WARMUP_ITERATIONS);
+    baseline = createPlainApp();
+  }
 
-  warmup(apps.documented, WARMUP_ITERATIONS);
+  if (setupOrder === "baseline-first") {
+    warmup(baseline, WARMUP_ITERATIONS);
 
-  const iterations = calibrate(apps);
+    warmup(candidate, WARMUP_ITERATIONS);
+  } else {
+    warmup(candidate, WARMUP_ITERATIONS);
 
-  const samples: Sample[] = [];
+    warmup(baseline, WARMUP_ITERATIONS);
+  }
+
+  const iterations = calibratePair(baseline, candidate, setupOrder);
+
+  const samples: PairSample[] = [];
 
   for (let sample = 0; sample < SAMPLES; sample++) {
-    const order = ORDERS[sample % ORDERS.length]!;
+    const baselineFirst = sample % 2 === 0;
 
-    const elapsed: Partial<Record<WorkloadName, number>> = {};
+    let baselineElapsed: number;
 
-    for (const workload of order) {
-      elapsed[workload] = measure(apps[workload], iterations);
+    let candidateElapsed: number;
+
+    if (baselineFirst) {
+      baselineElapsed = measure(baseline, iterations);
+
+      candidateElapsed = measure(candidate, iterations);
+    } else {
+      candidateElapsed = measure(candidate, iterations);
+
+      baselineElapsed = measure(baseline, iterations);
     }
 
-    const plainNs = millisecondsToNsPerOp(elapsed.plain!, iterations);
+    const baselineNs = millisecondsToNsPerOp(baselineElapsed, iterations);
 
-    const documentedNs = millisecondsToNsPerOp(elapsed.documented!, iterations);
-
-    const hiddenNs = millisecondsToNsPerOp(elapsed.hidden!, iterations);
+    const candidateNs = millisecondsToNsPerOp(candidateElapsed, iterations);
 
     samples.push({
-      order,
+      order: baselineFirst ? "baseline-first" : "candidate-first",
 
-      plainNs,
+      baselineNs,
 
-      documentedNs,
+      candidateNs,
 
-      hiddenNs,
+      deltaNs: candidateNs - baselineNs,
 
-      documentedDeltaNs: documentedNs - plainNs,
-
-      documentedDeltaPercent: (documentedNs / plainNs - 1) * 100,
-
-      hiddenDeltaNs: hiddenNs - plainNs,
-
-      hiddenDeltaPercent: (hiddenNs / plainNs - 1) * 100,
+      deltaPercent: (candidateNs / baselineNs - 1) * 100,
     });
   }
 
-  const plainValues = samples.map((sample) => sample.plainNs);
+  const baselineValues = samples.map((sample) => sample.baselineNs);
 
-  const documentedValues = samples.map((sample) => sample.documentedNs);
+  const candidateValues = samples.map((sample) => sample.candidateNs);
 
-  const hiddenValues = samples.map((sample) => sample.hiddenNs);
+  const deltaValues = samples.map((sample) => sample.deltaNs);
 
-  const documentedDeltaNs = samples.map((sample) => sample.documentedDeltaNs);
+  const deltaPercentValues = samples.map((sample) => sample.deltaPercent);
 
-  const documentedDeltaPercent = samples.map(
-    (sample) => sample.documentedDeltaPercent,
-  );
+  const result: PairResult = {
+    candidate: candidateName,
 
-  const hiddenDeltaNs = samples.map((sample) => sample.hiddenDeltaNs);
+    setupOrder,
 
-  const hiddenDeltaPercent = samples.map((sample) => sample.hiddenDeltaPercent);
+    baselineMedianNs: median(baselineValues),
 
-  const result: BenchmarkResult = {
-    plainMedianNs: median(plainValues),
+    candidateMedianNs: median(candidateValues),
 
-    documentedMedianNs: median(documentedValues),
+    pairedMedianDeltaNs: median(deltaValues),
 
-    hiddenMedianNs: median(hiddenValues),
+    pairedMedianDeltaPercent: median(deltaPercentValues),
 
-    documentedMedianDeltaNs: median(documentedDeltaNs),
+    baselineCv: coefficientOfVariation(baselineValues),
 
-    documentedMedianDeltaPercent: median(documentedDeltaPercent),
+    candidateCv: coefficientOfVariation(candidateValues),
 
-    hiddenMedianDeltaNs: median(hiddenDeltaNs),
-
-    hiddenMedianDeltaPercent: median(hiddenDeltaPercent),
-
-    plainCv: coefficientOfVariation(plainValues),
-
-    documentedCv: coefficientOfVariation(documentedValues),
-
-    hiddenCv: coefficientOfVariation(hiddenValues),
-
-    documentedWins: samples.filter(
-      (sample) => sample.documentedNs < sample.plainNs,
+    candidateWins: samples.filter(
+      (sample) => sample.candidateNs < sample.baselineNs,
     ).length,
-
-    hiddenWins: samples.filter((sample) => sample.hiddenNs < sample.plainNs)
-      .length,
   };
 
   console.log(`RESULT ${JSON.stringify(result)}`);
 
   void sink;
+}
+
+function createCandidateApp(candidate: CandidateName): Gelis {
+  switch (candidate) {
+    case "control":
+      return createPlainApp();
+
+    case "documented":
+      return createDocumentedApp();
+
+    case "hidden":
+      return createHiddenApp();
+  }
 }
 
 function createPlainApp(): Gelis {
@@ -433,23 +451,37 @@ function warmup(
   }
 }
 
-function calibrate(apps: Record<WorkloadName, Gelis>): number {
+function calibratePair(
+  baseline: Gelis,
+
+  candidate: Gelis,
+
+  setupOrder: SetupOrder,
+): number {
   let iterations = 1000;
 
   while (true) {
-    let slowest = 0;
+    let baselineElapsed: number;
 
-    for (const workload of ["plain", "hidden", "documented"] as const) {
-      const elapsed = measure(apps[workload], iterations);
+    let candidateElapsed: number;
 
-      slowest = Math.max(slowest, elapsed);
+    if (setupOrder === "baseline-first") {
+      baselineElapsed = measure(baseline, iterations);
+
+      candidateElapsed = measure(candidate, iterations);
+    } else {
+      candidateElapsed = measure(candidate, iterations);
+
+      baselineElapsed = measure(baseline, iterations);
     }
 
-    if (slowest >= MIN_CALIBRATION_MS) {
+    const slowerElapsed = Math.max(baselineElapsed, candidateElapsed);
+
+    if (slowerElapsed >= MIN_CALIBRATION_MS) {
       return Math.max(
         1,
 
-        Math.round((iterations * TARGET_MS) / Math.max(slowest, 0.001)),
+        Math.round((iterations * TARGET_MS) / Math.max(slowerElapsed, 0.001)),
       );
     }
 
@@ -523,21 +555,54 @@ function coefficientOfVariation(values: readonly number[]): number {
   return Math.sqrt(variance) / average;
 }
 
-function isBenchmarkResult(value: unknown): value is BenchmarkResult {
+function readArgument(name: string): string | undefined {
+  const index = process.argv.indexOf(name);
+
+  if (index === -1) {
+    return undefined;
+  }
+
+  return process.argv[index + 1];
+}
+
+function isCandidateName(value: string | undefined): value is CandidateName {
+  return value === "control" || value === "documented" || value === "hidden";
+}
+
+function isSetupOrder(value: string | undefined): value is SetupOrder {
+  return value === "baseline-first" || value === "candidate-first";
+}
+
+function isPairResult(value: unknown): value is PairResult {
   return (
     value !== null &&
     typeof value === "object" &&
-    "plainMedianNs" in value &&
-    typeof value.plainMedianNs === "number" &&
-    "documentedMedianNs" in value &&
-    typeof value.documentedMedianNs === "number" &&
-    "hiddenMedianNs" in value &&
-    typeof value.hiddenMedianNs === "number" &&
-    "documentedMedianDeltaPercent" in value &&
-    typeof value.documentedMedianDeltaPercent === "number" &&
-    "hiddenMedianDeltaPercent" in value &&
-    typeof value.hiddenMedianDeltaPercent === "number"
+    "candidate" in value &&
+    typeof value.candidate === "string" &&
+    "setupOrder" in value &&
+    typeof value.setupOrder === "string" &&
+    "baselineMedianNs" in value &&
+    typeof value.baselineMedianNs === "number" &&
+    "candidateMedianNs" in value &&
+    typeof value.candidateMedianNs === "number" &&
+    "pairedMedianDeltaPercent" in value &&
+    typeof value.pairedMedianDeltaPercent === "number" &&
+    "candidateWins" in value &&
+    typeof value.candidateWins === "number"
   );
+}
+
+function displayCandidate(candidate: CandidateName): string {
+  switch (candidate) {
+    case "control":
+      return "plain-control";
+
+    case "documented":
+      return "documented";
+
+    case "hidden":
+      return "openapi:false";
+  }
 }
 
 function round(
