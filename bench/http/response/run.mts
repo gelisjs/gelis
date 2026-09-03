@@ -57,6 +57,17 @@ type VariantName = (typeof variants)[number]["name"];
 
 type CaseName = (typeof cases)[number];
 
+const CASE_FILTER = process.env.BENCH_CASE?.trim();
+
+const selectedCases: readonly CaseName[] =
+  CASE_FILTER === undefined || CASE_FILTER.length === 0
+    ? cases
+    : cases.filter((benchmarkCase) => benchmarkCase === CASE_FILTER);
+
+if (selectedCases.length === 0) {
+  throw new Error(`Unknown response benchmark case: ${CASE_FILTER}`);
+}
+
 type PairOrder = "control-first" | "managed-first";
 
 interface RawResult {
@@ -165,8 +176,8 @@ const urlSet = generateUrls();
 
 const rawResults: RawResult[] = [];
 
-for (let caseIndex = 0; caseIndex < cases.length; caseIndex++) {
-  const benchmarkCase = cases[caseIndex];
+for (let caseIndex = 0; caseIndex < selectedCases.length; caseIndex++) {
+  const benchmarkCase = selectedCases[caseIndex];
 
   if (benchmarkCase === undefined) {
     continue;
@@ -690,7 +701,7 @@ async function runOha(
 function aggregate(results: readonly RawResult[]): AggregateRow[] {
   const rows: AggregateRow[] = [];
 
-  for (const benchmarkCase of cases) {
+  for (const benchmarkCase of selectedCases) {
     const group = results.filter((result) => result.case === benchmarkCase);
 
     const control = group.filter((result) => result.variant === "control");

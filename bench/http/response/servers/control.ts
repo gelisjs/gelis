@@ -7,7 +7,7 @@ import {
   TEXT,
   VALIDATION_INPUT,
   payloadSchema,
-  validateOutput,
+  validationSchema,
 } from "../schemas";
 
 const PORT = Number(process.env.PORT ?? 3100);
@@ -90,7 +90,23 @@ switch (CASE) {
         path,
 
         () => {
-          const result = validateOutput(VALIDATION_INPUT);
+          /*
+           * Exercise the exact same Standard Schema
+           * object used by the managed route.
+           *
+           * The control remains hand-written, but it
+           * must pay the Standard Schema interface
+           * cost rather than calling the underlying
+           * validator implementation directly.
+           */
+          const result =
+            validationSchema["~standard"].validate(VALIDATION_INPUT);
+
+          if (isPromiseLike(result)) {
+            throw new Error(
+              "Response benchmark validation schema unexpectedly became asynchronous",
+            );
+          }
 
           if (result.issues !== undefined) {
             throw new Error("Unexpected validation issues");
@@ -134,6 +150,25 @@ switch (CASE) {
 
   default:
     throw new Error(`Unknown response benchmark case: ${CASE}`);
+}
+
+function isPromiseLike<Value>(
+  value: Value | PromiseLike<Value>,
+): value is PromiseLike<Value> {
+  if (
+    value === null ||
+    (typeof value !== "object" && typeof value !== "function")
+  ) {
+    return false;
+  }
+
+  return (
+    typeof (
+      value as {
+        then?: unknown;
+      }
+    ).then === "function"
+  );
 }
 
 serve(
