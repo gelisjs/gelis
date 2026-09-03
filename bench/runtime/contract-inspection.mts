@@ -33,6 +33,16 @@ const MIN_CALIBRATION_MS = 20;
 
 const WARMUP_ITERATIONS = 20;
 
+const RAW_RESPONSE = new Response(
+  null,
+
+  {
+    status: 204,
+  },
+);
+
+const BENCHMARK_HANDLER = () => RAW_RESPONSE;
+
 interface BenchmarkResult {
   readonly workload: Workload;
 
@@ -233,10 +243,6 @@ function runCorrectnessGate(): void {
 
   assert.ok(openapi !== undefined && openapi !== false);
 
-  if (openapi === undefined || openapi === false) {
-    throw new Error("Expected OpenAPI metadata");
-  }
-
   assert.equal(openapi.operationId, "route2");
 
   console.log("Correctness: PASS");
@@ -363,11 +369,14 @@ function createBenchmarkApp(
 } {
   let validationCount = 0;
 
-  const SharedSchema = createSchema((value) => {
+  const SharedSchema = createSchema<
+    Record<string, unknown>,
+    Record<string, unknown>
+  >((value) => {
     validationCount++;
 
     return {
-      value,
+      value: value as Record<string, unknown>,
     };
   });
 
