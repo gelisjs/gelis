@@ -6,6 +6,8 @@ import type {
   HttpMethod,
   OpenAPIRouteMetadata,
   ResponseContractMap,
+  RouteContractOf,
+  StandardJSONSchemaV1,
   StandardSchemaV1,
 } from "../../src";
 
@@ -104,3 +106,158 @@ type _NoInspectMethod = Expect<
 >;
 
 void snapshot;
+
+/*
+ * Runtime validation does not require JSON Schema
+ * serialization capability.
+ *
+ * A runtime-only Standard Schema remains a valid
+ * Gelis route contract.
+ */
+declare const RuntimeOnlySchema: StandardSchemaV1<
+  {
+    raw: string;
+  },
+  {
+    normalized: number;
+  }
+>;
+
+const runtimeOnly = app.post(
+  "/runtime-only",
+
+  {
+    body: RuntimeOnlySchema,
+  },
+
+  ({ body }) => body.normalized,
+);
+
+type RuntimeOnlyContract = RouteContractOf<typeof runtimeOnly>;
+
+type _RuntimeOnlyInput = Expect<
+  Equal<
+    RuntimeOnlyContract["request"]["body"],
+    {
+      raw: string;
+    }
+  >
+>;
+
+type _RuntimeOnlyResponse = Expect<
+  Equal<
+    RuntimeOnlyContract["responses"],
+    {
+      200: number;
+    }
+  >
+>;
+
+/*
+ * A runtime-only schema may explicitly declare its
+ * documentation shape opaque without changing the
+ * runtime validation type.
+ */
+app.post(
+  "/runtime-only-opaque",
+
+  {
+    body: RuntimeOnlySchema,
+
+    openapi: {
+      request: {
+        body: {
+          opaque: true,
+        },
+      },
+    },
+  },
+
+  ({ body }) => body.normalized,
+);
+
+/*
+ * A schema may implement Standard Schema and
+ * Standard JSON Schema simultaneously.
+ *
+ * Gelis runtime typing continues to use Standard
+ * Schema Input/Output semantics.
+ */
+interface SerializableProps
+  extends
+    StandardSchemaV1.Props<
+      {
+        raw: string;
+      },
+      {
+        normalized: number;
+      }
+    >,
+    StandardJSONSchemaV1.Props<
+      {
+        raw: string;
+      },
+      {
+        normalized: number;
+      }
+    > {}
+
+interface SerializableSchema {
+  readonly "~standard": SerializableProps;
+}
+
+declare const Serializable: SerializableSchema;
+
+const serializableRoute = app.post(
+  "/serializable",
+
+  {
+    body: Serializable,
+  },
+
+  ({ body }) => body.normalized,
+);
+
+type SerializableContract = RouteContractOf<typeof serializableRoute>;
+
+type _SerializableInput = Expect<
+  Equal<
+    SerializableContract["request"]["body"],
+    {
+      raw: string;
+    }
+  >
+>;
+
+type _SerializableResponse = Expect<
+  Equal<
+    SerializableContract["responses"],
+    {
+      200: number;
+    }
+  >
+>;
+
+/*
+ * Standard JSON Schema by itself does not provide
+ * runtime validation.
+ */
+declare const JSONSchemaOnly: StandardJSONSchemaV1<
+  {
+    raw: string;
+  },
+  {
+    normalized: number;
+  }
+>;
+
+app.post(
+  "/json-schema-only",
+
+  {
+    // @ts-expect-error JSON Schema serialization alone is not runtime validation
+    body: JSONSchemaOnly,
+  },
+
+  () => undefined,
+);

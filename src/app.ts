@@ -11,7 +11,10 @@ import type {
   ContractRouteSnapshot,
 } from "./contract-source";
 
-import { RUNTIME_ROUTE_CONTRACT_METADATA } from "./runtime/contract-metadata";
+import {
+  cloneOpenAPIRouteMetadata,
+  RUNTIME_ROUTE_CONTRACT_METADATA,
+} from "./runtime/contract-metadata";
 
 import { Router } from "./runtime/router";
 
@@ -186,6 +189,10 @@ export class Gelis extends RouteBuilder<""> {
 
       const input = route.input;
 
+      const contractMetadata = route[RUNTIME_ROUTE_CONTRACT_METADATA];
+
+      const openapi = contractMetadata?.openapi;
+
       routes[index] = {
         method: route.method,
 
@@ -197,7 +204,10 @@ export class Gelis extends RouteBuilder<""> {
 
         responses: route.responses,
 
-        openapi: route[RUNTIME_ROUTE_CONTRACT_METADATA]?.openapi,
+        openapi:
+          openapi === undefined || openapi === false
+            ? openapi
+            : cloneOpenAPIRouteMetadata(openapi),
       };
     }
 
