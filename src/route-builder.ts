@@ -334,6 +334,609 @@ export class RouteBuilder<Prefix extends string = ""> {
     );
   }
 
+  /*
+   * PUT without options.
+   */
+  put<const Path extends string, Result>(
+    path: Path & ValidRoutePath<Path>,
+
+    handler: RouteHandler<JoinRoutePath<Prefix, Path>, never, never, Result>,
+
+    lifecycle?: RouteLifecycleFor<
+      JoinRoutePath<Prefix, Path>,
+      undefined,
+      undefined,
+      undefined,
+      Result
+    >,
+  ): RouteRef<
+    "PUT",
+    JoinRoutePath<Prefix, Path>,
+    RouteRequestContract<InferPathParams<JoinRoutePath<Prefix, Path>>>,
+    InferImplicitResponses<Result>
+  >;
+
+  /*
+   * PUT with options but without an explicit
+   * response contract.
+   */
+  put<
+    const Path extends string,
+    const Query extends StandardSchemaV1 | undefined = undefined,
+    const Body extends StandardSchemaV1 | undefined = undefined,
+    Result = unknown,
+  >(
+    path: Path & ValidRoutePath<Path>,
+
+    options: RouteOptionsFor<Query, Body, undefined>,
+
+    handler: (
+      context: RouteHandlerContextFor<
+        JoinRoutePath<Prefix, Path>,
+        RouteOptionsFor<Query, Body, undefined>
+      >,
+    ) => Result,
+
+    lifecycle?: RouteLifecycleFor<
+      JoinRoutePath<Prefix, Path>,
+      Query,
+      Body,
+      undefined,
+      Result
+    >,
+  ): RouteRef<
+    "PUT",
+    JoinRoutePath<Prefix, Path>,
+    RouteRequestFor<
+      JoinRoutePath<Prefix, Path>,
+      RouteOptionsFor<Query, Body, undefined>
+    >,
+    RouteResponsesFor<RouteOptionsFor<Query, Body, undefined>, Result>
+  >;
+
+  /*
+   * PUT with an explicit response contract.
+   */
+  put<
+    const Path extends string,
+    const Responses extends ResponseContractMap,
+    const Query extends StandardSchemaV1 | undefined = undefined,
+    const Body extends StandardSchemaV1 | undefined = undefined,
+  >(
+    path: Path & ValidRoutePath<Path>,
+
+    options: RouteOptionsFor<Query, Body, Responses> & {
+      readonly responses: Responses;
+    },
+
+    handler: (
+      context: RouteHandlerContextFor<
+        JoinRoutePath<Prefix, Path>,
+        RouteOptionsFor<Query, Body, Responses>
+      >,
+    ) => RouteHandlerResultFor<Responses>,
+
+    lifecycle?: RouteLifecycleFor<
+      JoinRoutePath<Prefix, Path>,
+      Query,
+      Body,
+      Responses,
+      RouteHandlerResultFor<Responses>
+    >,
+  ): RouteRef<
+    "PUT",
+    JoinRoutePath<Prefix, Path>,
+    RouteRequestFor<
+      JoinRoutePath<Prefix, Path>,
+      RouteOptionsFor<Query, Body, Responses>
+    >,
+    RouteResponsesFor<
+      RouteOptionsFor<Query, Body, Responses>,
+      RouteHandlerResultFor<Responses>
+    >
+  >;
+
+  put(
+    path: string,
+
+    optionsOrHandler: unknown,
+
+    handlerOrLifecycle?: unknown,
+
+    lifecycle?: unknown,
+  ): unknown {
+    return this.registerRoute(
+      "PUT",
+      path,
+      optionsOrHandler,
+      handlerOrLifecycle,
+      lifecycle,
+    );
+  }
+
+  /*
+   * PATCH without options.
+   */
+  patch<const Path extends string, Result>(
+    path: Path & ValidRoutePath<Path>,
+
+    handler: RouteHandler<JoinRoutePath<Prefix, Path>, never, never, Result>,
+
+    lifecycle?: RouteLifecycleFor<
+      JoinRoutePath<Prefix, Path>,
+      undefined,
+      undefined,
+      undefined,
+      Result
+    >,
+  ): RouteRef<
+    "PATCH",
+    JoinRoutePath<Prefix, Path>,
+    RouteRequestContract<InferPathParams<JoinRoutePath<Prefix, Path>>>,
+    InferImplicitResponses<Result>
+  >;
+
+  /*
+   * PATCH with options but without an explicit
+   * response contract.
+   */
+  patch<
+    const Path extends string,
+    const Query extends StandardSchemaV1 | undefined = undefined,
+    const Body extends StandardSchemaV1 | undefined = undefined,
+    Result = unknown,
+  >(
+    path: Path & ValidRoutePath<Path>,
+
+    options: RouteOptionsFor<Query, Body, undefined>,
+
+    handler: (
+      context: RouteHandlerContextFor<
+        JoinRoutePath<Prefix, Path>,
+        RouteOptionsFor<Query, Body, undefined>
+      >,
+    ) => Result,
+
+    lifecycle?: RouteLifecycleFor<
+      JoinRoutePath<Prefix, Path>,
+      Query,
+      Body,
+      undefined,
+      Result
+    >,
+  ): RouteRef<
+    "PATCH",
+    JoinRoutePath<Prefix, Path>,
+    RouteRequestFor<
+      JoinRoutePath<Prefix, Path>,
+      RouteOptionsFor<Query, Body, undefined>
+    >,
+    RouteResponsesFor<RouteOptionsFor<Query, Body, undefined>, Result>
+  >;
+
+  /*
+   * PATCH with an explicit response contract.
+   */
+  patch<
+    const Path extends string,
+    const Responses extends ResponseContractMap,
+    const Query extends StandardSchemaV1 | undefined = undefined,
+    const Body extends StandardSchemaV1 | undefined = undefined,
+  >(
+    path: Path & ValidRoutePath<Path>,
+
+    options: RouteOptionsFor<Query, Body, Responses> & {
+      readonly responses: Responses;
+    },
+
+    handler: (
+      context: RouteHandlerContextFor<
+        JoinRoutePath<Prefix, Path>,
+        RouteOptionsFor<Query, Body, Responses>
+      >,
+    ) => RouteHandlerResultFor<Responses>,
+
+    lifecycle?: RouteLifecycleFor<
+      JoinRoutePath<Prefix, Path>,
+      Query,
+      Body,
+      Responses,
+      RouteHandlerResultFor<Responses>
+    >,
+  ): RouteRef<
+    "PATCH",
+    JoinRoutePath<Prefix, Path>,
+    RouteRequestFor<
+      JoinRoutePath<Prefix, Path>,
+      RouteOptionsFor<Query, Body, Responses>
+    >,
+    RouteResponsesFor<
+      RouteOptionsFor<Query, Body, Responses>,
+      RouteHandlerResultFor<Responses>
+    >
+  >;
+
+  patch(
+    path: string,
+
+    optionsOrHandler: unknown,
+
+    handlerOrLifecycle?: unknown,
+
+    lifecycle?: unknown,
+  ): unknown {
+    return this.registerRoute(
+      "PATCH",
+      path,
+      optionsOrHandler,
+      handlerOrLifecycle,
+      lifecycle,
+    );
+  }
+
+  /*
+   * DELETE without options.
+   */
+  delete<const Path extends string, Result>(
+    path: Path & ValidRoutePath<Path>,
+
+    handler: RouteHandler<JoinRoutePath<Prefix, Path>, never, never, Result>,
+
+    lifecycle?: RouteLifecycleFor<
+      JoinRoutePath<Prefix, Path>,
+      undefined,
+      undefined,
+      undefined,
+      Result
+    >,
+  ): RouteRef<
+    "DELETE",
+    JoinRoutePath<Prefix, Path>,
+    RouteRequestContract<InferPathParams<JoinRoutePath<Prefix, Path>>>,
+    InferImplicitResponses<Result>
+  >;
+
+  /*
+   * DELETE with options but without an explicit
+   * response contract.
+   */
+  delete<
+    const Path extends string,
+    const Query extends StandardSchemaV1 | undefined = undefined,
+    const Body extends StandardSchemaV1 | undefined = undefined,
+    Result = unknown,
+  >(
+    path: Path & ValidRoutePath<Path>,
+
+    options: RouteOptionsFor<Query, Body, undefined>,
+
+    handler: (
+      context: RouteHandlerContextFor<
+        JoinRoutePath<Prefix, Path>,
+        RouteOptionsFor<Query, Body, undefined>
+      >,
+    ) => Result,
+
+    lifecycle?: RouteLifecycleFor<
+      JoinRoutePath<Prefix, Path>,
+      Query,
+      Body,
+      undefined,
+      Result
+    >,
+  ): RouteRef<
+    "DELETE",
+    JoinRoutePath<Prefix, Path>,
+    RouteRequestFor<
+      JoinRoutePath<Prefix, Path>,
+      RouteOptionsFor<Query, Body, undefined>
+    >,
+    RouteResponsesFor<RouteOptionsFor<Query, Body, undefined>, Result>
+  >;
+
+  /*
+   * DELETE with an explicit response contract.
+   */
+  delete<
+    const Path extends string,
+    const Responses extends ResponseContractMap,
+    const Query extends StandardSchemaV1 | undefined = undefined,
+    const Body extends StandardSchemaV1 | undefined = undefined,
+  >(
+    path: Path & ValidRoutePath<Path>,
+
+    options: RouteOptionsFor<Query, Body, Responses> & {
+      readonly responses: Responses;
+    },
+
+    handler: (
+      context: RouteHandlerContextFor<
+        JoinRoutePath<Prefix, Path>,
+        RouteOptionsFor<Query, Body, Responses>
+      >,
+    ) => RouteHandlerResultFor<Responses>,
+
+    lifecycle?: RouteLifecycleFor<
+      JoinRoutePath<Prefix, Path>,
+      Query,
+      Body,
+      Responses,
+      RouteHandlerResultFor<Responses>
+    >,
+  ): RouteRef<
+    "DELETE",
+    JoinRoutePath<Prefix, Path>,
+    RouteRequestFor<
+      JoinRoutePath<Prefix, Path>,
+      RouteOptionsFor<Query, Body, Responses>
+    >,
+    RouteResponsesFor<
+      RouteOptionsFor<Query, Body, Responses>,
+      RouteHandlerResultFor<Responses>
+    >
+  >;
+
+  delete(
+    path: string,
+
+    optionsOrHandler: unknown,
+
+    handlerOrLifecycle?: unknown,
+
+    lifecycle?: unknown,
+  ): unknown {
+    return this.registerRoute(
+      "DELETE",
+      path,
+      optionsOrHandler,
+      handlerOrLifecycle,
+      lifecycle,
+    );
+  }
+
+  /*
+   * OPTIONS without options.
+   */
+  options<const Path extends string, Result>(
+    path: Path & ValidRoutePath<Path>,
+
+    handler: RouteHandler<JoinRoutePath<Prefix, Path>, never, never, Result>,
+
+    lifecycle?: RouteLifecycleFor<
+      JoinRoutePath<Prefix, Path>,
+      undefined,
+      undefined,
+      undefined,
+      Result
+    >,
+  ): RouteRef<
+    "OPTIONS",
+    JoinRoutePath<Prefix, Path>,
+    RouteRequestContract<InferPathParams<JoinRoutePath<Prefix, Path>>>,
+    InferImplicitResponses<Result>
+  >;
+
+  /*
+   * OPTIONS with options but without an explicit
+   * response contract.
+   */
+  options<
+    const Path extends string,
+    const Query extends StandardSchemaV1 | undefined = undefined,
+    const Body extends StandardSchemaV1 | undefined = undefined,
+    Result = unknown,
+  >(
+    path: Path & ValidRoutePath<Path>,
+
+    options: RouteOptionsFor<Query, Body, undefined>,
+
+    handler: (
+      context: RouteHandlerContextFor<
+        JoinRoutePath<Prefix, Path>,
+        RouteOptionsFor<Query, Body, undefined>
+      >,
+    ) => Result,
+
+    lifecycle?: RouteLifecycleFor<
+      JoinRoutePath<Prefix, Path>,
+      Query,
+      Body,
+      undefined,
+      Result
+    >,
+  ): RouteRef<
+    "OPTIONS",
+    JoinRoutePath<Prefix, Path>,
+    RouteRequestFor<
+      JoinRoutePath<Prefix, Path>,
+      RouteOptionsFor<Query, Body, undefined>
+    >,
+    RouteResponsesFor<RouteOptionsFor<Query, Body, undefined>, Result>
+  >;
+
+  /*
+   * OPTIONS with an explicit response contract.
+   */
+  options<
+    const Path extends string,
+    const Responses extends ResponseContractMap,
+    const Query extends StandardSchemaV1 | undefined = undefined,
+    const Body extends StandardSchemaV1 | undefined = undefined,
+  >(
+    path: Path & ValidRoutePath<Path>,
+
+    options: RouteOptionsFor<Query, Body, Responses> & {
+      readonly responses: Responses;
+    },
+
+    handler: (
+      context: RouteHandlerContextFor<
+        JoinRoutePath<Prefix, Path>,
+        RouteOptionsFor<Query, Body, Responses>
+      >,
+    ) => RouteHandlerResultFor<Responses>,
+
+    lifecycle?: RouteLifecycleFor<
+      JoinRoutePath<Prefix, Path>,
+      Query,
+      Body,
+      Responses,
+      RouteHandlerResultFor<Responses>
+    >,
+  ): RouteRef<
+    "OPTIONS",
+    JoinRoutePath<Prefix, Path>,
+    RouteRequestFor<
+      JoinRoutePath<Prefix, Path>,
+      RouteOptionsFor<Query, Body, Responses>
+    >,
+    RouteResponsesFor<
+      RouteOptionsFor<Query, Body, Responses>,
+      RouteHandlerResultFor<Responses>
+    >
+  >;
+
+  options(
+    path: string,
+
+    optionsOrHandler: unknown,
+
+    handlerOrLifecycle?: unknown,
+
+    lifecycle?: unknown,
+  ): unknown {
+    return this.registerRoute(
+      "OPTIONS",
+      path,
+      optionsOrHandler,
+      handlerOrLifecycle,
+      lifecycle,
+    );
+  }
+
+  /*
+   * HEAD without options.
+   */
+  head<const Path extends string, Result>(
+    path: Path & ValidRoutePath<Path>,
+
+    handler: RouteHandler<JoinRoutePath<Prefix, Path>, never, never, Result>,
+
+    lifecycle?: RouteLifecycleFor<
+      JoinRoutePath<Prefix, Path>,
+      undefined,
+      undefined,
+      undefined,
+      Result
+    >,
+  ): RouteRef<
+    "HEAD",
+    JoinRoutePath<Prefix, Path>,
+    RouteRequestContract<InferPathParams<JoinRoutePath<Prefix, Path>>>,
+    InferImplicitResponses<Result>
+  >;
+
+  /*
+   * HEAD with options but without an explicit
+   * response contract.
+   */
+  head<
+    const Path extends string,
+    const Query extends StandardSchemaV1 | undefined = undefined,
+    const Body extends StandardSchemaV1 | undefined = undefined,
+    Result = unknown,
+  >(
+    path: Path & ValidRoutePath<Path>,
+
+    options: RouteOptionsFor<Query, Body, undefined>,
+
+    handler: (
+      context: RouteHandlerContextFor<
+        JoinRoutePath<Prefix, Path>,
+        RouteOptionsFor<Query, Body, undefined>
+      >,
+    ) => Result,
+
+    lifecycle?: RouteLifecycleFor<
+      JoinRoutePath<Prefix, Path>,
+      Query,
+      Body,
+      undefined,
+      Result
+    >,
+  ): RouteRef<
+    "HEAD",
+    JoinRoutePath<Prefix, Path>,
+    RouteRequestFor<
+      JoinRoutePath<Prefix, Path>,
+      RouteOptionsFor<Query, Body, undefined>
+    >,
+    RouteResponsesFor<RouteOptionsFor<Query, Body, undefined>, Result>
+  >;
+
+  /*
+   * HEAD with an explicit response contract.
+   */
+  head<
+    const Path extends string,
+    const Responses extends ResponseContractMap,
+    const Query extends StandardSchemaV1 | undefined = undefined,
+    const Body extends StandardSchemaV1 | undefined = undefined,
+  >(
+    path: Path & ValidRoutePath<Path>,
+
+    options: RouteOptionsFor<Query, Body, Responses> & {
+      readonly responses: Responses;
+    },
+
+    handler: (
+      context: RouteHandlerContextFor<
+        JoinRoutePath<Prefix, Path>,
+        RouteOptionsFor<Query, Body, Responses>
+      >,
+    ) => RouteHandlerResultFor<Responses>,
+
+    lifecycle?: RouteLifecycleFor<
+      JoinRoutePath<Prefix, Path>,
+      Query,
+      Body,
+      Responses,
+      RouteHandlerResultFor<Responses>
+    >,
+  ): RouteRef<
+    "HEAD",
+    JoinRoutePath<Prefix, Path>,
+    RouteRequestFor<
+      JoinRoutePath<Prefix, Path>,
+      RouteOptionsFor<Query, Body, Responses>
+    >,
+    RouteResponsesFor<
+      RouteOptionsFor<Query, Body, Responses>,
+      RouteHandlerResultFor<Responses>
+    >
+  >;
+
+  head(
+    path: string,
+
+    optionsOrHandler: unknown,
+
+    handlerOrLifecycle?: unknown,
+
+    lifecycle?: unknown,
+  ): unknown {
+    return this.registerRoute(
+      "HEAD",
+      path,
+      optionsOrHandler,
+      handlerOrLifecycle,
+      lifecycle,
+    );
+  }
+
+  /*
+   * Generic method route without options.
+   */
   route<const Method extends HttpMethod, const Path extends string, Result>(
     method: Method,
 
@@ -355,24 +958,110 @@ export class RouteBuilder<Prefix extends string = ""> {
     InferImplicitResponses<Result>
   >;
 
+  /*
+   * Generic method route with options but without
+   * an explicit response contract.
+   */
+  route<
+    const Method extends HttpMethod,
+    const Path extends string,
+    const Query extends StandardSchemaV1 | undefined = undefined,
+    const Body extends StandardSchemaV1 | undefined = undefined,
+    Result = unknown,
+  >(
+    method: Method,
+
+    path: Path & ValidRoutePath<Path>,
+
+    options: RouteOptionsFor<Query, Body, undefined>,
+
+    handler: (
+      context: RouteHandlerContextFor<
+        JoinRoutePath<Prefix, Path>,
+        RouteOptionsFor<Query, Body, undefined>
+      >,
+    ) => Result,
+
+    lifecycle?: RouteLifecycleFor<
+      JoinRoutePath<Prefix, Path>,
+      Query,
+      Body,
+      undefined,
+      Result
+    >,
+  ): RouteRef<
+    Method,
+    JoinRoutePath<Prefix, Path>,
+    RouteRequestFor<
+      JoinRoutePath<Prefix, Path>,
+      RouteOptionsFor<Query, Body, undefined>
+    >,
+    RouteResponsesFor<RouteOptionsFor<Query, Body, undefined>, Result>
+  >;
+
+  /*
+   * Generic method route with an explicit
+   * response contract.
+   */
+  route<
+    const Method extends HttpMethod,
+    const Path extends string,
+    const Responses extends ResponseContractMap,
+    const Query extends StandardSchemaV1 | undefined = undefined,
+    const Body extends StandardSchemaV1 | undefined = undefined,
+  >(
+    method: Method,
+
+    path: Path & ValidRoutePath<Path>,
+
+    options: RouteOptionsFor<Query, Body, Responses> & {
+      readonly responses: Responses;
+    },
+
+    handler: (
+      context: RouteHandlerContextFor<
+        JoinRoutePath<Prefix, Path>,
+        RouteOptionsFor<Query, Body, Responses>
+      >,
+    ) => RouteHandlerResultFor<Responses>,
+
+    lifecycle?: RouteLifecycleFor<
+      JoinRoutePath<Prefix, Path>,
+      Query,
+      Body,
+      Responses,
+      RouteHandlerResultFor<Responses>
+    >,
+  ): RouteRef<
+    Method,
+    JoinRoutePath<Prefix, Path>,
+    RouteRequestFor<
+      JoinRoutePath<Prefix, Path>,
+      RouteOptionsFor<Query, Body, Responses>
+    >,
+    RouteResponsesFor<
+      RouteOptionsFor<Query, Body, Responses>,
+      RouteHandlerResultFor<Responses>
+    >
+  >;
+
   route(
     method: HttpMethod,
 
     path: string,
 
-    handler: unknown,
+    optionsOrHandler: unknown,
+
+    handlerOrLifecycle?: unknown,
 
     lifecycle?: unknown,
   ): unknown {
-    return this.registerRuntimeRoute(
+    return this.registerRoute(
       method,
       path,
-
-      handler as RuntimeRouteHandler,
-
-      undefined,
-
-      lifecycle as RuntimeRouteLifecycle | undefined,
+      optionsOrHandler,
+      handlerOrLifecycle,
+      lifecycle,
     );
   }
 
