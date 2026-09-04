@@ -178,7 +178,11 @@ function isBodylessStatus(status: number): boolean {
 }
 
 function isStandardSchemaValue(value: unknown): value is StandardSchemaV1 {
-  return typeof value === "object" && value !== null && "~standard" in value;
+  return (
+    value !== null &&
+    (typeof value === "object" || typeof value === "function") &&
+    "~standard" in value
+  );
 }
 
 function hasExecutableResponse(responses: ResponseContractMap): boolean {

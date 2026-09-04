@@ -121,6 +121,53 @@ describe("Gelis response plan compilation", () => {
     });
   });
 
+  test("accepts callable Standard Schema response descriptors", async () => {
+    let validations = 0;
+
+    const Callable = createCallableSchema<
+      unknown,
+      {
+        ok: true;
+      }
+    >((value) => {
+      validations++;
+
+      return {
+        value: value as {
+          ok: true;
+        },
+      };
+    });
+
+    expect(typeof Callable).toBe("function");
+
+    const plan = createRuntimeResponsePlan({
+      200: {
+        schema: Callable,
+        validate: true,
+        serialize: "json",
+      },
+    });
+
+    expect(plan).toBeDefined();
+
+    if (plan === undefined) {
+      throw new Error("Expected response plan");
+    }
+
+    const response = await plan.finalize({
+      ok: true,
+    });
+
+    expect(validations).toBe(1);
+
+    expect(response.status).toBe(200);
+
+    expect(await response.json()).toEqual({
+      ok: true,
+    });
+  });
+
   test("bypasses the entire plan for raw Response", () => {
     let validations = 0;
 
@@ -743,4 +790,28 @@ function createSchema<Input = unknown, Output = Input>(
       validate,
     },
   } as StandardSchemaV1<Input, Output>;
+}
+
+function createCallableSchema<Input = unknown, Output = Input>(
+  validate: (
+    value: unknown,
+  ) =>
+    | StandardSchemaV1.Result<Output>
+    | Promise<StandardSchemaV1.Result<Output>> = (value) => ({
+    value: value as Output,
+  }),
+): StandardSchemaV1<Input, Output> {
+  return Object.assign(
+    (_value: unknown) => undefined,
+
+    {
+      "~standard": {
+        version: 1 as const,
+
+        vendor: "gelis-test-callable",
+
+        validate,
+      },
+    },
+  );
 }
