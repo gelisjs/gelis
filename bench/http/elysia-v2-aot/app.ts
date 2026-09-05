@@ -1,4 +1,4 @@
-import { Elysia } from "elysia-v2";
+import { Elysia } from "elysia";
 
 const ROUTES = Number(process.env.ROUTES ?? 5000);
 

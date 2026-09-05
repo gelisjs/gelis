@@ -1,0 +1,12 @@
+{
+  "name": "@gelis/bench-elysia-v2-aot",
+  "private": true,
+  "type": "module",
+  "packageManager": "bun@1.4.0",
+  "scripts": {
+    "build": "bun build.mts"
+  },
+  "dependencies": {
+    "elysia": "2.0.0-beta.11"
+  }
+}

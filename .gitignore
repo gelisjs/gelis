@@ -12,6 +12,7 @@ bench/types/results/
 bench/runtime/results/
 bench/http/results/
 bench/http/generated/
+bench/http/elysia-v2-aot/generated/
 
 # environment
 .env

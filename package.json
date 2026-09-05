@@ -38,7 +38,7 @@
     "bench:runtime:lifecycle": "bun bench/runtime/lifecycle.mts",
     "bench:http:autocannon": "bun bench/http/run.mts",
     "bench:http": "bun bench/http/run-oha.mts",
-    "bench:http:elysia2:aot:build": "bun bench/http/elysia-v2-aot/build.mts",
+    "bench:http:elysia2:aot:build": "bun --cwd bench/http/elysia-v2-aot run build",
     "typecheck:bun-adapter": "tsc -p prototype/bun/tsconfig.json --noEmit",
     "bench:http:adapter": "bun bench/http/run-gelis-adapter.mts",
     "bench:http:validation": "bun bench/http/validation/run.mts",

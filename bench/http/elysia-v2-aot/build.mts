@@ -4,7 +4,7 @@ import { dirname, resolve } from "node:path";
 
 import { fileURLToPath } from "node:url";
 
-import { aot } from "elysia-v2/plugin/aot/bun";
+import { aot } from "elysia/plugin/aot/bun";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
@@ -66,7 +66,7 @@ if (!selectedCase) {
       [process.execPath, import.meta.path],
 
       {
-        cwd: process.cwd(),
+        cwd: HERE,
 
         env: {
           ...process.env,
