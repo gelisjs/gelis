@@ -355,6 +355,157 @@ describe("Gelis runtime", () => {
 
     expect(response.status).toBe(404);
   });
+
+  test("keeps trailing-param routes compatible with deeper dynamic routes", async () => {
+    const app = new Gelis();
+
+    app.get(
+      "/users/:id",
+
+      ({ params }) => ({
+        route: "user",
+
+        id: params.id,
+      }),
+    );
+
+    app.get(
+      "/users/:id/posts/:postId",
+
+      ({ params }) => ({
+        route: "post",
+
+        userId: params.id,
+
+        postId: params.postId,
+      }),
+    );
+
+    const userResponse = await app.fetch(
+      new Request("http://gelis.test/users/42"),
+    );
+
+    expect(await userResponse.json()).toEqual({
+      route: "user",
+
+      id: "42",
+    });
+
+    const postResponse = await app.fetch(
+      new Request("http://gelis.test/users/42/posts/99"),
+    );
+
+    expect(await postResponse.json()).toEqual({
+      route: "post",
+
+      userId: "42",
+
+      postId: "99",
+    });
+  });
+
+  test("preserves trailing-param specificity over generic dynamic fallback", async () => {
+    const app = new Gelis();
+
+    /*
+     * Register generic route first deliberately.
+     * Matching must follow route specificity,
+     * not registration order.
+     */
+    app.get(
+      "/:scope/:id",
+
+      ({ params }) => ({
+        route: "generic",
+
+        scope: params.scope,
+
+        id: params.id,
+      }),
+    );
+
+    app.get(
+      "/users/:id",
+
+      ({ params }) => ({
+        route: "users",
+
+        id: params.id,
+      }),
+    );
+
+    const response = await app.fetch(
+      new Request("http://gelis.test/users/123"),
+    );
+
+    expect(await response.json()).toEqual({
+      route: "users",
+
+      id: "123",
+    });
+  });
+
+  test("isolates trailing-param routes by HTTP method", async () => {
+    const app = new Gelis();
+
+    app.get(
+      "/users/:id",
+
+      ({ params }) => ({
+        method: "GET",
+
+        id: params.id,
+      }),
+    );
+
+    app.post(
+      "/users/:id",
+
+      ({ params }) => ({
+        method: "POST",
+
+        id: params.id,
+      }),
+    );
+
+    const getResponse = await app.fetch(
+      new Request("http://gelis.test/users/42"),
+    );
+
+    expect(await getResponse.json()).toEqual({
+      method: "GET",
+
+      id: "42",
+    });
+
+    const postResponse = await app.fetch(
+      new Request("http://gelis.test/users/42", {
+        method: "POST",
+      }),
+    );
+
+    expect(await postResponse.json()).toEqual({
+      method: "POST",
+
+      id: "42",
+    });
+  });
+
+  test("does not let a root trailing param match the root URL", async () => {
+    const app = new Gelis();
+
+    app.get(
+      "/:id",
+
+      ({ params }) => ({
+        id: params.id,
+      }),
+    );
+
+    const response = await app.fetch(new Request("http://gelis.test/"));
+
+    expect(response.status).toBe(404);
+  });
 });
 
 function createSchema<Input = unknown, Output = Input>(): StandardSchemaV1<

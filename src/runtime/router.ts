@@ -14,8 +14,16 @@ interface DynamicNode {
   route: DynamicRoute | undefined;
 }
 
+interface TrailingParamRoute {
+  readonly route: RuntimeRouteRecord;
+
+  readonly paramName: string;
+}
+
 interface MethodRoutes {
   readonly staticRoutes: Map<string, RuntimeRouteRecord>;
+
+  trailingParamRoutes: Map<string, TrailingParamRoute> | undefined;
 
   readonly dynamicRoot: DynamicNode;
 }
@@ -48,6 +56,10 @@ export class Router {
       }
     }
 
+    /*
+     * Exact static routes remain completely
+     * unchanged and keep highest precedence.
+     */
     if (!hasParams) {
       if (table.staticRoutes.has(route.path)) {
         throw duplicateRoute(route);
@@ -58,6 +70,68 @@ export class Router {
       return;
     }
 
+    /*
+     * P5-D trailing-param fast lane.
+     *
+     * Eligible shape:
+     *
+     *   /users/:id
+     *   /r/4999/:id
+     *   /:id
+     *
+     * Requirements:
+     * - exactly one named param
+     * - param is the final segment
+     * - therefore every preceding segment is static
+     *
+     * Everything else stays on the generic trie.
+     */
+    const finalSegment = segments[segments.length - 1];
+
+    const trailingParamName =
+      paramNames.length === 1 && finalSegment?.startsWith(":")
+        ? paramNames[0]
+        : undefined;
+
+    if (trailingParamName !== undefined) {
+      const slash = route.path.lastIndexOf("/");
+
+      if (slash >= 0) {
+        const prefix = route.path.slice(0, slash + 1);
+
+        let trailingParamRoutes = table.trailingParamRoutes;
+
+        if (!trailingParamRoutes) {
+          trailingParamRoutes = new Map();
+
+          table.trailingParamRoutes = trailingParamRoutes;
+        }
+
+        /*
+         * /users/:id
+         * /users/:userId
+         *
+         * are semantically equivalent routes,
+         * because their static prefix is identical.
+         */
+        if (trailingParamRoutes.has(prefix)) {
+          throw duplicateRoute(route);
+        }
+
+        trailingParamRoutes.set(prefix, {
+          route,
+
+          paramName: trailingParamName,
+        });
+
+        return;
+      }
+    }
+
+    /*
+     * Generic dynamic routes retain the existing
+     * trie implementation and semantics.
+     */
     let node = table.dynamicRoot;
 
     for (const segment of segments) {
@@ -92,6 +166,7 @@ export class Router {
 
     node.route = {
       route,
+
       paramNames,
     };
   }
@@ -103,6 +178,9 @@ export class Router {
       return undefined;
     }
 
+    /*
+     * Exact static route always wins.
+     */
     const staticRoute = table.staticRoutes.get(pathname);
 
     if (staticRoute) {
@@ -113,11 +191,50 @@ export class Router {
       };
     }
 
+    /*
+     * P5-D fast lane.
+     *
+     * trailingParamRoutes is lazy. Methods without
+     * eligible routes do not pay lastIndexOf/slice.
+     *
+     * pathname "/" must skip this path because the
+     * old trie intentionally does not allow /:id
+     * to match the root URL.
+     */
+    const trailingParamRoutes = table.trailingParamRoutes;
+
+    if (pathname !== "/" && trailingParamRoutes) {
+      const slash = pathname.lastIndexOf("/");
+
+      if (slash >= 0) {
+        const prefix = pathname.slice(0, slash + 1);
+
+        const trailingRoute = trailingParamRoutes.get(prefix);
+
+        if (trailingRoute) {
+          const value = pathname.slice(slash + 1);
+
+          return {
+            route: trailingRoute.route,
+
+            params: {
+              [trailingRoute.paramName]: decodeParam(value),
+            },
+          };
+        }
+      }
+    }
+
+    /*
+     * Generic trie fallback remains unchanged.
+     */
     const captures: number[] = [];
 
     const dynamicRoute = matchDynamicPath(
       table.dynamicRoot,
+
       pathname,
+
       captures,
     );
 
@@ -159,6 +276,8 @@ export class Router {
 
     const created: MethodRoutes = {
       staticRoutes: new Map(),
+
+      trailingParamRoutes: undefined,
 
       dynamicRoot: createDynamicNode(),
     };
