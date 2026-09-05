@@ -69,7 +69,8 @@
     "bench:aot:registration": "bun bench/aot/registration-decomposition.mts",
     "bench:aot:lifecycle-registration": "bun bench/aot/lifecycle-registration.mts",
     "bench:aot:cold-registration": "bun bench/aot/run-cold-registration.mts",
-    "bench:aot:router-hydration": "bun bench/aot/run-router-hydration.mts"
+    "bench:aot:router-hydration": "bun bench/aot/run-router-hydration.mts",
+    "bench:aot:generic-trie-hydration": "bun bench/aot/run-generic-trie-hydration.mts"
   },
   "devDependencies": {
     "@hono/standard-validator": "^0.4.0",
