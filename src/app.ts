@@ -128,6 +128,12 @@ export const GELIS_INTERNAL_RUNTIME = Symbol("gelis.internal.runtime");
 
 export interface GelisInternalRuntimeControl {
   installRouter(router: GelisInternalRouter): void;
+
+  installPrebuiltRuntime(
+    router: GelisInternalRouter,
+
+    routes: RuntimeRouteRecord[],
+  ): void;
 }
 
 export class Gelis extends RouteBuilder<""> {
@@ -203,6 +209,33 @@ export class Gelis extends RouteBuilder<""> {
     return {
       installRouter(router: GelisInternalRouter): void {
         state.router = router;
+      },
+
+      installPrebuiltRuntime(
+        router: GelisInternalRouter,
+
+        routes: RuntimeRouteRecord[],
+      ): void {
+        if (state.routes.length !== 0) {
+          throw new Error(
+            "Cannot install Gelis prebuilt runtime after route registration",
+          );
+        }
+
+        if (
+          state.localBeforeHooks !== undefined ||
+          state.localAfterHooks !== undefined ||
+          state.globalBeforeHooks.length !== 0 ||
+          state.globalAfterHooks.length !== 0
+        ) {
+          throw new Error(
+            "Cannot install Gelis plain prebuilt runtime after lifecycle registration",
+          );
+        }
+
+        state.router = router;
+
+        state.routes = routes;
       },
     };
   }
