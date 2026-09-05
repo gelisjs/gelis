@@ -22,6 +22,8 @@ import { compileSemanticRoutePlan } from "../../src/tooling/semantic-route-plan-
 
 const ROUTES = 5000;
 
+const SHARED_PARAM_NAMES = ["id"] as const;
+
 const scenario = process.env.SCENARIO;
 
 if (
@@ -161,8 +163,6 @@ console.log(
     hydrateMs,
   }),
 );
-
-const SHARED_PARAM_NAMES = ["id"] as const;
 
 function hydrateFlatRouterLowerBound(
   methodNames: readonly string[],
