@@ -1077,15 +1077,29 @@ export class RouteBuilder<Prefix extends string = ""> {
     lifecycle: unknown,
   ): unknown {
     if (typeof optionsOrHandler === "function") {
+      const handler = optionsOrHandler as RuntimeRouteHandler;
+
+      const routeLifecycle = handlerOrLifecycle as
+        | RuntimeRouteLifecycle
+        | undefined;
+
+      /*
+       * Completely plain routes have no input,
+       * response contract, metadata, or lifecycle.
+       *
+       * Avoid entering generic route-plan
+       * construction entirely.
+       */
+      if (routeLifecycle === undefined) {
+        return this.registerPlainRuntimeRoute(method, path, handler);
+      }
+
       return this.registerRuntimeRoute(
         method,
         path,
-
-        optionsOrHandler as RuntimeRouteHandler,
-
+        handler,
         undefined,
-
-        handlerOrLifecycle as RuntimeRouteLifecycle | undefined,
+        routeLifecycle,
       );
     }
 
@@ -1099,6 +1113,42 @@ export class RouteBuilder<Prefix extends string = ""> {
 
       lifecycle as RuntimeRouteLifecycle | undefined,
     );
+  }
+
+  private registerPlainRuntimeRoute(
+    method: HttpMethod,
+
+    path: string,
+
+    handler: RuntimeRouteHandler,
+  ): unknown {
+    const fullPath = this.resolve(path);
+
+    const runtimeRoute: RuntimeRouteRecord = {
+      method,
+
+      path: fullPath,
+
+      handler,
+
+      flags: 0,
+
+      input: undefined,
+
+      beforeHandle: undefined,
+
+      afterHandle: undefined,
+
+      responses: undefined,
+    };
+
+    this.#register(runtimeRoute);
+
+    return {
+      method,
+
+      path: fullPath,
+    };
   }
 
   private registerRuntimeRoute(
