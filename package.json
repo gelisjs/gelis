@@ -59,7 +59,8 @@
     "bench:runtime:contract:inspect": "bun bench/runtime/contract-inspection.mts",
     "bench:runtime:decomposition": "bun bench/runtime/decomposition.mts",
     "bench:runtime:executor-specialization": "bun bench/runtime/executor-specialization.mts",
-    "bench:runtime:params": "bun bench/runtime/params-materialization.mts"
+    "bench:runtime:params": "bun bench/runtime/params-materialization.mts",
+    "bench:http:bun-native-routing": "bun bench/http/bun-native-routing/run.mts"
   },
   "devDependencies": {
     "@hono/standard-validator": "^0.4.0",
