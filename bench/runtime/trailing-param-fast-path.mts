@@ -18,6 +18,20 @@ const SAMPLES = 7;
 
 const TARGET_MS = 80;
 
+const EMPTY_PARAMS = Object.freeze({}) as Record<string, string>;
+
+const RAW_RESPONSE = new Response(
+  null,
+
+  {
+    status: 204,
+  },
+);
+
+const STATIC_HANDLER: RuntimeRouteHandler = () => STATIC_RESPONSE;
+
+const STATIC_RESPONSE = new Response("static");
+
 let sink: unknown;
 
 interface FastEntry {
@@ -719,19 +733,5 @@ function isPromiseLike(value: unknown): value is PromiseLike<unknown> {
     "then" in value
   );
 }
-
-const EMPTY_PARAMS = Object.freeze({}) as Record<string, string>;
-
-const RAW_RESPONSE = new Response(
-  null,
-
-  {
-    status: 204,
-  },
-);
-
-const STATIC_HANDLER: RuntimeRouteHandler = () => STATIC_RESPONSE;
-
-const STATIC_RESPONSE = new Response("static");
 
 void sink;
