@@ -116,6 +116,14 @@ interface AppRuntimeState {
   onErrorHooks: OnError[] | undefined;
 }
 
+export const GELIS_INTERNAL_RUNTIME = Symbol("gelis.internal.runtime");
+
+export interface GelisInternalRuntimeControl {
+  installRouter(router: Router): void;
+
+  collectRoutes(): RuntimeRouteRecord[];
+}
+
 export class Gelis extends RouteBuilder<""> {
   readonly #state: AppRuntimeState;
 
@@ -177,6 +185,28 @@ export class Gelis extends RouteBuilder<""> {
     );
 
     this.#state = state;
+  }
+
+  [GELIS_INTERNAL_RUNTIME](): GelisInternalRuntimeControl {
+    const state = this.#state;
+
+    return {
+      installRouter(router: Router): void {
+        state.router = router;
+      },
+
+      collectRoutes(): RuntimeRouteRecord[] {
+        const entries = state.routes;
+
+        const routes = new Array<RuntimeRouteRecord>(entries.length);
+
+        for (let index = 0; index < entries.length; index++) {
+          routes[index] = entries[index]!.route;
+        }
+
+        return routes;
+      },
+    };
   }
 
   private [GELIS_CONTRACT_SOURCE](): ApplicationContractSnapshot {
