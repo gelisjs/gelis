@@ -458,7 +458,7 @@ function buildFixture(
       path,
 
       ({ params }) => ({
-        id: params.id,
+        id: (params as { id: string }).id,
 
         route: index,
       }),
