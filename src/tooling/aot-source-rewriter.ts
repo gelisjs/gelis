@@ -15,6 +15,12 @@ export interface AotSourceRewrite {
   readonly routeCount: number;
 }
 
+export interface AotSourceInsertion {
+  readonly offset: number;
+
+  readonly text: string;
+}
+
 interface SourceEdit {
   readonly start: number;
 
@@ -53,6 +59,26 @@ export function rewriteAotSource(
   );
 
   const edits: SourceEdit[] = [];
+
+  for (const insertion of insertions) {
+    if (
+      !Number.isInteger(insertion.offset) ||
+      insertion.offset < 0 ||
+      insertion.offset > sourceText.length
+    ) {
+      throw new Error(
+        `Invalid AOT source insertion offset: ${insertion.offset}`,
+      );
+    }
+
+    edits.push({
+      start: insertion.offset,
+
+      end: insertion.offset,
+
+      text: insertion.text,
+    });
+  }
 
   edits.push({
     start: appDeclarationEnd,
