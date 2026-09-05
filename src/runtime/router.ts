@@ -1,12 +1,12 @@
 import type { RuntimeRouteRecord } from "./types";
 
-interface DynamicRoute {
+export interface DynamicRoute {
   readonly route: RuntimeRouteRecord;
 
   readonly paramNames: readonly string[];
 }
 
-interface DynamicNode {
+export interface DynamicNode {
   staticChildren: Map<string, DynamicNode> | undefined;
 
   paramChild: DynamicNode | undefined;
@@ -14,13 +14,13 @@ interface DynamicNode {
   route: DynamicRoute | undefined;
 }
 
-interface TrailingParamRoute {
+export interface TrailingParamRoute {
   readonly route: RuntimeRouteRecord;
 
   readonly paramName: string;
 }
 
-interface MethodRoutes {
+export interface MethodRoutes {
   readonly staticRoutes: Map<string, RuntimeRouteRecord>;
 
   trailingParamRoutes: Map<string, TrailingParamRoute> | undefined;
@@ -39,7 +39,11 @@ export interface RuntimeRouteMatch {
 const EMPTY_PARAMS = Object.freeze({}) as Record<string, string>;
 
 export class Router {
-  readonly #methods = new Map<string, MethodRoutes>();
+  readonly #methods: Map<string, MethodRoutes>;
+
+  constructor(methods?: Map<string, MethodRoutes>) {
+    this.#methods = methods ?? new Map();
+  }
 
   register(route: RuntimeRouteRecord): void {
     const table = this.getOrCreateMethod(route.method);
