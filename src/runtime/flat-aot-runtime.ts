@@ -99,7 +99,7 @@ export function installFlatAotRuntime(
   );
 }
 
-function bindFlatRoutes(
+export function bindFlatRoutes(
   routeCount: number,
 
   methodNames: readonly string[],
@@ -153,7 +153,7 @@ function bindFlatRoutes(
   return routes;
 }
 
-function hydrateFlatRouter(
+export function hydrateFlatRouter(
   methodNames: readonly string[],
 
   flat: FlatAotRouter,
