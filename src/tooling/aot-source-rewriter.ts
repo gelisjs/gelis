@@ -37,6 +37,8 @@ export function rewriteAotSource(
   appIdentifier = "app",
 
   handlerArrayIdentifier = DEFAULT_HANDLER_IDENTIFIER,
+
+  insertions: readonly AotSourceInsertion[] = [],
 ): AotSourceRewrite {
   const analysis = analyzeAotSource(sourceText, fileName, appIdentifier);
 
