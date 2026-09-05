@@ -1,4 +1,4 @@
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 
 import { cpus } from "node:os";
 
@@ -32,7 +32,9 @@ const PREWARM_BATCH_SIZE = 100;
 
 interface MixedHttpFramework {
   readonly name: string;
-  readonly file: string;
+
+  readonly file: string | ((benchmarkCase: HttpRouteCase) => string);
+
   readonly env?: Record<string, string>;
 }
 
@@ -73,6 +75,19 @@ const frameworks = [
     name: "elysia-2",
 
     file: resolve(HERE, "servers/elysia-v2.ts"),
+  },
+
+  {
+    name: "elysia-2-aot",
+
+    file: (benchmarkCase) =>
+      resolve(
+        HERE,
+        "elysia-v2-aot",
+        "generated",
+        `${benchmarkCase.routeKind}-${benchmarkCase.bodyKind}`,
+        "server.js",
+      ),
   },
 ] as const satisfies readonly MixedHttpFramework[];
 
@@ -297,8 +312,17 @@ async function runFramework(
   urlSet: UrlSet,
   sample: number,
 ): Promise<HttpRouteResultRow> {
+  const frameworkFile =
+    typeof framework.file === "function"
+      ? framework.file(benchmarkCase)
+      : framework.file;
+
+  if (!existsSync(frameworkFile)) {
+    throw new Error(`Benchmark server does not exist: ${frameworkFile}`);
+  }
+
   const server = Bun.spawn(
-    [process.execPath, framework.file],
+    [process.execPath, frameworkFile],
 
     {
       cwd: ROOT,
