@@ -16,7 +16,7 @@ import {
   RUNTIME_ROUTE_CONTRACT_METADATA,
 } from "./runtime/contract-metadata";
 
-import { Router } from "./runtime/router";
+import { Router, type RuntimeRouteMatch } from "./runtime/router";
 
 import { normalizeResponse, runtimeReply } from "./runtime/response";
 
@@ -100,8 +100,18 @@ interface AppRuntimeRouteEntry {
   readonly localAfterHandle: RuntimeAfterHandle | undefined;
 }
 
+export interface GelisInternalRouter {
+  register(route: RuntimeRouteRecord): void;
+
+  match(
+    method: string,
+
+    pathname: string,
+  ): RuntimeRouteMatch | undefined;
+}
+
 interface AppRuntimeState {
-  router: Router;
+  router: GelisInternalRouter;
 
   routes: AppRuntimeRouteEntry[];
 
@@ -119,9 +129,7 @@ interface AppRuntimeState {
 export const GELIS_INTERNAL_RUNTIME = Symbol("gelis.internal.runtime");
 
 export interface GelisInternalRuntimeControl {
-  installRouter(router: Router): void;
-
-  collectRoutes(): RuntimeRouteRecord[];
+  installRouter(router: GelisInternalRouter): void;
 }
 
 export class Gelis extends RouteBuilder<""> {
@@ -191,20 +199,8 @@ export class Gelis extends RouteBuilder<""> {
     const state = this.#state;
 
     return {
-      installRouter(router: Router): void {
+      installRouter(router: GelisInternalRouter): void {
         state.router = router;
-      },
-
-      collectRoutes(): RuntimeRouteRecord[] {
-        const entries = state.routes;
-
-        const routes = new Array<RuntimeRouteRecord>(entries.length);
-
-        for (let index = 0; index < entries.length; index++) {
-          routes[index] = entries[index]!.route;
-        }
-
-        return routes;
       },
     };
   }

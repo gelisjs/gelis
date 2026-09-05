@@ -1,6 +1,6 @@
 import { GELIS_INTERNAL_RUNTIME, Gelis } from "../app";
 
-import { Router } from "../runtime/router";
+import type { GelisInternalRouter } from "../app";
 
 import { hydrateRouterSnapshot } from "../runtime/router-snapshot";
 
@@ -13,28 +13,27 @@ import type { RuntimeRouteRecord } from "../runtime/types";
 export interface AotAppSession {
   readonly app: Gelis;
 
-  collectRoutes(): RuntimeRouteRecord[];
+  collectRoutes(): readonly RuntimeRouteRecord[];
 
   hydrate(snapshot: RouterSnapshot): Gelis;
 }
 
 /*
- * RouteBuilder and Gelis still perform all normal
- * runtime-plan construction.
+ * Collect runtime route records without performing
+ * any routing grammar or placement work.
  *
- * Only router grammar/placement work is skipped.
+ * This intentionally does not extend Router:
+ * the AOT collection path does not need Router's
+ * Map allocation or registration machinery.
  */
-class CollectOnlyRouter extends Router {
-  override register(_route: RuntimeRouteRecord): void {
-    /*
-     * Intentionally empty.
-     *
-     * Duplicate/path-placement validation occurs
-     * when the RouterSnapshot is compiled.
-     */
+class CollectOnlyRouter implements GelisInternalRouter {
+  readonly routes: RuntimeRouteRecord[] = [];
+
+  register(route: RuntimeRouteRecord): void {
+    this.routes.push(route);
   }
 
-  override match(
+  match(
     _method: string,
 
     _pathname: string,
@@ -48,19 +47,19 @@ export function createAotAppSession(): AotAppSession {
 
   const control = app[GELIS_INTERNAL_RUNTIME]();
 
-  control.installRouter(new CollectOnlyRouter());
+  const collector = new CollectOnlyRouter();
+
+  control.installRouter(collector);
 
   return {
     app,
 
-    collectRoutes(): RuntimeRouteRecord[] {
-      return control.collectRoutes();
+    collectRoutes(): readonly RuntimeRouteRecord[] {
+      return collector.routes;
     },
 
     hydrate(snapshot: RouterSnapshot): Gelis {
-      const routes = control.collectRoutes();
-
-      const router = hydrateRouterSnapshot(snapshot, routes);
+      const router = hydrateRouterSnapshot(snapshot, collector.routes);
 
       control.installRouter(router);
 
