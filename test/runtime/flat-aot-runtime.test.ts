@@ -350,48 +350,6 @@ describe("Gelis direct flat AOT runtime", () => {
 
     expect(await normal.text()).toBe("normal");
   });
-
-  test("preserves distinct parameter names while interning singleton bindings", async () => {
-    const artifact = await compileArtifact([
-      {
-        method: "GET",
-
-        path: "/users/:id/detail",
-      },
-
-      {
-        method: "GET",
-
-        path: "/teams/:slug/detail",
-      },
-    ]);
-
-    const app = new Gelis();
-
-    install(
-      app,
-
-      artifact,
-
-      [
-        ({ params }) => `user:${params.id}`,
-
-        ({ params }) => `team:${params.slug}`,
-      ],
-    );
-
-    const user = await app.fetch(
-      new Request("http://gelis.test/users/42/detail"),
-    );
-
-    const team = await app.fetch(
-      new Request("http://gelis.test/teams/core/detail"),
-    );
-
-    expect(await user.text()).toBe("user:42");
-
-    expect(await team.text()).toBe("team:core");
-  });
 });
 
 type RouteShape = {

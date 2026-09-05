@@ -329,16 +329,6 @@ function hydrateFlatNodes(
   const nodes = new Array<DynamicNode>(nodeCount);
 
   /*
-   * Single-parameter dynamic routes frequently reuse
-   * the same parameter name across many route shapes.
-   *
-   * DynamicRoute.paramNames is immutable at runtime,
-   * so identical singleton arrays can safely share
-   * one allocation.
-   */
-  const singletonParamNames = new Map<string, readonly string[]>();
-
-  /*
    * Pass one creates stable node objects and terminal
    * route bindings without following any graph edges.
    */
@@ -370,34 +360,10 @@ function hydrateFlatNodes(
         throw new Error(`Invalid Gelis flat AOT parameter range: ${nodeIndex}`);
       }
 
-      let routeParamNames: readonly string[];
-
-      if (paramCount === 1) {
-        const paramName = paramNames[paramStart];
-
-        if (paramName === undefined) {
-          throw new Error(
-            `Missing Gelis flat AOT parameter name: ${nodeIndex}`,
-          );
-        }
-
-        const existing = singletonParamNames.get(paramName);
-
-        if (existing !== undefined) {
-          routeParamNames = existing;
-        } else {
-          routeParamNames = [paramName];
-
-          singletonParamNames.set(paramName, routeParamNames);
-        }
-      } else {
-        routeParamNames = paramNames.slice(paramStart, paramStart + paramCount);
-      }
-
       route = {
         route: routeAt(routes, routeIndex),
 
-        paramNames: routeParamNames,
+        paramNames: paramNames.slice(paramStart, paramStart + paramCount),
       };
     }
 
