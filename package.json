@@ -61,7 +61,8 @@
     "bench:runtime:executor-specialization": "bun bench/runtime/executor-specialization.mts",
     "bench:runtime:params": "bun bench/runtime/params-materialization.mts",
     "bench:http:bun-native-routing": "bun bench/http/bun-native-routing/run.mts",
-    "bench:runtime:trailing-param": "bun bench/runtime/trailing-param-fast-path.mts"
+    "bench:runtime:trailing-param": "bun bench/runtime/trailing-param-fast-path.mts",
+    "bench:runtime:trailing-regression": "bun bench/runtime/trailing-param-regression.mts"
   },
   "devDependencies": {
     "@hono/standard-validator": "^0.4.0",
