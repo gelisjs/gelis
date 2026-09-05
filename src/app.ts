@@ -87,19 +87,6 @@ type RuntimeRouteInvoker = (
   body: unknown,
 ) => Response | Promise<Response>;
 
-interface AppRuntimeRouteEntry {
-  readonly route: RuntimeRouteRecord;
-
-  /*
-   * Keep original route-local hooks separate
-   * from the compiled/effective hooks stored
-   * on the runtime route.
-   */
-  readonly localBeforeHandle: RuntimeBeforeHandle | undefined;
-
-  readonly localAfterHandle: RuntimeAfterHandle | undefined;
-}
-
 export interface GelisInternalRouter {
   register(route: RuntimeRouteRecord): void;
 
@@ -113,7 +100,18 @@ export interface GelisInternalRouter {
 interface AppRuntimeState {
   router: GelisInternalRouter;
 
-  routes: AppRuntimeRouteEntry[];
+  /*
+   * Plain applications keep only their actual
+   * RuntimeRouteRecord objects.
+   *
+   * Local lifecycle sidecars are allocated lazily
+   * only when application-global lifecycle is used.
+   */
+  routes: RuntimeRouteRecord[];
+
+  localBeforeHooks: (RuntimeBeforeHandle | undefined)[] | undefined;
+
+  localAfterHooks: (RuntimeAfterHandle | undefined)[] | undefined;
 
   globalBeforeHooks: RuntimeBeforeHandle[];
 
@@ -173,6 +171,10 @@ export class Gelis extends RouteBuilder<""> {
 
       routes: [],
 
+      localBeforeHooks: undefined,
+
+      localAfterHooks: undefined,
+
       globalBeforeHooks: [],
 
       globalAfterHooks: [],
@@ -211,7 +213,7 @@ export class Gelis extends RouteBuilder<""> {
     const routes = new Array<ContractRouteSnapshot>(entries.length);
 
     for (let index = 0; index < entries.length; index++) {
-      const route = entries[index]!.route;
+      const route = entries[index]!;
 
       const input = route.input;
 
@@ -275,17 +277,25 @@ export class Gelis extends RouteBuilder<""> {
   }
 
   onBeforeHandle(hook: GlobalBeforeHandle): this {
-    this.#state.globalBeforeHooks.push(hook as RuntimeBeforeHandle);
+    const state = this.#state;
 
-    recompileAppLifecycle(this.#state);
+    ensureLocalLifecycleSidecar(state);
+
+    state.globalBeforeHooks.push(hook as RuntimeBeforeHandle);
+
+    recompileAppLifecycle(state);
 
     return this;
   }
 
   onAfterHandle(hook: GlobalAfterHandle): this {
-    this.#state.globalAfterHooks.push(hook as RuntimeAfterHandle);
+    const state = this.#state;
 
-    recompileAppLifecycle(this.#state);
+    ensureLocalLifecycleSidecar(state);
+
+    state.globalAfterHooks.push(hook as RuntimeAfterHandle);
+
+    recompileAppLifecycle(state);
 
     return this;
   }
@@ -533,53 +543,126 @@ function registerAppRuntimeRoute(
   route: RuntimeRouteRecord,
 ): void {
   /*
-   * RouteBuilder gives us route-local lifecycle.
-   * Save it before replacing route.before/after
-   * with effective compiled plans.
-   */
-  const entry: AppRuntimeRouteEntry = {
-    route,
-
-    localBeforeHandle: route.beforeHandle,
-
-    localAfterHandle: route.afterHandle,
-  };
-
-  applyLifecyclePlan(state, entry);
-
-  /*
-   * Register before adding the metadata entry.
-   * If the router rejects a duplicate route,
-   * application lifecycle state stays clean.
+   * Router registration happens before mutating
+   * application bookkeeping.
+   *
+   * Duplicate rejection therefore leaves app state
+   * unchanged.
    */
   state.router.register(route);
 
-  state.routes.push(entry);
+  const localBeforeHooks = state.localBeforeHooks;
+
+  const localAfterHooks = state.localAfterHooks;
+
+  /*
+   * No application-global lifecycle has ever been
+   * installed.
+   *
+   * RouteBuilder already compiled the correct
+   * route-local flags and hooks, so there is
+   * nothing else to do.
+   */
+  if (localBeforeHooks === undefined || localAfterHooks === undefined) {
+    state.routes.push(route);
+
+    return;
+  }
+
+  const localBeforeHandle = route.beforeHandle;
+
+  const localAfterHandle = route.afterHandle;
+
+  localBeforeHooks.push(localBeforeHandle);
+
+  localAfterHooks.push(localAfterHandle);
+
+  applyLifecyclePlan(state, route, localBeforeHandle, localAfterHandle);
+
+  state.routes.push(route);
+}
+
+function ensureLocalLifecycleSidecar(state: AppRuntimeState): void {
+  if (state.localBeforeHooks !== undefined) {
+    return;
+  }
+
+  const routes = state.routes;
+
+  const localBeforeHooks = new Array<RuntimeBeforeHandle | undefined>(
+    routes.length,
+  );
+
+  const localAfterHooks = new Array<RuntimeAfterHandle | undefined>(
+    routes.length,
+  );
+
+  for (let index = 0; index < routes.length; index++) {
+    const route = routes[index];
+
+    if (route === undefined) {
+      continue;
+    }
+
+    /*
+     * Before the first global lifecycle hook exists,
+     * these fields still contain the original
+     * route-local hooks.
+     */
+    localBeforeHooks[index] = route.beforeHandle;
+
+    localAfterHooks[index] = route.afterHandle;
+  }
+
+  state.localBeforeHooks = localBeforeHooks;
+
+  state.localAfterHooks = localAfterHooks;
 }
 
 function recompileAppLifecycle(state: AppRuntimeState): void {
-  for (const entry of state.routes) {
-    applyLifecyclePlan(state, entry);
+  const localBeforeHooks = state.localBeforeHooks;
+
+  const localAfterHooks = state.localAfterHooks;
+
+  if (localBeforeHooks === undefined || localAfterHooks === undefined) {
+    throw new Error("Missing Gelis local lifecycle sidecar");
+  }
+
+  const routes = state.routes;
+
+  for (let index = 0; index < routes.length; index++) {
+    const route = routes[index];
+
+    if (route === undefined) {
+      continue;
+    }
+
+    applyLifecyclePlan(
+      state,
+      route,
+      localBeforeHooks[index],
+      localAfterHooks[index],
+    );
   }
 }
 
 function applyLifecyclePlan(
   state: AppRuntimeState,
 
-  entry: AppRuntimeRouteEntry,
-): void {
-  const route = entry.route;
+  route: RuntimeRouteRecord,
 
+  localBeforeHandle: RuntimeBeforeHandle | undefined,
+
+  localAfterHandle: RuntimeAfterHandle | undefined,
+): void {
   const beforeHandle = compileBeforeHandle(
     state.globalBeforeHooks,
-
-    entry.localBeforeHandle,
+    localBeforeHandle,
   );
 
   const afterHandle = compileAfterHandle(
     state.globalAfterHooks,
-
-    entry.localAfterHandle,
+    localAfterHandle,
   );
 
   route.beforeHandle = beforeHandle;
