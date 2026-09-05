@@ -173,20 +173,29 @@ export function hydrateFlatRouter(
     paramNames,
   ] = flat;
 
-  validateFlatNodeTopology(
-    nodeStaticStart,
-    nodeStaticCount,
-    nodeParamChild,
-    nodeRouteIndex,
-    nodeParamStart,
-    nodeParamCount,
-    edgeSegments,
-    edgeChildren,
-    paramNames,
-    routes.length,
-  );
+  const nodeCount = nodeStaticStart.length;
 
-  const nodes = hydrateFlatNodesTrusted(
+  if (
+    nodeStaticCount.length !== nodeCount ||
+    nodeParamChild.length !== nodeCount ||
+    nodeRouteIndex.length !== nodeCount ||
+    nodeParamStart.length !== nodeCount ||
+    nodeParamCount.length !== nodeCount
+  ) {
+    throw new Error("Gelis flat AOT node column length mismatch");
+  }
+
+  if (edgeSegments.length !== edgeChildren.length) {
+    throw new Error("Gelis flat AOT edge column length mismatch");
+  }
+
+  /*
+   * Reconstruct every dynamic node exactly once.
+   *
+   * The flat artifact already contains stable node indexes,
+   * so runtime hydration does not need recursive traversal.
+   */
+  const nodes = hydrateFlatNodes(
     nodeStaticStart,
     nodeStaticCount,
     nodeParamChild,
@@ -294,134 +303,7 @@ function hydrateFlatMethod(
   };
 }
 
-function validateFlatNodeTopology(
-  nodeStaticStart: readonly number[],
-
-  nodeStaticCount: readonly number[],
-
-  nodeParamChild: readonly number[],
-
-  nodeRouteIndex: readonly number[],
-
-  nodeParamStart: readonly number[],
-
-  nodeParamCount: readonly number[],
-
-  edgeSegments: readonly string[],
-
-  edgeChildren: readonly number[],
-
-  paramNames: readonly string[],
-
-  routeCount: number,
-): void {
-  const nodeCount = nodeStaticStart.length;
-
-  if (
-    nodeStaticCount.length !== nodeCount ||
-    nodeParamChild.length !== nodeCount ||
-    nodeRouteIndex.length !== nodeCount ||
-    nodeParamStart.length !== nodeCount ||
-    nodeParamCount.length !== nodeCount
-  ) {
-    throw new Error("Gelis flat AOT node column length mismatch");
-  }
-
-  if (edgeSegments.length !== edgeChildren.length) {
-    throw new Error("Gelis flat AOT edge column length mismatch");
-  }
-
-  /*
-   * Validate the complete flat topology before
-   * runtime objects are allocated.
-   *
-   * Hydration can then consume trusted indexes
-   * without repeating structural checks while
-   * constructing every node.
-   */
-  for (let nodeIndex = 0; nodeIndex < nodeCount; nodeIndex++) {
-    const staticStart = nodeStaticStart[nodeIndex];
-
-    const staticCount = nodeStaticCount[nodeIndex];
-
-    const paramChildIndex = nodeParamChild[nodeIndex];
-
-    const routeIndex = nodeRouteIndex[nodeIndex];
-
-    const paramStart = nodeParamStart[nodeIndex];
-
-    const paramCount = nodeParamCount[nodeIndex];
-
-    if (
-      staticStart === undefined ||
-      staticCount === undefined ||
-      paramChildIndex === undefined ||
-      routeIndex === undefined ||
-      paramStart === undefined ||
-      paramCount === undefined
-    ) {
-      throw new Error(`Missing Gelis flat AOT node data: ${nodeIndex}`);
-    }
-
-    if (
-      !Number.isInteger(staticStart) ||
-      !Number.isInteger(staticCount) ||
-      staticStart < 0 ||
-      staticCount < 0 ||
-      staticStart + staticCount > edgeSegments.length
-    ) {
-      throw new Error(`Invalid Gelis flat AOT edge range: ${nodeIndex}`);
-    }
-
-    if (
-      !Number.isInteger(paramChildIndex) ||
-      (paramChildIndex !== -1 &&
-        (paramChildIndex < 0 || paramChildIndex >= nodeCount))
-    ) {
-      throw new Error(`Invalid Gelis flat AOT node index: ${paramChildIndex}`);
-    }
-
-    if (
-      !Number.isInteger(routeIndex) ||
-      (routeIndex !== -1 && (routeIndex < 0 || routeIndex >= routeCount))
-    ) {
-      throw new Error(`Invalid Gelis flat AOT route index: ${routeIndex}`);
-    }
-
-    if (
-      routeIndex !== -1 &&
-      (!Number.isInteger(paramStart) ||
-        !Number.isInteger(paramCount) ||
-        paramStart < 0 ||
-        paramCount < 0 ||
-        paramStart + paramCount > paramNames.length)
-    ) {
-      throw new Error(`Invalid Gelis flat AOT parameter range: ${nodeIndex}`);
-    }
-
-    const edgeEnd = staticStart + staticCount;
-
-    for (let edgeIndex = staticStart; edgeIndex < edgeEnd; edgeIndex++) {
-      const segment = edgeSegments[edgeIndex];
-
-      const childIndex = edgeChildren[edgeIndex];
-
-      if (segment === undefined || childIndex === undefined) {
-        throw new Error(`Missing Gelis flat AOT edge: ${edgeIndex}`);
-      }
-
-      if (
-        !Number.isInteger(childIndex) ||
-        childIndex < 0 ||
-        childIndex >= nodeCount
-      ) {
-        throw new Error(`Invalid Gelis flat AOT node index: ${childIndex}`);
-      }
-    }
-  }
-}
-
-function hydrateFlatNodesTrusted(
+function hydrateFlatNodes(
   nodeStaticStart: readonly number[],
 
   nodeStaticCount: readonly number[],
@@ -447,28 +329,41 @@ function hydrateFlatNodesTrusted(
   const nodes = new Array<DynamicNode>(nodeCount);
 
   /*
-   * Pass one allocates nodes and terminal route
-   * bindings from topology that has already been
-   * structurally validated.
+   * Pass one creates stable node objects and terminal
+   * route bindings without following any graph edges.
    */
   for (let nodeIndex = 0; nodeIndex < nodeCount; nodeIndex++) {
-    const routeIndex = nodeRouteIndex[nodeIndex]!;
+    const routeIndex = nodeRouteIndex[nodeIndex];
+
+    const paramStart = nodeParamStart[nodeIndex];
+
+    const paramCount = nodeParamCount[nodeIndex];
+
+    if (
+      routeIndex === undefined ||
+      paramStart === undefined ||
+      paramCount === undefined
+    ) {
+      throw new Error(`Missing Gelis flat AOT node data: ${nodeIndex}`);
+    }
 
     let route: DynamicNode["route"];
 
     if (routeIndex !== -1) {
-      const paramStart = nodeParamStart[nodeIndex]!;
-
-      const paramCount = nodeParamCount[nodeIndex]!;
+      if (
+        !Number.isInteger(paramStart) ||
+        !Number.isInteger(paramCount) ||
+        paramStart < 0 ||
+        paramCount < 0 ||
+        paramStart + paramCount > paramNames.length
+      ) {
+        throw new Error(`Invalid Gelis flat AOT parameter range: ${nodeIndex}`);
+      }
 
       route = {
-        route: routes[routeIndex]!,
+        route: routeAt(routes, routeIndex),
 
-        paramNames: paramNames.slice(
-          paramStart,
-
-          paramStart + paramCount,
-        ),
+        paramNames: paramNames.slice(paramStart, paramStart + paramCount),
       };
     }
 
@@ -482,15 +377,38 @@ function hydrateFlatNodesTrusted(
   }
 
   /*
-   * Pass two wires graph references directly
-   * through validated node indexes.
+   * Pass two wires graph references by index.
+   *
+   * All target nodes already exist, so no recursive
+   * reconstruction or repeated subtree traversal occurs.
    */
   for (let nodeIndex = 0; nodeIndex < nodeCount; nodeIndex++) {
-    const node = nodes[nodeIndex]!;
+    const node = nodes[nodeIndex];
 
-    const staticStart = nodeStaticStart[nodeIndex]!;
+    const staticStart = nodeStaticStart[nodeIndex];
 
-    const staticCount = nodeStaticCount[nodeIndex]!;
+    const staticCount = nodeStaticCount[nodeIndex];
+
+    const paramChildIndex = nodeParamChild[nodeIndex];
+
+    if (
+      node === undefined ||
+      staticStart === undefined ||
+      staticCount === undefined ||
+      paramChildIndex === undefined
+    ) {
+      throw new Error(`Missing Gelis flat AOT node data: ${nodeIndex}`);
+    }
+
+    if (
+      !Number.isInteger(staticStart) ||
+      !Number.isInteger(staticCount) ||
+      staticStart < 0 ||
+      staticCount < 0 ||
+      staticStart + staticCount > edgeSegments.length
+    ) {
+      throw new Error(`Invalid Gelis flat AOT edge range: ${nodeIndex}`);
+    }
 
     if (staticCount !== 0) {
       const staticChildren = new Map<string, DynamicNode>();
@@ -498,20 +416,26 @@ function hydrateFlatNodesTrusted(
       const end = staticStart + staticCount;
 
       for (let edgeIndex = staticStart; edgeIndex < end; edgeIndex++) {
-        staticChildren.set(
-          edgeSegments[edgeIndex]!,
+        const segment = edgeSegments[edgeIndex];
 
-          nodes[edgeChildren[edgeIndex]!]!,
+        const childIndex = edgeChildren[edgeIndex];
+
+        if (segment === undefined || childIndex === undefined) {
+          throw new Error(`Missing Gelis flat AOT edge: ${edgeIndex}`);
+        }
+
+        staticChildren.set(
+          segment,
+
+          nodeAt(nodes, childIndex),
         );
       }
 
       node.staticChildren = staticChildren;
     }
 
-    const paramChildIndex = nodeParamChild[nodeIndex]!;
-
     if (paramChildIndex !== -1) {
-      node.paramChild = nodes[paramChildIndex]!;
+      node.paramChild = nodeAt(nodes, paramChildIndex);
     }
   }
 

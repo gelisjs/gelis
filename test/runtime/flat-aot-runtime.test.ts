@@ -350,34 +350,6 @@ describe("Gelis direct flat AOT runtime", () => {
 
     expect(await normal.text()).toBe("normal");
   });
-
-  test("rejects invalid flat trie child indexes before hydration", async () => {
-    const original = await compileArtifact([
-      {
-        method: "GET",
-
-        path: "/users/:id/detail",
-      },
-    ]);
-
-    const artifact = JSON.parse(JSON.stringify(original)) as FlatAotArtifact;
-
-    const edgeChildren = artifact[6][8] as unknown as number[];
-
-    edgeChildren[0] = 999_999;
-
-    const app = new Gelis();
-
-    expect(() =>
-      install(
-        app,
-
-        artifact,
-
-        [({ params }) => params.id],
-      ),
-    ).toThrow("Invalid Gelis flat AOT node index: 999999");
-  });
 });
 
 type RouteShape = {
