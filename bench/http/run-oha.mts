@@ -50,7 +50,7 @@ const frameworks = [
   },
 
   {
-    name: "elysia",
+    name: "elysia-1",
 
     file: resolve(HERE, "servers/elysia.ts"),
 
@@ -60,13 +60,19 @@ const frameworks = [
   },
 
   {
-    name: "elysia-precompile",
+    name: "elysia-1-precompile",
 
     file: resolve(HERE, "servers/elysia.ts"),
 
     env: {
       PRECOMPILE: "true",
     },
+  },
+
+  {
+    name: "elysia-2",
+
+    file: resolve(HERE, "servers/elysia-v2.ts"),
   },
 ] as const satisfies readonly MixedHttpFramework[];
 
@@ -162,7 +168,9 @@ console.log(`CPU:         ${cpus()[0]?.model ?? "unknown"}`);
 
 console.log(`Hono:        ${packageVersion("hono")}`);
 
-console.log(`Elysia:      ${packageVersion("elysia")}`);
+console.log(`Elysia 1:    ${packageVersion("elysia")}`);
+
+console.log(`Elysia 2:    ${packageVersion("elysia-v2")}`);
 
 console.log(`Routes:      ${ROUTES}`);
 
@@ -223,7 +231,9 @@ const output = {
     versions: {
       hono: packageVersion("hono"),
 
-      elysia: packageVersion("elysia"),
+      elysia1: packageVersion("elysia"),
+
+      elysia2: packageVersion("elysia-v2"),
     },
   },
 
