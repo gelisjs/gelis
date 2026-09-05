@@ -8,6 +8,20 @@ export function compileBeforeHandle(
   globalHooks: readonly RuntimeBeforeHandle[],
   localHook: RuntimeBeforeHandle | undefined,
 ): RuntimeBeforeHandle | undefined {
+  /*
+   * Zero-global fast path.
+   *
+   * There is nothing to compile or snapshot when
+   * the application has no global beforeHandle hooks.
+   *
+   * Returning the local hook directly preserves
+   * the exact existing semantics while avoiding
+   * a temporary array allocation for every route.
+   */
+  if (globalHooks.length === 0) {
+    return localHook;
+  }
+
   const hooks =
     localHook === undefined ? [...globalHooks] : [...globalHooks, localHook];
 
@@ -50,6 +64,16 @@ export function compileAfterHandle(
   globalHooks: readonly RuntimeAfterHandle[],
   localHook: RuntimeAfterHandle | undefined,
 ): RuntimeAfterHandle | undefined {
+  /*
+   * Same zero-global specialization as beforeHandle.
+   *
+   * A route-local afterHandle is already the complete
+   * effective plan when no global hooks exist.
+   */
+  if (globalHooks.length === 0) {
+    return localHook;
+  }
+
   const hooks =
     localHook === undefined ? [...globalHooks] : [localHook, ...globalHooks];
 
