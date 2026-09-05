@@ -81,7 +81,8 @@
     "bench:aot:flat-runtime:param-pool": "bun bench/aot/run-generic-param-vector-pool.mts",
     "bench:aot:flat-runtime:hybrid-topology": "bun bench/aot/run-generic-hybrid-topology.mts",
     "bench:aot:flat-runtime:hybrid-payload": "bun bench/aot/run-hybrid-topology-payload.mts",
-    "bench:aot:flat-runtime:hybrid-serialized": "bun bench/aot/run-hybrid-serialized-runtime.mts"
+    "bench:aot:flat-runtime:hybrid-serialized": "bun bench/aot/run-hybrid-serialized-runtime.mts",
+    "bench:aot:flat-runtime:preorder-serialized": "bun bench/aot/run-preorder-serialized-runtime.mts"
   },
   "devDependencies": {
     "@hono/standard-validator": "^0.4.0",
