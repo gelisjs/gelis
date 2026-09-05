@@ -81,7 +81,7 @@ export function hydrateRouterSnapshot(
     );
   }
 
-  return new Router(methods);
+  return Router.fromMethods(methods);
 }
 
 function hydrateMethodRoutes(

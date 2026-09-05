@@ -39,10 +39,21 @@ export interface RuntimeRouteMatch {
 const EMPTY_PARAMS = Object.freeze({}) as Record<string, string>;
 
 export class Router {
-  readonly #methods: Map<string, MethodRoutes>;
+  #methods = new Map<string, MethodRoutes>();
 
-  constructor(methods?: Map<string, MethodRoutes>) {
-    this.#methods = methods ?? new Map();
+  /*
+   * Internal construction path for precomputed
+   * router representations.
+   *
+   * Normal Router construction remains identical
+   * to the non-AOT runtime path.
+   */
+  static fromMethods(methods: Map<string, MethodRoutes>): Router {
+    const router = new Router();
+
+    router.#methods = methods;
+
+    return router;
   }
 
   register(route: RuntimeRouteRecord): void {
