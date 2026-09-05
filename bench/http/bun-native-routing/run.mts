@@ -30,6 +30,10 @@ const DURATION = "10s";
 
 const PREWARM_BATCH_SIZE = 100;
 
+const READINESS_TIMEOUT_MS = 30_000;
+
+const READINESS_POLL_MS = 25;
+
 type RouteKind = "static" | "dynamic";
 
 type BodyKind = "raw" | "json";
@@ -473,7 +477,7 @@ async function runFramework(
   );
 
   try {
-    await waitForServer(urlSet.readinessUrl);
+    await waitForServer(urlSet.readinessUrl, server, framework.name);
 
     /*
      * Exercise every registered route once.
@@ -618,10 +622,27 @@ async function runOha(
   return JSON.parse(stdout) as OhaJson;
 }
 
-async function waitForServer(url: string): Promise<void> {
+async function waitForServer(
+  url: string,
+
+  server: {
+    readonly exitCode: number | null;
+  },
+
+  frameworkName: string,
+): Promise<void> {
   let lastError: unknown;
 
-  for (let attempt = 0; attempt < 100; attempt++) {
+  const deadline = performance.now() + READINESS_TIMEOUT_MS;
+
+  while (performance.now() < deadline) {
+    if (server.exitCode !== null) {
+      throw new Error(
+        `${frameworkName} server exited before readiness ` +
+          `(exit code ${server.exitCode})`,
+      );
+    }
+
     try {
       const response = await fetch(url);
 
@@ -634,12 +655,12 @@ async function waitForServer(url: string): Promise<void> {
       lastError = error;
     }
 
-    await sleep(25);
+    await sleep(READINESS_POLL_MS);
   }
 
   throw new Error(
-    "Server did not become ready",
-
+    `${frameworkName} server did not become ready within ` +
+      `${READINESS_TIMEOUT_MS} ms`,
     {
       cause: lastError,
     },
