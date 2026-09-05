@@ -77,7 +77,8 @@
     "bench:aot:declaration": "bun bench/aot/run-aot-declaration.mts",
     "bench:aot:flat-runtime": "bun bench/aot/run-production-flat-runtime.mts",
     "bench:aot:flat-runtime:decompose": "bun bench/aot/run-flat-runtime-decomposition.mts",
-    "bench:aot:flat-runtime:generic-lower-bound": "bun bench/aot/run-generic-flat-hydration-lower-bound.mts"
+    "bench:aot:flat-runtime:generic-lower-bound": "bun bench/aot/run-generic-flat-hydration-lower-bound.mts",
+    "bench:aot:flat-runtime:param-pool": "bun bench/aot/run-generic-param-vector-pool.mts"
   },
   "devDependencies": {
     "@hono/standard-validator": "^0.4.0",
