@@ -77,6 +77,18 @@ const frameworks = [
       PRECOMPILE: "true",
     },
   },
+
+  {
+    name: "elysia-v2",
+
+    file: resolve(HERE, "servers/elysia-v2.ts"),
+  },
+
+  {
+    name: "elysia-v2-aot",
+
+    file: resolve(HERE, "servers/elysia-v2-aot.ts"),
+  },
 ] as const satisfies readonly ValidationHttpFramework[];
 
 const cases = [
@@ -193,6 +205,8 @@ console.log(`Hono std:    ${packageVersion("@hono/standard-validator")}`);
 
 console.log(`Elysia:      ${packageVersion("elysia")}`);
 
+console.log(`Elysia 2:    ${packageVersion("elysia-v2")}`);
+
 console.log(`Routes:      ${ROUTES}`);
 
 console.log(`Connections: ${CONNECTIONS}`);
@@ -247,6 +261,8 @@ const output = {
       honoStandardValidator: packageVersion("@hono/standard-validator"),
 
       elysia: packageVersion("elysia"),
+
+      elysiaV2: packageVersion("elysia-v2"),
     },
   },
 

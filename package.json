@@ -41,7 +41,7 @@
     "bench:http:elysia2:aot:build": "bun run --cwd bench/http/elysia-v2-aot build",
     "typecheck:bun-adapter": "bun ./node_modules/typescript/bin/tsc -p prototype/bun/tsconfig.json --noEmit",
     "bench:http:adapter": "bun bench/http/run-gelis-adapter.mts",
-    "bench:http:validation": "bun bench/http/validation/run.mts",
+    "bench:http:validation": "bun run bench:http:elysia2:aot:validation:build && bun bench/http/validation/run.mts",
     "bench:http:lifecycle": "bun bench/http/lifecycle/run.mts",
     "bench:runtime:lifecycle:global": "bun bench/runtime/global-lifecycle.mts",
     "bench:http:lifecycle:global": "bun bench/http/global-lifecycle/run.mts",
@@ -87,7 +87,8 @@
     "bench:aot:preorder-runtime:confirm": "bun bench/aot/run-production-preorder-runtime-confirmation.mts",
     "bench:aot:preorder-policy": "bun bench/aot/run-selective-preorder-policy.mts",
     "bench:aot:final-integrated": "bun bench/aot/run-final-integrated-aot.mts",
-    "bench:aot:final-source-runtime": "bun bench/aot/run-final-source-runtime.mts"
+    "bench:aot:final-source-runtime": "bun bench/aot/run-final-source-runtime.mts",
+    "bench:http:elysia2:aot:validation:build": "bun run --cwd bench/http/elysia-v2-aot build:validation"
   },
   "devDependencies": {
     "@hono/standard-validator": "^0.4.0",
