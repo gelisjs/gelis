@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 
 import { Gelis } from "../../src";
 
-describe("application context", () => {
+describe("application scope", () => {
   test("delivers application scope to a scoped route", async () => {
     const app = new Gelis();
 
@@ -16,7 +16,7 @@ describe("application context", () => {
       },
     };
 
-    const routes = app.context(scope);
+    const routes = app.scope(scope);
 
     routes.get(
       "/users/:id",
@@ -50,11 +50,11 @@ describe("application context", () => {
   test("keeps separate application scopes isolated", async () => {
     const app = new Gelis();
 
-    const first = app.context({
+    const first = app.scope({
       name: "first",
     });
 
-    const second = app.context({
+    const second = app.scope({
       name: "second",
     });
 
@@ -92,7 +92,7 @@ describe("application context", () => {
       },
     };
 
-    const routes = app.context(scope);
+    const routes = app.scope(scope);
 
     routes.get(
       "/counter",
@@ -111,7 +111,7 @@ describe("application context", () => {
     const app = new Gelis();
 
     app
-      .context({
+      .scope({
         service: "unused",
       })
       .get(

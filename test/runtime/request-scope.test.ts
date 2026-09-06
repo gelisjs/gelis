@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 
 import { Gelis } from "../../src";
 
-describe("request context", () => {
+describe("request scope", () => {
   test("derives exactly once and shares one scope across local lifecycle", async () => {
     const app = new Gelis();
 
@@ -16,7 +16,7 @@ describe("request context", () => {
 
     const seenScopes: object[] = [];
 
-    const routes = app.requestContext(({ params }) => {
+    const routes = app.requestScope(({ params }) => {
       deriveCalls++;
 
       expect(params.id).toBe("42");
@@ -66,7 +66,7 @@ describe("request context", () => {
 
     let deriveCalls = 0;
 
-    const routes = app.requestContext(async () => {
+    const routes = app.requestScope(async () => {
       deriveCalls++;
 
       await Promise.resolve();
@@ -98,7 +98,7 @@ describe("request context", () => {
 
     const order: string[] = [];
 
-    const routes = app.requestContext(() => ({
+    const routes = app.requestScope(() => ({
       marker: "scope",
     }));
 
@@ -158,7 +158,7 @@ describe("request context", () => {
       });
     });
 
-    const routes = app.requestContext(() => {
+    const routes = app.requestScope(() => {
       throw marker;
     });
 

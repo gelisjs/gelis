@@ -37,7 +37,7 @@ const app = new Gelis();
 
 type RootBefore = typeof app;
 
-const routes = app.context({
+const routes = app.scope({
   db: {
     name: "primary",
   },

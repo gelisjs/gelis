@@ -68,7 +68,7 @@ const controlApp = new Gelis();
 
 const candidateApp = new Gelis();
 
-const scoped = candidateApp.context(services);
+const scoped = candidateApp.scope(services);
 
 type CandidateRootBefore = typeof candidateApp;
 

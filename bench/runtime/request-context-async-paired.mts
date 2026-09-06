@@ -65,7 +65,7 @@ const controlApp = new Gelis();
 
 const candidateApp = new Gelis();
 
-const requestRoutes = candidateApp.requestContext(deriveScope);
+const requestRoutes = candidateApp.requestScope(deriveScope);
 
 for (let index = 0; index < ROUTES; index++) {
   const kind = index % 4;
@@ -141,7 +141,7 @@ for (let index = 0; index < ROUTES; index++) {
   );
 
   /*
-   * Candidate = requestContext async derive with local lifecycle.
+   * Candidate = requestScope async derive with local lifecycle.
    * Phase work intentionally matches the fused control.
    */
   requestRoutes.get(

@@ -45,12 +45,12 @@ type LifecycleAfter<
   RouteLifecycleFor<Path, Query, Body, Responses, Result>["afterHandle"]
 >;
 
-export type ApplicationContextHandler<Path extends string, Scope, Result> = (
+export type ApplicationScopeHandler<Path extends string, Scope, Result> = (
   context: RouteContext<Path>,
   scope: Scope,
 ) => Result;
 
-export type ApplicationContextLifecycleFor<
+export type ApplicationScopeLifecycleFor<
   Path extends string,
   Scope,
   Query extends StandardSchemaV1 | undefined = undefined,
@@ -77,16 +77,16 @@ export type ApplicationContextLifecycleFor<
   ) => ReturnType<LifecycleAfter<Path, Query, Body, Responses, Result>>;
 };
 
-interface ApplicationContextRouteMethod<
+interface ApplicationScopeRouteMethod<
   Method extends HttpMethod,
   Scope extends object,
 > {
   <const Path extends string, Result>(
     path: Path & ValidRoutePath<Path>,
 
-    handler: ApplicationContextHandler<Path, Scope, Result>,
+    handler: ApplicationScopeHandler<Path, Scope, Result>,
 
-    lifecycle?: ApplicationContextLifecycleFor<
+    lifecycle?: ApplicationScopeLifecycleFor<
       Path,
       Scope,
       undefined,
@@ -120,7 +120,7 @@ interface ApplicationContextRouteMethod<
       scope: Scope,
     ) => Result,
 
-    lifecycle?: ApplicationContextLifecycleFor<
+    lifecycle?: ApplicationScopeLifecycleFor<
       Path,
       Scope,
       Query,
@@ -156,7 +156,7 @@ interface ApplicationContextRouteMethod<
       scope: Scope,
     ) => RouteHandlerResultFor<Responses>,
 
-    lifecycle?: ApplicationContextLifecycleFor<
+    lifecycle?: ApplicationScopeLifecycleFor<
       Path,
       Scope,
       Query,
@@ -175,15 +175,15 @@ interface ApplicationContextRouteMethod<
   >;
 }
 
-interface ApplicationContextGenericRouteMethod<Scope extends object> {
+interface ApplicationScopeGenericRouteMethod<Scope extends object> {
   <const Method extends HttpMethod, const Path extends string, Result>(
     method: Method,
 
     path: Path & ValidRoutePath<Path>,
 
-    handler: ApplicationContextHandler<Path, Scope, Result>,
+    handler: ApplicationScopeHandler<Path, Scope, Result>,
 
-    lifecycle?: ApplicationContextLifecycleFor<
+    lifecycle?: ApplicationScopeLifecycleFor<
       Path,
       Scope,
       undefined,
@@ -220,7 +220,7 @@ interface ApplicationContextGenericRouteMethod<Scope extends object> {
       scope: Scope,
     ) => Result,
 
-    lifecycle?: ApplicationContextLifecycleFor<
+    lifecycle?: ApplicationScopeLifecycleFor<
       Path,
       Scope,
       Query,
@@ -259,7 +259,7 @@ interface ApplicationContextGenericRouteMethod<Scope extends object> {
       scope: Scope,
     ) => RouteHandlerResultFor<Responses>,
 
-    lifecycle?: ApplicationContextLifecycleFor<
+    lifecycle?: ApplicationScopeLifecycleFor<
       Path,
       Scope,
       Query,
@@ -278,22 +278,22 @@ interface ApplicationContextGenericRouteMethod<Scope extends object> {
   >;
 }
 
-export interface ApplicationContextBuilder<Scope extends object> {
-  readonly get: ApplicationContextRouteMethod<"GET", Scope>;
+export interface ApplicationScopeBuilder<Scope extends object> {
+  readonly get: ApplicationScopeRouteMethod<"GET", Scope>;
 
-  readonly post: ApplicationContextRouteMethod<"POST", Scope>;
+  readonly post: ApplicationScopeRouteMethod<"POST", Scope>;
 
-  readonly put: ApplicationContextRouteMethod<"PUT", Scope>;
+  readonly put: ApplicationScopeRouteMethod<"PUT", Scope>;
 
-  readonly patch: ApplicationContextRouteMethod<"PATCH", Scope>;
+  readonly patch: ApplicationScopeRouteMethod<"PATCH", Scope>;
 
-  readonly delete: ApplicationContextRouteMethod<"DELETE", Scope>;
+  readonly delete: ApplicationScopeRouteMethod<"DELETE", Scope>;
 
-  readonly options: ApplicationContextRouteMethod<"OPTIONS", Scope>;
+  readonly options: ApplicationScopeRouteMethod<"OPTIONS", Scope>;
 
-  readonly head: ApplicationContextRouteMethod<"HEAD", Scope>;
+  readonly head: ApplicationScopeRouteMethod<"HEAD", Scope>;
 
-  readonly route: ApplicationContextGenericRouteMethod<Scope>;
+  readonly route: ApplicationScopeGenericRouteMethod<Scope>;
 }
 
 type ScopedRuntimeHandler<Scope> = (
@@ -320,23 +320,23 @@ type ScopedRuntimeAfterHandle<Scope> = (
  * references. Application context only adapts scoped callbacks once during
  * registration before the runtime route enters the application.
  */
-export function createApplicationContextBuilder<const Scope extends object>(
+export function createApplicationScopeBuilder<const Scope extends object>(
   scope: Scope,
 
   register: RuntimeRouteRegister,
-): ApplicationContextBuilder<Scope> {
+): ApplicationScopeBuilder<Scope> {
   const builder = new RouteBuilder(
     "",
 
     (route) => {
-      register(bindApplicationContextRoute(route, scope));
+      register(bindApplicationScopeRoute(route, scope));
     },
   );
 
-  return builder as unknown as ApplicationContextBuilder<Scope>;
+  return builder as unknown as ApplicationScopeBuilder<Scope>;
 }
 
-function bindApplicationContextRoute<Scope extends object>(
+function bindApplicationScopeRoute<Scope extends object>(
   route: RuntimeRouteRecord,
 
   scope: Scope,

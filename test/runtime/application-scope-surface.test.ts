@@ -27,11 +27,11 @@ function createSchema<Input = unknown, Output = Input>(
   };
 }
 
-describe("application context route surface", () => {
+describe("application scope route surface", () => {
   test("supports every convenience HTTP method", async () => {
     const app = new Gelis();
 
-    const routes = app.context({
+    const routes = app.scope({
       value: "scoped",
     });
 
@@ -86,7 +86,7 @@ describe("application context route surface", () => {
   test("supports the generic route method", async () => {
     const app = new Gelis();
 
-    const routes = app.context({
+    const routes = app.scope({
       name: "generic",
     });
 
@@ -159,7 +159,7 @@ describe("application context route surface", () => {
 
     const app = new Gelis();
 
-    const routes = app.context({
+    const routes = app.scope({
       prefix: "ctx",
     });
 
@@ -209,7 +209,7 @@ describe("application context route surface", () => {
 
     const order: string[] = [];
 
-    const routes = app.context({
+    const routes = app.scope({
       marker: "scope",
     });
 

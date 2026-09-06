@@ -67,7 +67,7 @@ const controlApp = new Gelis();
 
 const candidateApp = new Gelis();
 
-const requestRoutes = candidateApp.requestContext(deriveScope);
+const requestRoutes = candidateApp.requestScope(deriveScope);
 
 for (let index = 0; index < ROUTES; index++) {
   const kind = index % 4;

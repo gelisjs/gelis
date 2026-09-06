@@ -210,7 +210,7 @@ function generateScopedBuilder(size: BenchmarkSize): void {
     "}",
     "",
     "export class App {",
-    "  context<const Context extends object>(",
+    "  scope<const Context extends object>(",
     "    values: Context,",
     "  ): ScopedBuilder<Context> {",
     "    void values",
@@ -240,7 +240,7 @@ function generateScopedBuilder(size: BenchmarkSize): void {
   lines.push(
     "}",
     "",
-    "export const routes = app.context(capabilityValues)",
+    "export const routes = app.scope(capabilityValues)",
     "",
     "// Correctness gate: invalid capability values must remain rejected.",
     "// @ts-expect-error cap0 requires literal id 0",

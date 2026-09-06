@@ -1,13 +1,13 @@
-import { createApplicationContextBuilder } from "./application-context";
+import { createApplicationScopeBuilder } from "./application-scope";
 
-import type { ApplicationContextBuilder } from "./application-context";
+import type { ApplicationScopeBuilder } from "./application-scope";
 
-import { createRequestContextBuilder } from "./request-context";
+import { createRequestScopeBuilder } from "./request-scope";
 
 import type {
-  RequestContextBuilder,
-  RequestContextDerive,
-} from "./request-context";
+  RequestScopeBuilder,
+  RequestScopeDerive,
+} from "./request-scope";
 
 import { getModuleRuntimeRoutes } from "./module";
 
@@ -216,12 +216,12 @@ export class Gelis extends RouteBuilder<""> {
     this.#state = state;
   }
 
-  context<const Scope extends object>(
+  scope<const Scope extends object>(
     scope: Scope,
-  ): ApplicationContextBuilder<Scope> {
+  ): ApplicationScopeBuilder<Scope> {
     const state = this.#state;
 
-    return createApplicationContextBuilder(
+    return createApplicationScopeBuilder(
       scope,
 
       (route) => {
@@ -230,12 +230,12 @@ export class Gelis extends RouteBuilder<""> {
     );
   }
 
-  requestContext<const Scope extends object>(
-    derive: RequestContextDerive<Scope>,
-  ): RequestContextBuilder<Scope> {
+  requestScope<const Scope extends object>(
+    derive: RequestScopeDerive<Scope>,
+  ): RequestScopeBuilder<Scope> {
     const state = this.#state;
 
-    return createRequestContextBuilder(
+    return createRequestScopeBuilder(
       derive,
 
       (route) => {
@@ -1089,43 +1089,21 @@ function invokeRequestScopeValidatedRoute(
 
   body: unknown,
 ): Response | Promise<Response> {
-  const requestScope = route.requestScope;
-
-  if (requestScope === undefined) {
-    throw new Error("Missing Gelis request scope plan");
-  }
-
   /*
-   * This context contains canonical input values.
+   * Input validation has already completed before
+   * this executor is entered.
    *
-   * For routes without input schemas query/body are
-   * undefined. For input routes they have already
-   * passed the normal Gelis validation pipeline.
+   * Application-global policy runs before any
+   * route-local request-scope derivation. A global
+   * short circuit therefore avoids unnecessary
+   * per-request capability work.
    */
   const context = createRuntimeContext(request, params, query, body);
 
-  const scope = requestScope.derive(context);
-
-  if (isPromiseLike(scope)) {
-    return Promise.resolve(scope).then((resolvedScope) =>
-      invokeRequestScopeWithScope(route, context, resolvedScope),
-    );
-  }
-
-  return invokeRequestScopeWithScope(route, context, scope);
-}
-
-function invokeRequestScopeWithScope(
-  route: RuntimeRouteRecord,
-
-  context: RuntimeRouteContext,
-
-  scope: unknown,
-): Response | Promise<Response> {
   const globalBeforeHandle = route.beforeHandle;
 
   if (globalBeforeHandle === undefined) {
-    return invokeLocalRequestScopeBefore(route, context, scope);
+    return deriveRequestScopeAfterGlobalBefore(route, context);
   }
 
   const early = globalBeforeHandle(context);
@@ -1136,12 +1114,34 @@ function invokeRequestScopeWithScope(
         return normalizeResponse(resolvedEarly);
       }
 
-      return invokeLocalRequestScopeBefore(route, context, scope);
+      return deriveRequestScopeAfterGlobalBefore(route, context);
     });
   }
 
   if (early !== undefined) {
     return normalizeResponse(early);
+  }
+
+  return deriveRequestScopeAfterGlobalBefore(route, context);
+}
+
+function deriveRequestScopeAfterGlobalBefore(
+  route: RuntimeRouteRecord,
+
+  context: RuntimeRouteContext,
+): Response | Promise<Response> {
+  const requestScope = route.requestScope;
+
+  if (requestScope === undefined) {
+    throw new Error("Missing Gelis request scope plan");
+  }
+
+  const scope = requestScope.derive(context);
+
+  if (isPromiseLike(scope)) {
+    return Promise.resolve(scope).then((resolvedScope) =>
+      invokeLocalRequestScopeBefore(route, context, resolvedScope),
+    );
   }
 
   return invokeLocalRequestScopeBefore(route, context, scope);

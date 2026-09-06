@@ -50,7 +50,7 @@ type LifecycleAfter<
   RouteLifecycleFor<Path, Query, Body, Responses, Result>["afterHandle"]
 >;
 
-export interface RequestContextDeriveContext {
+export interface RequestScopeDeriveContext {
   readonly request: Request;
 
   readonly params: Record<string, string>;
@@ -68,17 +68,17 @@ export interface RequestContextDeriveContext {
   readonly body: unknown;
 }
 
-export type RequestContextDerive<Scope extends object> = (
-  context: RequestContextDeriveContext,
+export type RequestScopeDerive<Scope extends object> = (
+  context: RequestScopeDeriveContext,
 ) => Scope | PromiseLike<Scope>;
 
-export type RequestContextHandler<Path extends string, Scope, Result> = (
+export type RequestScopeHandler<Path extends string, Scope, Result> = (
   context: RouteContext<Path>,
 
   scope: Scope,
 ) => Result;
 
-export type RequestContextLifecycleFor<
+export type RequestScopeLifecycleFor<
   Path extends string,
   Scope,
   Query extends StandardSchemaV1 | undefined = undefined,
@@ -105,16 +105,16 @@ export type RequestContextLifecycleFor<
   ) => ReturnType<LifecycleAfter<Path, Query, Body, Responses, Result>>;
 };
 
-interface RequestContextRouteMethod<
+interface RequestScopeRouteMethod<
   Method extends HttpMethod,
   Scope extends object,
 > {
   <const Path extends string, Result>(
     path: Path & ValidRoutePath<Path>,
 
-    handler: RequestContextHandler<Path, Scope, Result>,
+    handler: RequestScopeHandler<Path, Scope, Result>,
 
-    lifecycle?: RequestContextLifecycleFor<
+    lifecycle?: RequestScopeLifecycleFor<
       Path,
       Scope,
       undefined,
@@ -148,7 +148,7 @@ interface RequestContextRouteMethod<
       scope: Scope,
     ) => Result,
 
-    lifecycle?: RequestContextLifecycleFor<
+    lifecycle?: RequestScopeLifecycleFor<
       Path,
       Scope,
       Query,
@@ -184,7 +184,7 @@ interface RequestContextRouteMethod<
       scope: Scope,
     ) => RouteHandlerResultFor<Responses>,
 
-    lifecycle?: RequestContextLifecycleFor<
+    lifecycle?: RequestScopeLifecycleFor<
       Path,
       Scope,
       Query,
@@ -203,15 +203,15 @@ interface RequestContextRouteMethod<
   >;
 }
 
-interface RequestContextGenericRouteMethod<Scope extends object> {
+interface RequestScopeGenericRouteMethod<Scope extends object> {
   <const Method extends HttpMethod, const Path extends string, Result>(
     method: Method,
 
     path: Path & ValidRoutePath<Path>,
 
-    handler: RequestContextHandler<Path, Scope, Result>,
+    handler: RequestScopeHandler<Path, Scope, Result>,
 
-    lifecycle?: RequestContextLifecycleFor<
+    lifecycle?: RequestScopeLifecycleFor<
       Path,
       Scope,
       undefined,
@@ -248,7 +248,7 @@ interface RequestContextGenericRouteMethod<Scope extends object> {
       scope: Scope,
     ) => Result,
 
-    lifecycle?: RequestContextLifecycleFor<
+    lifecycle?: RequestScopeLifecycleFor<
       Path,
       Scope,
       Query,
@@ -287,7 +287,7 @@ interface RequestContextGenericRouteMethod<Scope extends object> {
       scope: Scope,
     ) => RouteHandlerResultFor<Responses>,
 
-    lifecycle?: RequestContextLifecycleFor<
+    lifecycle?: RequestScopeLifecycleFor<
       Path,
       Scope,
       Query,
@@ -306,22 +306,22 @@ interface RequestContextGenericRouteMethod<Scope extends object> {
   >;
 }
 
-export interface RequestContextBuilder<Scope extends object> {
-  readonly get: RequestContextRouteMethod<"GET", Scope>;
+export interface RequestScopeBuilder<Scope extends object> {
+  readonly get: RequestScopeRouteMethod<"GET", Scope>;
 
-  readonly post: RequestContextRouteMethod<"POST", Scope>;
+  readonly post: RequestScopeRouteMethod<"POST", Scope>;
 
-  readonly put: RequestContextRouteMethod<"PUT", Scope>;
+  readonly put: RequestScopeRouteMethod<"PUT", Scope>;
 
-  readonly patch: RequestContextRouteMethod<"PATCH", Scope>;
+  readonly patch: RequestScopeRouteMethod<"PATCH", Scope>;
 
-  readonly delete: RequestContextRouteMethod<"DELETE", Scope>;
+  readonly delete: RequestScopeRouteMethod<"DELETE", Scope>;
 
-  readonly options: RequestContextRouteMethod<"OPTIONS", Scope>;
+  readonly options: RequestScopeRouteMethod<"OPTIONS", Scope>;
 
-  readonly head: RequestContextRouteMethod<"HEAD", Scope>;
+  readonly head: RequestScopeRouteMethod<"HEAD", Scope>;
 
-  readonly route: RequestContextGenericRouteMethod<Scope>;
+  readonly route: RequestScopeGenericRouteMethod<Scope>;
 }
 
 /**
@@ -338,26 +338,26 @@ export interface RequestContextBuilder<Scope extends object> {
  * The public name and surface remain experimental until
  * the P8-A composition API freeze.
  */
-export function createRequestContextBuilder<const Scope extends object>(
-  derive: RequestContextDerive<Scope>,
+export function createRequestScopeBuilder<const Scope extends object>(
+  derive: RequestScopeDerive<Scope>,
 
   register: RuntimeRouteRegister,
-): RequestContextBuilder<Scope> {
+): RequestScopeBuilder<Scope> {
   const builder = new RouteBuilder(
     "",
 
     (route) => {
-      register(bindRequestContextRoute(route, derive));
+      register(bindRequestScopeRoute(route, derive));
     },
   );
 
-  return builder as unknown as RequestContextBuilder<Scope>;
+  return builder as unknown as RequestScopeBuilder<Scope>;
 }
 
-function bindRequestContextRoute<Scope extends object>(
+function bindRequestScopeRoute<Scope extends object>(
   route: RuntimeRouteRecord,
 
-  derive: RequestContextDerive<Scope>,
+  derive: RequestScopeDerive<Scope>,
 ): RuntimeRouteRecord {
   const requestScope: RuntimeRequestScopePlan = {
     derive: derive as RuntimeRequestScopeDerive,

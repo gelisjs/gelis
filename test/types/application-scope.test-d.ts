@@ -18,7 +18,7 @@ const scope = {
   },
 } as const;
 
-const routes = app.context(scope);
+const routes = app.scope(scope);
 
 const getUser = routes.get(
   "/users/:id",

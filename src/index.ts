@@ -1,18 +1,18 @@
 export { Gelis } from "./app";
 
 export type {
-  ApplicationContextBuilder,
-  ApplicationContextHandler,
-  ApplicationContextLifecycleFor,
-} from "./application-context";
+  ApplicationScopeBuilder,
+  ApplicationScopeHandler,
+  ApplicationScopeLifecycleFor,
+} from "./application-scope";
 
 export type {
-  RequestContextBuilder,
-  RequestContextDerive,
-  RequestContextDeriveContext,
-  RequestContextHandler,
-  RequestContextLifecycleFor,
-} from "./request-context";
+  RequestScopeBuilder,
+  RequestScopeDerive,
+  RequestScopeDeriveContext,
+  RequestScopeHandler,
+  RequestScopeLifecycleFor,
+} from "./request-scope";
 
 export { inspectContract } from "./contract-source";
 

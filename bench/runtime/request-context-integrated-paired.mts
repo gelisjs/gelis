@@ -58,7 +58,7 @@ const controlApp = new Gelis();
 
 const candidateApp = new Gelis();
 
-const requestRoutes = candidateApp.requestContext(deriveScope);
+const requestRoutes = candidateApp.requestScope(deriveScope);
 
 type CandidateRootBefore = typeof candidateApp;
 
