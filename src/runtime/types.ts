@@ -18,6 +18,8 @@ export const RUNTIME_ROUTE_AFTER_HANDLE = 4;
 
 export const RUNTIME_ROUTE_RESPONSE = 8;
 
+export const RUNTIME_ROUTE_REQUEST_SCOPE = 16;
+
 export const RUNTIME_ROUTE_INPUT_BEFORE_HANDLE =
   RUNTIME_ROUTE_INPUT | RUNTIME_ROUTE_BEFORE_HANDLE;
 
@@ -88,6 +90,38 @@ export type RuntimeAfterHandle = (
   result: unknown,
 ) => void | PromiseLike<void>;
 
+export type RuntimeRequestScopeDerive = (
+  context: RuntimeRouteContext,
+) => unknown | PromiseLike<unknown>;
+
+export type RuntimeRequestScopeHandler = (
+  context: RuntimeRouteContext,
+
+  scope: unknown,
+) => unknown;
+
+export type RuntimeRequestScopeBeforeHandle = (
+  context: RuntimeRouteContext,
+
+  scope: unknown,
+) => unknown | PromiseLike<unknown>;
+
+export type RuntimeRequestScopeAfterHandle = (
+  context: RuntimeRouteContext,
+
+  result: unknown,
+
+  scope: unknown,
+) => void | PromiseLike<void>;
+
+export interface RuntimeRequestScopePlan {
+  readonly derive: RuntimeRequestScopeDerive;
+
+  readonly beforeHandle: RuntimeRequestScopeBeforeHandle | undefined;
+
+  readonly afterHandle: RuntimeRequestScopeAfterHandle | undefined;
+}
+
 export interface RuntimeRouteRecord {
   readonly method: HttpMethod;
 
@@ -128,6 +162,14 @@ export interface RuntimeRouteRecord {
    * not gain response-plan state unnecessarily.
    */
   readonly responsePlan?: RuntimeResponsePlan;
+
+  /*
+   * Present only on request-scoped routes.
+   *
+   * Ordinary routes deliberately omit this property
+   * so their runtime object shape remains unchanged.
+   */
+  readonly requestScope?: RuntimeRequestScopePlan;
 
   beforeHandle: RuntimeBeforeHandle | undefined;
 
