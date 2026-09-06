@@ -6,6 +6,14 @@ export type {
   ApplicationContextLifecycleFor,
 } from "./application-context";
 
+export type {
+  RequestContextBuilder,
+  RequestContextDerive,
+  RequestContextDeriveContext,
+  RequestContextHandler,
+  RequestContextLifecycleFor,
+} from "./request-context";
+
 export { inspectContract } from "./contract-source";
 
 export type {

@@ -2,6 +2,13 @@ import { createApplicationContextBuilder } from "./application-context";
 
 import type { ApplicationContextBuilder } from "./application-context";
 
+import { createRequestContextBuilder } from "./request-context";
+
+import type {
+  RequestContextBuilder,
+  RequestContextDerive,
+} from "./request-context";
+
 import { getModuleRuntimeRoutes } from "./module";
 
 import { pathnameFromUrl } from "./runtime/url";
@@ -62,6 +69,7 @@ import {
   RUNTIME_ROUTE_INPUT_BEFORE_HANDLE_RESPONSE,
   RUNTIME_ROUTE_INPUT_RESPONSE,
   RUNTIME_ROUTE_PLAIN,
+  RUNTIME_ROUTE_REQUEST_SCOPE,
   RUNTIME_ROUTE_RESPONSE,
 } from "./runtime/types";
 
@@ -74,6 +82,7 @@ import type { RuntimeInputPlan } from "./runtime/input";
 import type {
   RuntimeAfterHandle,
   RuntimeBeforeHandle,
+  RuntimeRequestScopeHandler,
   RuntimeRouteContext,
   RuntimeRouteHandler,
   RuntimeRouteRecord,
@@ -214,6 +223,20 @@ export class Gelis extends RouteBuilder<""> {
 
     return createApplicationContextBuilder(
       scope,
+
+      (route) => {
+        registerAppRuntimeRoute(state, route);
+      },
+    );
+  }
+
+  requestContext<const Scope extends object>(
+    derive: RequestContextDerive<Scope>,
+  ): RequestContextBuilder<Scope> {
+    const state = this.#state;
+
+    return createRequestContextBuilder(
+      derive,
 
       (route) => {
         registerAppRuntimeRoute(state, route);
@@ -582,8 +605,73 @@ export class Gelis extends RouteBuilder<""> {
         );
       }
 
-      default:
+      default: {
+        /*
+         * Request-scoped route without input, lifecycle,
+         * or response contract.
+         *
+         * Keep this execution shape close to the ordinary
+         * plain-route fast path. The scope is derived once
+         * and passed directly as the handler's second
+         * argument.
+         */
+        if (route.flags === RUNTIME_ROUTE_REQUEST_SCOPE) {
+          return invokePlainRequestScopeRoute(route, request, params);
+        }
+
+        /*
+         * Request scope with local beforeHandle + afterHandle,
+         * but without application-global lifecycle.
+         *
+         * Global lifecycle compilation stores its effective
+         * hooks on route.beforeHandle / route.afterHandle, so
+         * both fields being undefined proves this route can use
+         * the fully local specialized executor.
+         */
+        if (
+          route.flags ===
+            (RUNTIME_ROUTE_REQUEST_SCOPE |
+              RUNTIME_ROUTE_BEFORE_HANDLE |
+              RUNTIME_ROUTE_AFTER_HANDLE) &&
+          route.beforeHandle === undefined &&
+          route.afterHandle === undefined
+        ) {
+          return invokeLocalRequestScopeBeforeAfterRoute(
+            route,
+            request,
+            params,
+          );
+        }
+
+        if ((route.flags & RUNTIME_ROUTE_REQUEST_SCOPE) !== 0) {
+          /*
+           * Input validation remains owned by the canonical
+           * Gelis input pipeline.
+           *
+           * Request-scope derivation therefore receives
+           * validated/transformed query and body values.
+           */
+          if ((route.flags & RUNTIME_ROUTE_INPUT) !== 0) {
+            return runInputPlan(
+              route,
+              request,
+              params,
+
+              invokeRequestScopeValidatedRoute,
+            );
+          }
+
+          return invokeRequestScopeValidatedRoute(
+            route,
+            request,
+            params,
+            undefined,
+            undefined,
+          );
+        }
+
         throw new Error("Invalid Gelis runtime route flags");
+      }
     }
   }
 }
@@ -734,6 +822,20 @@ function applyLifecyclePlan(
     flags |= RUNTIME_ROUTE_AFTER_HANDLE;
   }
 
+  const requestScope = route.requestScope;
+
+  if (requestScope !== undefined) {
+    flags |= RUNTIME_ROUTE_REQUEST_SCOPE;
+
+    if (requestScope.beforeHandle !== undefined) {
+      flags |= RUNTIME_ROUTE_BEFORE_HANDLE;
+    }
+
+    if (requestScope.afterHandle !== undefined) {
+      flags |= RUNTIME_ROUTE_AFTER_HANDLE;
+    }
+  }
+
   /*
    * Global lifecycle recompilation must never erase
    * executable response behavior compiled at route
@@ -744,6 +846,433 @@ function applyLifecyclePlan(
   }
 
   route.flags = flags;
+}
+
+function invokePlainRequestScopeRoute(
+  route: RuntimeRouteRecord,
+
+  request: Request,
+
+  params: Record<string, string>,
+): Response | Promise<Response> {
+  const requestScope = route.requestScope;
+
+  if (requestScope === undefined) {
+    throw new Error("Missing Gelis request scope plan");
+  }
+
+  const context: RuntimeRouteContext = {
+    request,
+    params,
+
+    query: undefined,
+
+    body: undefined,
+
+    reply: runtimeReply,
+  };
+
+  const scope = requestScope.derive(context);
+
+  const handler = route.handler as unknown as RuntimeRequestScopeHandler;
+
+  if (isPromiseLike(scope)) {
+    return Promise.resolve(scope).then((resolvedScope) => {
+      const result = handler(context, resolvedScope);
+
+      if (isPromiseLike(result)) {
+        return Promise.resolve(result).then(normalizeResponse);
+      }
+
+      return normalizeResponse(result);
+    });
+  }
+
+  const result = handler(context, scope);
+
+  if (isPromiseLike(result)) {
+    return Promise.resolve(result).then(normalizeResponse);
+  }
+
+  return normalizeResponse(result);
+}
+
+function invokeLocalRequestScopeBeforeAfterRoute(
+  route: RuntimeRouteRecord,
+
+  request: Request,
+
+  params: Record<string, string>,
+): Response | Promise<Response> {
+  const requestScope = route.requestScope;
+
+  if (requestScope === undefined) {
+    throw new Error("Missing Gelis request scope plan");
+  }
+
+  const beforeHandle = requestScope.beforeHandle;
+
+  const afterHandle = requestScope.afterHandle;
+
+  if (beforeHandle === undefined || afterHandle === undefined) {
+    throw new Error("Missing Gelis request scope lifecycle");
+  }
+
+  const context: RuntimeRouteContext = {
+    request,
+    params,
+
+    query: undefined,
+
+    body: undefined,
+
+    reply: runtimeReply,
+  };
+
+  const handler = route.handler as unknown as RuntimeRequestScopeHandler;
+
+  const scope = requestScope.derive(context);
+
+  /*
+   * Async derivation is not the synchronous hot path,
+   * so it can enter the generic resolved helper.
+   */
+  if (isPromiseLike(scope)) {
+    return Promise.resolve(scope).then((resolvedScope) =>
+      invokeResolvedLocalRequestScopeBeforeAfter(
+        context,
+        resolvedScope,
+        handler,
+        beforeHandle,
+        afterHandle,
+      ),
+    );
+  }
+
+  /*
+   * Keep the synchronous path completely linear.
+   */
+  const early = beforeHandle(context, scope);
+
+  if (isPromiseLike(early)) {
+    return Promise.resolve(early).then((resolvedEarly) => {
+      if (resolvedEarly !== undefined) {
+        return normalizeResponse(resolvedEarly);
+      }
+
+      return invokeResolvedRequestScopeHandlerAfter(
+        context,
+        scope,
+        handler,
+        afterHandle,
+      );
+    });
+  }
+
+  if (early !== undefined) {
+    return normalizeResponse(early);
+  }
+
+  const result = handler(context, scope);
+
+  if (isPromiseLike(result)) {
+    return Promise.resolve(result).then((resolvedResult) => {
+      const after = afterHandle(context, resolvedResult, scope);
+
+      if (isPromiseLike(after)) {
+        return Promise.resolve(after).then(() =>
+          normalizeResponse(resolvedResult),
+        );
+      }
+
+      return normalizeResponse(resolvedResult);
+    });
+  }
+
+  const after = afterHandle(context, result, scope);
+
+  if (isPromiseLike(after)) {
+    return Promise.resolve(after).then(() => normalizeResponse(result));
+  }
+
+  return normalizeResponse(result);
+}
+
+function invokeResolvedLocalRequestScopeBeforeAfter(
+  context: RuntimeRouteContext,
+
+  scope: unknown,
+
+  handler: RuntimeRequestScopeHandler,
+
+  beforeHandle: NonNullable<
+    NonNullable<RuntimeRouteRecord["requestScope"]>["beforeHandle"]
+  >,
+
+  afterHandle: NonNullable<
+    NonNullable<RuntimeRouteRecord["requestScope"]>["afterHandle"]
+  >,
+): Response | Promise<Response> {
+  const early = beforeHandle(context, scope);
+
+  if (isPromiseLike(early)) {
+    return Promise.resolve(early).then((resolvedEarly) => {
+      if (resolvedEarly !== undefined) {
+        return normalizeResponse(resolvedEarly);
+      }
+
+      return invokeResolvedRequestScopeHandlerAfter(
+        context,
+        scope,
+        handler,
+        afterHandle,
+      );
+    });
+  }
+
+  if (early !== undefined) {
+    return normalizeResponse(early);
+  }
+
+  return invokeResolvedRequestScopeHandlerAfter(
+    context,
+    scope,
+    handler,
+    afterHandle,
+  );
+}
+
+function invokeResolvedRequestScopeHandlerAfter(
+  context: RuntimeRouteContext,
+
+  scope: unknown,
+
+  handler: RuntimeRequestScopeHandler,
+
+  afterHandle: NonNullable<
+    NonNullable<RuntimeRouteRecord["requestScope"]>["afterHandle"]
+  >,
+): Response | Promise<Response> {
+  const result = handler(context, scope);
+
+  if (isPromiseLike(result)) {
+    return Promise.resolve(result).then((resolvedResult) => {
+      const after = afterHandle(context, resolvedResult, scope);
+
+      if (isPromiseLike(after)) {
+        return Promise.resolve(after).then(() =>
+          normalizeResponse(resolvedResult),
+        );
+      }
+
+      return normalizeResponse(resolvedResult);
+    });
+  }
+
+  const after = afterHandle(context, result, scope);
+
+  if (isPromiseLike(after)) {
+    return Promise.resolve(after).then(() => normalizeResponse(result));
+  }
+
+  return normalizeResponse(result);
+}
+
+function invokeRequestScopeValidatedRoute(
+  route: RuntimeRouteRecord,
+
+  request: Request,
+
+  params: Record<string, string>,
+
+  query: unknown,
+
+  body: unknown,
+): Response | Promise<Response> {
+  const requestScope = route.requestScope;
+
+  if (requestScope === undefined) {
+    throw new Error("Missing Gelis request scope plan");
+  }
+
+  /*
+   * This context contains canonical input values.
+   *
+   * For routes without input schemas query/body are
+   * undefined. For input routes they have already
+   * passed the normal Gelis validation pipeline.
+   */
+  const context = createRuntimeContext(request, params, query, body);
+
+  const scope = requestScope.derive(context);
+
+  if (isPromiseLike(scope)) {
+    return Promise.resolve(scope).then((resolvedScope) =>
+      invokeRequestScopeWithScope(route, context, resolvedScope),
+    );
+  }
+
+  return invokeRequestScopeWithScope(route, context, scope);
+}
+
+function invokeRequestScopeWithScope(
+  route: RuntimeRouteRecord,
+
+  context: RuntimeRouteContext,
+
+  scope: unknown,
+): Response | Promise<Response> {
+  const globalBeforeHandle = route.beforeHandle;
+
+  if (globalBeforeHandle === undefined) {
+    return invokeLocalRequestScopeBefore(route, context, scope);
+  }
+
+  const early = globalBeforeHandle(context);
+
+  if (isPromiseLike(early)) {
+    return Promise.resolve(early).then((resolvedEarly) => {
+      if (resolvedEarly !== undefined) {
+        return normalizeResponse(resolvedEarly);
+      }
+
+      return invokeLocalRequestScopeBefore(route, context, scope);
+    });
+  }
+
+  if (early !== undefined) {
+    return normalizeResponse(early);
+  }
+
+  return invokeLocalRequestScopeBefore(route, context, scope);
+}
+
+function invokeLocalRequestScopeBefore(
+  route: RuntimeRouteRecord,
+
+  context: RuntimeRouteContext,
+
+  scope: unknown,
+): Response | Promise<Response> {
+  const requestScope = route.requestScope;
+
+  if (requestScope === undefined) {
+    throw new Error("Missing Gelis request scope plan");
+  }
+
+  const localBeforeHandle = requestScope.beforeHandle;
+
+  if (localBeforeHandle === undefined) {
+    return invokeRequestScopeHandler(route, context, scope);
+  }
+
+  const early = localBeforeHandle(context, scope);
+
+  if (isPromiseLike(early)) {
+    return Promise.resolve(early).then((resolvedEarly) => {
+      if (resolvedEarly !== undefined) {
+        return normalizeResponse(resolvedEarly);
+      }
+
+      return invokeRequestScopeHandler(route, context, scope);
+    });
+  }
+
+  if (early !== undefined) {
+    return normalizeResponse(early);
+  }
+
+  return invokeRequestScopeHandler(route, context, scope);
+}
+
+function invokeRequestScopeHandler(
+  route: RuntimeRouteRecord,
+
+  context: RuntimeRouteContext,
+
+  scope: unknown,
+): Response | Promise<Response> {
+  const handler = route.handler as unknown as RuntimeRequestScopeHandler;
+
+  const result = handler(context, scope);
+
+  if (isPromiseLike(result)) {
+    return Promise.resolve(result).then((resolved) =>
+      invokeRequestScopeAfter(route, context, resolved, scope),
+    );
+  }
+
+  return invokeRequestScopeAfter(route, context, result, scope);
+}
+
+function invokeRequestScopeAfter(
+  route: RuntimeRouteRecord,
+
+  context: RuntimeRouteContext,
+
+  result: unknown,
+
+  scope: unknown,
+): Response | Promise<Response> {
+  const requestScope = route.requestScope;
+
+  if (requestScope === undefined) {
+    throw new Error("Missing Gelis request scope plan");
+  }
+
+  const localAfterHandle = requestScope.afterHandle;
+
+  if (localAfterHandle === undefined) {
+    return invokeGlobalRequestScopeAfter(route, context, result);
+  }
+
+  const after = localAfterHandle(context, result, scope);
+
+  if (isPromiseLike(after)) {
+    return Promise.resolve(after).then(() =>
+      invokeGlobalRequestScopeAfter(route, context, result),
+    );
+  }
+
+  return invokeGlobalRequestScopeAfter(route, context, result);
+}
+
+function invokeGlobalRequestScopeAfter(
+  route: RuntimeRouteRecord,
+
+  context: RuntimeRouteContext,
+
+  result: unknown,
+): Response | Promise<Response> {
+  const globalAfterHandle = route.afterHandle;
+
+  if (globalAfterHandle === undefined) {
+    return finalizeRequestScopeResult(route, result);
+  }
+
+  const after = globalAfterHandle(context, result);
+
+  if (isPromiseLike(after)) {
+    return Promise.resolve(after).then(() =>
+      finalizeRequestScopeResult(route, result),
+    );
+  }
+
+  return finalizeRequestScopeResult(route, result);
+}
+
+function finalizeRequestScopeResult(
+  route: RuntimeRouteRecord,
+
+  result: unknown,
+): Response | Promise<Response> {
+  const responsePlan = route.responsePlan;
+
+  if (responsePlan !== undefined) {
+    return responsePlan.finalize(result);
+  }
+
+  return normalizeResponse(result);
 }
 
 function runInputPlan(
