@@ -1,3 +1,7 @@
+import { createApplicationContextBuilder } from "./application-context";
+
+import type { ApplicationContextBuilder } from "./application-context";
+
 import { getModuleRuntimeRoutes } from "./module";
 
 import { pathnameFromUrl } from "./runtime/url";
@@ -201,6 +205,20 @@ export class Gelis extends RouteBuilder<""> {
     );
 
     this.#state = state;
+  }
+
+  context<const Scope extends object>(
+    scope: Scope,
+  ): ApplicationContextBuilder<Scope> {
+    const state = this.#state;
+
+    return createApplicationContextBuilder(
+      scope,
+
+      (route) => {
+        registerAppRuntimeRoute(state, route);
+      },
+    );
   }
 
   [GELIS_INTERNAL_RUNTIME](): GelisInternalRuntimeControl {

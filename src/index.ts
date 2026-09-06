@@ -1,5 +1,11 @@
 export { Gelis } from "./app";
 
+export type {
+  ApplicationContextBuilder,
+  ApplicationContextHandler,
+  ApplicationContextLifecycleFor,
+} from "./application-context";
+
 export { inspectContract } from "./contract-source";
 
 export type {
