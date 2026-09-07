@@ -4,7 +4,8 @@ export type PluginInstallErrorCode =
   | "PLUGIN_DEPENDENCY_MISSING"
   | "PLUGIN_CAPABILITY_ALREADY_PROVIDED"
   | "PLUGIN_SETUP_CONTEXT_INACTIVE"
-  | "PLUGIN_ASYNC_SETUP_UNSUPPORTED";
+  | "PLUGIN_ASYNC_SETUP_UNSUPPORTED"
+  | "PLUGIN_ALREADY_INSTALLED";
 
 export class PluginInstallError extends Error {
   override readonly name = "PluginInstallError";
@@ -32,6 +33,8 @@ interface CapabilityEntry {
 
 interface PluginRuntimeState {
   readonly capabilities: Map<object, CapabilityEntry>;
+
+  readonly pluginInstallations: Set<Plugin>;
 }
 
 interface PluginInstallFrame {
@@ -134,10 +137,20 @@ export function installPlugin(application: object, plugin: Plugin): void {
   if (state === undefined) {
     state = {
       capabilities: new Map(),
+
+      pluginInstallations: new Set(),
     };
 
     applicationPluginStates.set(application, state);
   }
+
+  if (state.pluginInstallations.has(plugin)) {
+    throw pluginAlreadyInstalledError(plugin.name);
+  }
+
+  state.pluginInstallations.add(plugin);
+
+  let installationSucceeded = false;
 
   const frame: PluginInstallFrame = {
     plugin,
@@ -165,8 +178,14 @@ export function installPlugin(application: object, plugin: Plugin): void {
     for (const [capability, entry] of frame.pendingCapabilities) {
       state.capabilities.set(capability, entry);
     }
+
+    installationSucceeded = true;
   } finally {
     frame.active = false;
+
+    if (!installationSucceeded) {
+      state.pluginInstallations.delete(plugin);
+    }
   }
 }
 
@@ -242,6 +261,16 @@ function asyncSetupUnsupportedError(pluginName: string): PluginInstallError {
     "PLUGIN_ASYNC_SETUP_UNSUPPORTED",
 
     `Async setup is not supported for plugin "${pluginName}"`,
+
+    pluginName,
+  );
+}
+
+function pluginAlreadyInstalledError(pluginName: string): PluginInstallError {
+  return new PluginInstallError(
+    "PLUGIN_ALREADY_INSTALLED",
+
+    `Plugin "${pluginName}" cannot be installed more than once on the same application`,
 
     pluginName,
   );
