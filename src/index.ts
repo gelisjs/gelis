@@ -6,6 +6,7 @@ export type {
   Capability,
   Plugin,
   PluginInstallErrorCode,
+  PluginRouteBuilder,
   PluginSetup,
   PluginSetupContext,
 } from "./plugin";

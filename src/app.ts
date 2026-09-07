@@ -8,7 +8,7 @@ import type { RequestScopeBuilder, RequestScopeDerive } from "./request-scope";
 
 import { installPlugin } from "./plugin";
 
-import type { Plugin } from "./plugin";
+import type { Plugin, PluginCompositionDeclaration } from "./plugin";
 
 import { getModuleRuntimeRoutes } from "./module";
 
@@ -123,6 +123,8 @@ interface AppRuntimeState {
    */
   routes: RuntimeRouteRecord[];
 
+  routeIdentityKeys: Set<string> | undefined;
+
   localBeforeHooks: (RuntimeBeforeHandle | undefined)[] | undefined;
 
   localAfterHooks: (RuntimeAfterHandle | undefined)[] | undefined;
@@ -183,6 +185,62 @@ export class Gelis extends RouteBuilder<""> {
     });
   }
 
+  #commitPluginComposition(composition: PluginCompositionDeclaration): void {
+    const state = this.#state;
+
+    validatePluginCompositionRoutes(state, composition.routes);
+
+    for (const route of composition.routes) {
+      registerAppRuntimeRoute(state, route);
+    }
+
+    const onRequestHooks = composition.onRequestHooks;
+
+    if (onRequestHooks.length !== 0) {
+      const hooks = state.onRequestHooks;
+
+      if (hooks === undefined) {
+        state.onRequestHooks = [...onRequestHooks];
+      } else {
+        hooks.push(...onRequestHooks);
+      }
+    }
+
+    const onErrorHooks = composition.onErrorHooks;
+
+    if (onErrorHooks.length !== 0) {
+      const hooks = state.onErrorHooks;
+
+      if (hooks === undefined) {
+        state.onErrorHooks = [...onErrorHooks];
+      } else {
+        hooks.push(...onErrorHooks);
+      }
+    }
+
+    if (onRequestHooks.length !== 0 || onErrorHooks.length !== 0) {
+      this.#recompileApplicationFetch();
+    }
+
+    const beforeHandleHooks = composition.beforeHandleHooks;
+
+    const afterHandleHooks = composition.afterHandleHooks;
+
+    if (beforeHandleHooks.length !== 0 || afterHandleHooks.length !== 0) {
+      ensureLocalLifecycleSidecar(state);
+
+      for (const hook of beforeHandleHooks) {
+        state.globalBeforeHooks.push(hook as RuntimeBeforeHandle);
+      }
+
+      for (const hook of afterHandleHooks) {
+        state.globalAfterHooks.push(hook as RuntimeAfterHandle);
+      }
+
+      recompileAppLifecycle(state);
+    }
+  }
+
   constructor() {
     const router = new Router();
 
@@ -190,6 +248,8 @@ export class Gelis extends RouteBuilder<""> {
       router,
 
       routes: [],
+
+      routeIdentityKeys: undefined,
 
       localBeforeHooks: undefined,
 
@@ -218,7 +278,14 @@ export class Gelis extends RouteBuilder<""> {
   }
 
   use(plugin: Plugin): this {
-    installPlugin(this, plugin);
+    installPlugin(
+      this,
+      plugin,
+
+      (composition) => {
+        this.#commitPluginComposition(composition);
+      },
+    );
 
     return this;
   }
@@ -284,6 +351,8 @@ export class Gelis extends RouteBuilder<""> {
         state.router = router;
 
         state.routes = routes;
+
+        state.routeIdentityKeys = undefined;
       },
     };
   }
@@ -683,6 +752,70 @@ export class Gelis extends RouteBuilder<""> {
   }
 }
 
+function validatePluginCompositionRoutes(
+  state: AppRuntimeState,
+
+  routes: readonly RuntimeRouteRecord[],
+): void {
+  if (routes.length === 0) {
+    return;
+  }
+
+  const installed = ensureRouteIdentityKeys(state);
+
+  const pending = new Set<string>();
+
+  for (const route of routes) {
+    const key = runtimeRouteIdentityKey(route);
+
+    if (installed.has(key) || pending.has(key)) {
+      throw new Error(`Duplicate route: ${route.method} ${route.path}`);
+    }
+
+    pending.add(key);
+  }
+}
+
+function ensureRouteIdentityKeys(state: AppRuntimeState): Set<string> {
+  const existing = state.routeIdentityKeys;
+
+  if (existing !== undefined) {
+    return existing;
+  }
+
+  const created = new Set<string>();
+
+  for (const route of state.routes) {
+    created.add(runtimeRouteIdentityKey(route));
+  }
+
+  state.routeIdentityKeys = created;
+
+  return created;
+}
+
+function runtimeRouteIdentityKey(route: RuntimeRouteRecord): string {
+  return `${route.method}\u0000` + runtimeRouteShape(route.path);
+}
+
+function runtimeRouteShape(path: string): string {
+  if (!path.includes(":")) {
+    return path;
+  }
+
+  const segments = path.split("/");
+
+  for (let index = 0; index < segments.length; index++) {
+    const segment = segments[index];
+
+    if (segment !== undefined && segment.startsWith(":")) {
+      segments[index] = ":";
+    }
+  }
+
+  return segments.join("/");
+}
+
 function registerAppRuntimeRoute(
   state: AppRuntimeState,
 
@@ -696,6 +829,12 @@ function registerAppRuntimeRoute(
    * unchanged.
    */
   state.router.register(route);
+
+  const routeIdentityKeys = state.routeIdentityKeys;
+
+  if (routeIdentityKeys !== undefined) {
+    routeIdentityKeys.add(runtimeRouteIdentityKey(route));
+  }
 
   const localBeforeHooks = state.localBeforeHooks;
 

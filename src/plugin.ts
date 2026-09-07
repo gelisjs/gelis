@@ -1,4 +1,50 @@
+import { createApplicationScopeBuilder } from "./application-scope";
+
+import type { ApplicationScopeBuilder } from "./application-scope";
+
+import { createRequestScopeBuilder } from "./request-scope";
+
+import type { RequestScopeBuilder, RequestScopeDerive } from "./request-scope";
+
+import { RouteBuilder } from "./route-builder";
+
+import type { GlobalAfterHandle, GlobalBeforeHandle } from "./route";
+
+import type { OnRequest } from "./request";
+
+import type { OnError } from "./error";
+
+import type { RuntimeRouteRecord } from "./runtime/types";
+
 const PLUGIN_SETUP_RUNTIME = Symbol("gelis.plugin.setup.runtime");
+
+type PluginRouteMethodName =
+  | "get"
+  | "post"
+  | "put"
+  | "patch"
+  | "delete"
+  | "options"
+  | "head"
+  | "route";
+
+export type PluginRouteBuilder = Pick<RouteBuilder<"">, PluginRouteMethodName>;
+
+export interface PluginCompositionDeclaration {
+  readonly routes: RuntimeRouteRecord[];
+
+  readonly onRequestHooks: OnRequest[];
+
+  readonly onErrorHooks: OnError[];
+
+  readonly beforeHandleHooks: GlobalBeforeHandle[];
+
+  readonly afterHandleHooks: GlobalAfterHandle[];
+}
+
+export type PluginCompositionCommit = (
+  composition: PluginCompositionDeclaration,
+) => void;
 
 export type PluginInstallErrorCode =
   | "PLUGIN_DEPENDENCY_MISSING"
@@ -44,11 +90,33 @@ interface PluginInstallFrame {
 
   readonly pendingCapabilities: Map<object, CapabilityEntry>;
 
+  readonly composition: PluginCompositionDeclaration;
+
+  readonly commitComposition: PluginCompositionCommit;
+
   active: boolean;
 }
 
 export interface PluginSetupContext {
   readonly [PLUGIN_SETUP_RUNTIME]: PluginInstallFrame;
+
+  readonly routes: PluginRouteBuilder;
+
+  onRequest(hook: OnRequest): void;
+
+  onError(hook: OnError): void;
+
+  onBeforeHandle(hook: GlobalBeforeHandle): void;
+
+  onAfterHandle(hook: GlobalAfterHandle): void;
+
+  scope<const Scope extends object>(
+    scope: Scope,
+  ): ApplicationScopeBuilder<Scope>;
+
+  requestScope<const Scope extends object>(
+    derive: RequestScopeDerive<Scope>,
+  ): RequestScopeBuilder<Scope>;
 }
 
 export interface Capability<Value> {
@@ -72,6 +140,90 @@ export interface Plugin {
 }
 
 const applicationPluginStates = new WeakMap<object, PluginRuntimeState>();
+
+class PluginSetupContextRuntime implements PluginSetupContext {
+  readonly [PLUGIN_SETUP_RUNTIME]: PluginInstallFrame;
+
+  #routes: PluginRouteBuilder | undefined;
+
+  constructor(frame: PluginInstallFrame) {
+    this[PLUGIN_SETUP_RUNTIME] = frame;
+
+    this.#routes = undefined;
+  }
+
+  get routes(): PluginRouteBuilder {
+    const frame = getActivePluginInstallFrame(this);
+
+    let routes = this.#routes;
+
+    if (routes === undefined) {
+      routes = new RouteBuilder(
+        "",
+
+        (route) => {
+          declarePluginRoute(frame, route);
+        },
+      );
+
+      this.#routes = routes;
+    }
+
+    return routes;
+  }
+
+  onRequest(hook: OnRequest): void {
+    const frame = getActivePluginInstallFrame(this);
+
+    frame.composition.onRequestHooks.push(hook);
+  }
+
+  onError(hook: OnError): void {
+    const frame = getActivePluginInstallFrame(this);
+
+    frame.composition.onErrorHooks.push(hook);
+  }
+
+  onBeforeHandle(hook: GlobalBeforeHandle): void {
+    const frame = getActivePluginInstallFrame(this);
+
+    frame.composition.beforeHandleHooks.push(hook);
+  }
+
+  onAfterHandle(hook: GlobalAfterHandle): void {
+    const frame = getActivePluginInstallFrame(this);
+
+    frame.composition.afterHandleHooks.push(hook);
+  }
+
+  scope<const Scope extends object>(
+    scope: Scope,
+  ): ApplicationScopeBuilder<Scope> {
+    const frame = getActivePluginInstallFrame(this);
+
+    return createApplicationScopeBuilder(
+      scope,
+
+      (route) => {
+        declarePluginRoute(frame, route);
+      },
+    );
+  }
+
+  requestScope<const Scope extends object>(
+    derive: RequestScopeDerive<Scope>,
+  ): RequestScopeBuilder<Scope> {
+    const frame = getActivePluginInstallFrame(this);
+
+    return createRequestScopeBuilder(
+      derive,
+
+      (route) => {
+        declarePluginRoute(frame, route);
+      },
+    );
+  }
+}
 
 export function defineCapability(name: string): Capability<never> {
   const capability: Capability<never> = {
@@ -131,7 +283,11 @@ export function definePlugin(name: string, setup: PluginSetup): Plugin {
   };
 }
 
-export function installPlugin(application: object, plugin: Plugin): void {
+export function installPlugin(
+  application: object,
+  plugin: Plugin,
+  commitComposition: PluginCompositionCommit,
+): void {
   let state = applicationPluginStates.get(application);
 
   if (state === undefined) {
@@ -159,12 +315,24 @@ export function installPlugin(application: object, plugin: Plugin): void {
 
     pendingCapabilities: new Map(),
 
+    composition: {
+      routes: [],
+
+      onRequestHooks: [],
+
+      onErrorHooks: [],
+
+      beforeHandleHooks: [],
+
+      afterHandleHooks: [],
+    },
+
+    commitComposition,
+
     active: true,
   };
 
-  const context: PluginSetupContext = {
-    [PLUGIN_SETUP_RUNTIME]: frame,
-  };
+  const context = new PluginSetupContextRuntime(frame);
 
   try {
     const result = plugin.setup(context);
@@ -174,6 +342,8 @@ export function installPlugin(application: object, plugin: Plugin): void {
 
       throw asyncSetupUnsupportedError(plugin.name);
     }
+
+    frame.commitComposition(frame.composition);
 
     for (const [capability, entry] of frame.pendingCapabilities) {
       state.capabilities.set(capability, entry);
@@ -189,14 +359,27 @@ export function installPlugin(application: object, plugin: Plugin): void {
   }
 }
 
+function declarePluginRoute(
+  frame: PluginInstallFrame,
+  route: RuntimeRouteRecord,
+): void {
+  assertPluginInstallFrameActive(frame);
+
+  frame.composition.routes.push(route);
+}
+
+function assertPluginInstallFrameActive(frame: PluginInstallFrame): void {
+  if (!frame.active) {
+    throw setupContextInactiveError(frame.plugin.name);
+  }
+}
+
 function getActivePluginInstallFrame(
   context: PluginSetupContext,
 ): PluginInstallFrame {
   const frame = getPluginInstallFrame(context);
 
-  if (!frame.active) {
-    throw setupContextInactiveError(frame.plugin.name);
-  }
+  assertPluginInstallFrameActive(frame);
 
   return frame;
 }
