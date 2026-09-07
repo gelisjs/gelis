@@ -69,6 +69,7 @@ import {
   RUNTIME_ROUTE_INPUT_BEFORE_HANDLE,
   RUNTIME_ROUTE_INPUT_BEFORE_HANDLE_RESPONSE,
   RUNTIME_ROUTE_INPUT_RESPONSE,
+  RUNTIME_ROUTE_MODULE_REQUEST_SCOPE,
   RUNTIME_ROUTE_PLAIN,
   RUNTIME_ROUTE_REQUEST_SCOPE,
   RUNTIME_ROUTE_RESPONSE,
@@ -87,6 +88,10 @@ import type {
   RuntimeRouteContext,
   RuntimeRouteHandler,
   RuntimeRouteRecord,
+  RuntimeScopedModuleRequestScopeHandler,
+  RuntimeScopedModuleRequestScopePlan,
+  RuntimeStaticModuleRequestScopeHandler,
+  RuntimeStaticModuleRequestScopePlan,
 } from "./runtime/types";
 
 type RuntimeRouteInvoker = (
@@ -683,6 +688,58 @@ export class Gelis extends RouteBuilder<""> {
 
       default: {
         /*
+         * Module request scope gets a dedicated compiled execution path.
+         *
+         * Ordinary app.requestScope() keeps its existing runtime path
+         * completely unchanged.
+         */
+        if (route.flags === RUNTIME_ROUTE_MODULE_REQUEST_SCOPE) {
+          return invokePlainModuleRequestScopeRoute(route, request, params);
+        }
+
+        /*
+         * Fully local module request-scope lifecycle.
+         *
+         * No application-global lifecycle is present when both ordinary
+         * route lifecycle fields remain undefined, so this path stays
+         * linear just like the existing request-scope specialization.
+         */
+        if (
+          route.flags ===
+            (RUNTIME_ROUTE_MODULE_REQUEST_SCOPE |
+              RUNTIME_ROUTE_BEFORE_HANDLE |
+              RUNTIME_ROUTE_AFTER_HANDLE) &&
+          route.beforeHandle === undefined &&
+          route.afterHandle === undefined
+        ) {
+          return invokeLocalModuleRequestScopeBeforeAfterRoute(
+            route,
+            request,
+            params,
+          );
+        }
+
+        if ((route.flags & RUNTIME_ROUTE_MODULE_REQUEST_SCOPE) !== 0) {
+          if ((route.flags & RUNTIME_ROUTE_INPUT) !== 0) {
+            return runInputPlan(
+              route,
+              request,
+              params,
+
+              invokeModuleRequestScopeValidatedRoute,
+            );
+          }
+
+          return invokeModuleRequestScopeValidatedRoute(
+            route,
+            request,
+            params,
+            undefined,
+            undefined,
+          );
+        }
+
+        /*
          * Request-scoped route without input, lifecycle,
          * or response contract.
          *
@@ -1085,6 +1142,26 @@ function applyLifecyclePlan(
     }
   }
 
+  const moduleRequestScope = route.moduleRequestScope;
+
+  if (moduleRequestScope !== undefined) {
+    flags |= RUNTIME_ROUTE_MODULE_REQUEST_SCOPE;
+
+    if (
+      moduleRequestScope.moduleBeforeHandle !== undefined ||
+      moduleRequestScope.beforeHandle !== undefined
+    ) {
+      flags |= RUNTIME_ROUTE_BEFORE_HANDLE;
+    }
+
+    if (
+      moduleRequestScope.moduleAfterHandle !== undefined ||
+      moduleRequestScope.afterHandle !== undefined
+    ) {
+      flags |= RUNTIME_ROUTE_AFTER_HANDLE;
+    }
+  }
+
   /*
    * Global lifecycle recompilation must never erase
    * executable response behavior compiled at route
@@ -1095,6 +1172,806 @@ function applyLifecyclePlan(
   }
 
   route.flags = flags;
+}
+
+function invokePlainModuleRequestScopeRoute(
+  route: RuntimeRouteRecord,
+
+  request: Request,
+
+  params: Record<string, string>,
+): Response | Promise<Response> {
+  const plan = route.moduleRequestScope;
+
+  if (plan === undefined) {
+    throw new Error("Missing Gelis module request scope plan");
+  }
+
+  const context: RuntimeRouteContext = {
+    request,
+    params,
+
+    query: undefined,
+
+    body: undefined,
+
+    reply: runtimeReply,
+  };
+
+  if (plan.kind === "static") {
+    const requestScope = plan.derive(context);
+
+    const handler =
+      route.handler as unknown as RuntimeStaticModuleRequestScopeHandler;
+
+    if (isPromiseLike(requestScope)) {
+      return Promise.resolve(requestScope).then((resolvedRequestScope) => {
+        const result = handler(context, resolvedRequestScope);
+
+        if (isPromiseLike(result)) {
+          return Promise.resolve(result).then(normalizeResponse);
+        }
+
+        return normalizeResponse(result);
+      });
+    }
+
+    const result = handler(context, requestScope);
+
+    if (isPromiseLike(result)) {
+      return Promise.resolve(result).then(normalizeResponse);
+    }
+
+    return normalizeResponse(result);
+  }
+
+  const moduleScope = route.moduleScope;
+
+  if (moduleScope === undefined) {
+    throw new Error("Missing Gelis module scope binding");
+  }
+
+  const requestScope = plan.derive(context, moduleScope);
+
+  const handler =
+    route.handler as unknown as RuntimeScopedModuleRequestScopeHandler;
+
+  if (isPromiseLike(requestScope)) {
+    return Promise.resolve(requestScope).then((resolvedRequestScope) => {
+      const result = handler(context, moduleScope, resolvedRequestScope);
+
+      if (isPromiseLike(result)) {
+        return Promise.resolve(result).then(normalizeResponse);
+      }
+
+      return normalizeResponse(result);
+    });
+  }
+
+  const result = handler(context, moduleScope, requestScope);
+
+  if (isPromiseLike(result)) {
+    return Promise.resolve(result).then(normalizeResponse);
+  }
+
+  return normalizeResponse(result);
+}
+
+function invokeLocalModuleRequestScopeBeforeAfterRoute(
+  route: RuntimeRouteRecord,
+
+  request: Request,
+
+  params: Record<string, string>,
+): Response | Promise<Response> {
+  const plan = route.moduleRequestScope;
+
+  if (plan === undefined) {
+    throw new Error("Missing Gelis module request scope plan");
+  }
+
+  const context: RuntimeRouteContext = {
+    request,
+    params,
+
+    query: undefined,
+
+    body: undefined,
+
+    reply: runtimeReply,
+  };
+
+  if (plan.kind === "static") {
+    const requestScope = plan.derive(context);
+
+    if (isPromiseLike(requestScope)) {
+      return Promise.resolve(requestScope).then((resolvedRequestScope) =>
+        invokeResolvedStaticModuleRequestScope(
+          route,
+          plan,
+          context,
+          resolvedRequestScope,
+        ),
+      );
+    }
+
+    const moduleBeforeHandle = plan.moduleBeforeHandle;
+
+    if (moduleBeforeHandle !== undefined) {
+      const early = moduleBeforeHandle(context);
+
+      if (isPromiseLike(early)) {
+        return Promise.resolve(early).then((resolvedEarly) => {
+          if (resolvedEarly !== undefined) {
+            return normalizeResponse(resolvedEarly);
+          }
+
+          return invokeStaticModuleRequestScopeAfterModuleBefore(
+            route,
+            plan,
+            context,
+            requestScope,
+          );
+        });
+      }
+
+      if (early !== undefined) {
+        return normalizeResponse(early);
+      }
+    }
+
+    const beforeHandle = plan.beforeHandle;
+
+    if (beforeHandle !== undefined) {
+      const early = beforeHandle(context, requestScope);
+
+      if (isPromiseLike(early)) {
+        return Promise.resolve(early).then((resolvedEarly) => {
+          if (resolvedEarly !== undefined) {
+            return normalizeResponse(resolvedEarly);
+          }
+
+          return invokeStaticModuleRequestScopeHandler(
+            route,
+            plan,
+            context,
+            requestScope,
+          );
+        });
+      }
+
+      if (early !== undefined) {
+        return normalizeResponse(early);
+      }
+    }
+
+    const handler =
+      route.handler as unknown as RuntimeStaticModuleRequestScopeHandler;
+
+    const result = handler(context, requestScope);
+
+    if (isPromiseLike(result)) {
+      return Promise.resolve(result).then((resolvedResult) =>
+        invokeStaticModuleRequestScopeAfter(
+          route,
+          plan,
+          context,
+          resolvedResult,
+          requestScope,
+        ),
+      );
+    }
+
+    const afterHandle = plan.afterHandle;
+
+    if (afterHandle !== undefined) {
+      const after = afterHandle(context, result, requestScope);
+
+      if (isPromiseLike(after)) {
+        return Promise.resolve(after).then(() =>
+          invokeStaticModuleAfterAndGlobal(route, plan, context, result),
+        );
+      }
+    }
+
+    const moduleAfterHandle = plan.moduleAfterHandle;
+
+    if (moduleAfterHandle !== undefined) {
+      const after = moduleAfterHandle(context, result);
+
+      if (isPromiseLike(after)) {
+        return Promise.resolve(after).then(() => normalizeResponse(result));
+      }
+    }
+
+    return normalizeResponse(result);
+  }
+
+  const moduleScope = route.moduleScope;
+
+  if (moduleScope === undefined) {
+    throw new Error("Missing Gelis module scope binding");
+  }
+
+  const requestScope = plan.derive(context, moduleScope);
+
+  if (isPromiseLike(requestScope)) {
+    return Promise.resolve(requestScope).then((resolvedRequestScope) =>
+      invokeResolvedScopedModuleRequestScope(
+        route,
+        plan,
+        context,
+        moduleScope,
+        resolvedRequestScope,
+      ),
+    );
+  }
+
+  const moduleBeforeHandle = plan.moduleBeforeHandle;
+
+  if (moduleBeforeHandle !== undefined) {
+    const early = moduleBeforeHandle(context, moduleScope);
+
+    if (isPromiseLike(early)) {
+      return Promise.resolve(early).then((resolvedEarly) => {
+        if (resolvedEarly !== undefined) {
+          return normalizeResponse(resolvedEarly);
+        }
+
+        return invokeScopedModuleRequestScopeAfterModuleBefore(
+          route,
+          plan,
+          context,
+          moduleScope,
+          requestScope,
+        );
+      });
+    }
+
+    if (early !== undefined) {
+      return normalizeResponse(early);
+    }
+  }
+
+  const beforeHandle = plan.beforeHandle;
+
+  if (beforeHandle !== undefined) {
+    const early = beforeHandle(context, moduleScope, requestScope);
+
+    if (isPromiseLike(early)) {
+      return Promise.resolve(early).then((resolvedEarly) => {
+        if (resolvedEarly !== undefined) {
+          return normalizeResponse(resolvedEarly);
+        }
+
+        return invokeScopedModuleRequestScopeHandler(
+          route,
+          plan,
+          context,
+          moduleScope,
+          requestScope,
+        );
+      });
+    }
+
+    if (early !== undefined) {
+      return normalizeResponse(early);
+    }
+  }
+
+  const handler =
+    route.handler as unknown as RuntimeScopedModuleRequestScopeHandler;
+
+  const result = handler(context, moduleScope, requestScope);
+
+  if (isPromiseLike(result)) {
+    return Promise.resolve(result).then((resolvedResult) =>
+      invokeScopedModuleRequestScopeAfter(
+        route,
+        plan,
+        context,
+        moduleScope,
+        resolvedResult,
+        requestScope,
+      ),
+    );
+  }
+
+  const afterHandle = plan.afterHandle;
+
+  if (afterHandle !== undefined) {
+    const after = afterHandle(context, result, moduleScope, requestScope);
+
+    if (isPromiseLike(after)) {
+      return Promise.resolve(after).then(() =>
+        invokeScopedModuleAfterAndGlobal(
+          route,
+          plan,
+          context,
+          moduleScope,
+          result,
+        ),
+      );
+    }
+  }
+
+  const moduleAfterHandle = plan.moduleAfterHandle;
+
+  if (moduleAfterHandle !== undefined) {
+    const after = moduleAfterHandle(context, result, moduleScope);
+
+    if (isPromiseLike(after)) {
+      return Promise.resolve(after).then(() => normalizeResponse(result));
+    }
+  }
+
+  return normalizeResponse(result);
+}
+
+function invokeModuleRequestScopeValidatedRoute(
+  route: RuntimeRouteRecord,
+
+  request: Request,
+
+  params: Record<string, string>,
+
+  query: unknown,
+
+  body: unknown,
+): Response | Promise<Response> {
+  const context = createRuntimeContext(request, params, query, body);
+
+  const globalBeforeHandle = route.beforeHandle;
+
+  if (globalBeforeHandle === undefined) {
+    return deriveModuleRequestScopeAfterGlobalBefore(route, context);
+  }
+
+  const early = globalBeforeHandle(context);
+
+  if (isPromiseLike(early)) {
+    return Promise.resolve(early).then((resolvedEarly) => {
+      if (resolvedEarly !== undefined) {
+        return normalizeResponse(resolvedEarly);
+      }
+
+      return deriveModuleRequestScopeAfterGlobalBefore(route, context);
+    });
+  }
+
+  if (early !== undefined) {
+    return normalizeResponse(early);
+  }
+
+  return deriveModuleRequestScopeAfterGlobalBefore(route, context);
+}
+
+function deriveModuleRequestScopeAfterGlobalBefore(
+  route: RuntimeRouteRecord,
+
+  context: RuntimeRouteContext,
+): Response | Promise<Response> {
+  const plan = route.moduleRequestScope;
+
+  if (plan === undefined) {
+    throw new Error("Missing Gelis module request scope plan");
+  }
+
+  if (plan.kind === "static") {
+    const requestScope = plan.derive(context);
+
+    if (isPromiseLike(requestScope)) {
+      return Promise.resolve(requestScope).then((resolvedRequestScope) =>
+        invokeResolvedStaticModuleRequestScope(
+          route,
+          plan,
+          context,
+          resolvedRequestScope,
+        ),
+      );
+    }
+
+    return invokeResolvedStaticModuleRequestScope(
+      route,
+      plan,
+      context,
+      requestScope,
+    );
+  }
+
+  const moduleScope = route.moduleScope;
+
+  if (moduleScope === undefined) {
+    throw new Error("Missing Gelis module scope binding");
+  }
+
+  const requestScope = plan.derive(context, moduleScope);
+
+  if (isPromiseLike(requestScope)) {
+    return Promise.resolve(requestScope).then((resolvedRequestScope) =>
+      invokeResolvedScopedModuleRequestScope(
+        route,
+        plan,
+        context,
+        moduleScope,
+        resolvedRequestScope,
+      ),
+    );
+  }
+
+  return invokeResolvedScopedModuleRequestScope(
+    route,
+    plan,
+    context,
+    moduleScope,
+    requestScope,
+  );
+}
+
+function invokeResolvedStaticModuleRequestScope(
+  route: RuntimeRouteRecord,
+
+  plan: RuntimeStaticModuleRequestScopePlan,
+
+  context: RuntimeRouteContext,
+
+  requestScope: unknown,
+): Response | Promise<Response> {
+  const moduleBeforeHandle = plan.moduleBeforeHandle;
+
+  if (moduleBeforeHandle !== undefined) {
+    const early = moduleBeforeHandle(context);
+
+    if (isPromiseLike(early)) {
+      return Promise.resolve(early).then((resolvedEarly) => {
+        if (resolvedEarly !== undefined) {
+          return normalizeResponse(resolvedEarly);
+        }
+
+        return invokeStaticModuleRequestScopeAfterModuleBefore(
+          route,
+          plan,
+          context,
+          requestScope,
+        );
+      });
+    }
+
+    if (early !== undefined) {
+      return normalizeResponse(early);
+    }
+  }
+
+  return invokeStaticModuleRequestScopeAfterModuleBefore(
+    route,
+    plan,
+    context,
+    requestScope,
+  );
+}
+
+function invokeStaticModuleRequestScopeAfterModuleBefore(
+  route: RuntimeRouteRecord,
+
+  plan: RuntimeStaticModuleRequestScopePlan,
+
+  context: RuntimeRouteContext,
+
+  requestScope: unknown,
+): Response | Promise<Response> {
+  const beforeHandle = plan.beforeHandle;
+
+  if (beforeHandle !== undefined) {
+    const early = beforeHandle(context, requestScope);
+
+    if (isPromiseLike(early)) {
+      return Promise.resolve(early).then((resolvedEarly) => {
+        if (resolvedEarly !== undefined) {
+          return normalizeResponse(resolvedEarly);
+        }
+
+        return invokeStaticModuleRequestScopeHandler(
+          route,
+          plan,
+          context,
+          requestScope,
+        );
+      });
+    }
+
+    if (early !== undefined) {
+      return normalizeResponse(early);
+    }
+  }
+
+  return invokeStaticModuleRequestScopeHandler(
+    route,
+    plan,
+    context,
+    requestScope,
+  );
+}
+
+function invokeStaticModuleRequestScopeHandler(
+  route: RuntimeRouteRecord,
+
+  plan: RuntimeStaticModuleRequestScopePlan,
+
+  context: RuntimeRouteContext,
+
+  requestScope: unknown,
+): Response | Promise<Response> {
+  const handler =
+    route.handler as unknown as RuntimeStaticModuleRequestScopeHandler;
+
+  const result = handler(context, requestScope);
+
+  if (isPromiseLike(result)) {
+    return Promise.resolve(result).then((resolvedResult) =>
+      invokeStaticModuleRequestScopeAfter(
+        route,
+        plan,
+        context,
+        resolvedResult,
+        requestScope,
+      ),
+    );
+  }
+
+  return invokeStaticModuleRequestScopeAfter(
+    route,
+    plan,
+    context,
+    result,
+    requestScope,
+  );
+}
+
+function invokeStaticModuleRequestScopeAfter(
+  route: RuntimeRouteRecord,
+
+  plan: RuntimeStaticModuleRequestScopePlan,
+
+  context: RuntimeRouteContext,
+
+  result: unknown,
+
+  requestScope: unknown,
+): Response | Promise<Response> {
+  const afterHandle = plan.afterHandle;
+
+  if (afterHandle !== undefined) {
+    const after = afterHandle(context, result, requestScope);
+
+    if (isPromiseLike(after)) {
+      return Promise.resolve(after).then(() =>
+        invokeStaticModuleAfterAndGlobal(route, plan, context, result),
+      );
+    }
+  }
+
+  return invokeStaticModuleAfterAndGlobal(route, plan, context, result);
+}
+
+function invokeStaticModuleAfterAndGlobal(
+  route: RuntimeRouteRecord,
+
+  plan: RuntimeStaticModuleRequestScopePlan,
+
+  context: RuntimeRouteContext,
+
+  result: unknown,
+): Response | Promise<Response> {
+  const moduleAfterHandle = plan.moduleAfterHandle;
+
+  if (moduleAfterHandle !== undefined) {
+    const after = moduleAfterHandle(context, result);
+
+    if (isPromiseLike(after)) {
+      return Promise.resolve(after).then(() =>
+        invokeGlobalRequestScopeAfter(route, context, result),
+      );
+    }
+  }
+
+  return invokeGlobalRequestScopeAfter(route, context, result);
+}
+
+function invokeResolvedScopedModuleRequestScope(
+  route: RuntimeRouteRecord,
+
+  plan: RuntimeScopedModuleRequestScopePlan,
+
+  context: RuntimeRouteContext,
+
+  moduleScope: object,
+
+  requestScope: unknown,
+): Response | Promise<Response> {
+  const moduleBeforeHandle = plan.moduleBeforeHandle;
+
+  if (moduleBeforeHandle !== undefined) {
+    const early = moduleBeforeHandle(context, moduleScope);
+
+    if (isPromiseLike(early)) {
+      return Promise.resolve(early).then((resolvedEarly) => {
+        if (resolvedEarly !== undefined) {
+          return normalizeResponse(resolvedEarly);
+        }
+
+        return invokeScopedModuleRequestScopeAfterModuleBefore(
+          route,
+          plan,
+          context,
+          moduleScope,
+          requestScope,
+        );
+      });
+    }
+
+    if (early !== undefined) {
+      return normalizeResponse(early);
+    }
+  }
+
+  return invokeScopedModuleRequestScopeAfterModuleBefore(
+    route,
+    plan,
+    context,
+    moduleScope,
+    requestScope,
+  );
+}
+
+function invokeScopedModuleRequestScopeAfterModuleBefore(
+  route: RuntimeRouteRecord,
+
+  plan: RuntimeScopedModuleRequestScopePlan,
+
+  context: RuntimeRouteContext,
+
+  moduleScope: object,
+
+  requestScope: unknown,
+): Response | Promise<Response> {
+  const beforeHandle = plan.beforeHandle;
+
+  if (beforeHandle !== undefined) {
+    const early = beforeHandle(context, moduleScope, requestScope);
+
+    if (isPromiseLike(early)) {
+      return Promise.resolve(early).then((resolvedEarly) => {
+        if (resolvedEarly !== undefined) {
+          return normalizeResponse(resolvedEarly);
+        }
+
+        return invokeScopedModuleRequestScopeHandler(
+          route,
+          plan,
+          context,
+          moduleScope,
+          requestScope,
+        );
+      });
+    }
+
+    if (early !== undefined) {
+      return normalizeResponse(early);
+    }
+  }
+
+  return invokeScopedModuleRequestScopeHandler(
+    route,
+    plan,
+    context,
+    moduleScope,
+    requestScope,
+  );
+}
+
+function invokeScopedModuleRequestScopeHandler(
+  route: RuntimeRouteRecord,
+
+  plan: RuntimeScopedModuleRequestScopePlan,
+
+  context: RuntimeRouteContext,
+
+  moduleScope: object,
+
+  requestScope: unknown,
+): Response | Promise<Response> {
+  const handler =
+    route.handler as unknown as RuntimeScopedModuleRequestScopeHandler;
+
+  const result = handler(context, moduleScope, requestScope);
+
+  if (isPromiseLike(result)) {
+    return Promise.resolve(result).then((resolvedResult) =>
+      invokeScopedModuleRequestScopeAfter(
+        route,
+        plan,
+        context,
+        moduleScope,
+        resolvedResult,
+        requestScope,
+      ),
+    );
+  }
+
+  return invokeScopedModuleRequestScopeAfter(
+    route,
+    plan,
+    context,
+    moduleScope,
+    result,
+    requestScope,
+  );
+}
+
+function invokeScopedModuleRequestScopeAfter(
+  route: RuntimeRouteRecord,
+
+  plan: RuntimeScopedModuleRequestScopePlan,
+
+  context: RuntimeRouteContext,
+
+  moduleScope: object,
+
+  result: unknown,
+
+  requestScope: unknown,
+): Response | Promise<Response> {
+  const afterHandle = plan.afterHandle;
+
+  if (afterHandle !== undefined) {
+    const after = afterHandle(context, result, moduleScope, requestScope);
+
+    if (isPromiseLike(after)) {
+      return Promise.resolve(after).then(() =>
+        invokeScopedModuleAfterAndGlobal(
+          route,
+          plan,
+          context,
+          moduleScope,
+          result,
+        ),
+      );
+    }
+  }
+
+  return invokeScopedModuleAfterAndGlobal(
+    route,
+    plan,
+    context,
+    moduleScope,
+    result,
+  );
+}
+
+function invokeScopedModuleAfterAndGlobal(
+  route: RuntimeRouteRecord,
+
+  plan: RuntimeScopedModuleRequestScopePlan,
+
+  context: RuntimeRouteContext,
+
+  moduleScope: object,
+
+  result: unknown,
+): Response | Promise<Response> {
+  const moduleAfterHandle = plan.moduleAfterHandle;
+
+  if (moduleAfterHandle !== undefined) {
+    const after = moduleAfterHandle(context, result, moduleScope);
+
+    if (isPromiseLike(after)) {
+      return Promise.resolve(after).then(() =>
+        invokeGlobalRequestScopeAfter(route, context, result),
+      );
+    }
+  }
+
+  return invokeGlobalRequestScopeAfter(route, context, result);
 }
 
 function invokePlainRequestScopeRoute(

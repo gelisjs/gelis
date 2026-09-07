@@ -25,6 +25,13 @@ export type {
   RequestScopeLifecycleFor,
 } from "./request-scope";
 
+export type {
+  ModuleRequestScopeBuilder,
+  ModuleRequestScopeDerive,
+  ModuleRequestScopeHandler,
+  ModuleRequestScopeLifecycleFor,
+} from "./module-request-scope";
+
 export { inspectContract } from "./contract-source";
 
 export type {
@@ -78,6 +85,8 @@ export type {
   ModuleLifecycle,
   ModuleMountErrorCode,
   ModuleRef,
+  ModuleRouteBuilder,
+  ModuleScopeBuilder,
   ModuleScopeLifecycle,
   ModuleScopeResolver,
   ModuleSetupContext,

@@ -1,6 +1,14 @@
-import { bindApplicationScopeRoute } from "./application-scope";
-
 import type { ApplicationScopeBuilder } from "./application-scope";
+
+import {
+  bindModuleApplicationScopeRoute,
+  createModuleRequestScopeBuilder,
+} from "./module-request-scope";
+
+import type {
+  ModuleRequestScopeBuilder,
+  ModuleRequestScopeDerive,
+} from "./module-request-scope";
 
 import {
   GELIS_CAPABILITY_REQUIRE_RUNTIME,
@@ -56,6 +64,30 @@ export interface ModuleSetupContext extends CapabilitySetupContext {}
 export type ModuleScopeResolver<Scope extends object> = (
   setup: ModuleSetupContext,
 ) => Scope;
+
+type StaticModuleRequestScopeFactory<Prefix extends string> = <
+  const RequestScope extends object,
+>(
+  derive: ModuleRequestScopeDerive<never, RequestScope>,
+) => ModuleRequestScopeBuilder<never, RequestScope, Prefix>;
+
+type ScopedModuleRequestScopeFactory<
+  ModuleScope extends object,
+  Prefix extends string,
+> = <const RequestScope extends object>(
+  derive: ModuleRequestScopeDerive<ModuleScope, RequestScope>,
+) => ModuleRequestScopeBuilder<ModuleScope, RequestScope, Prefix>;
+
+export type ModuleRouteBuilder<Prefix extends string> = RouteBuilder<Prefix> & {
+  readonly requestScope: StaticModuleRequestScopeFactory<Prefix>;
+};
+
+export type ModuleScopeBuilder<
+  Scope extends object,
+  Prefix extends string,
+> = ApplicationScopeBuilder<Scope, Prefix> & {
+  readonly requestScope: ScopedModuleRequestScopeFactory<Scope, Prefix>;
+};
 
 export interface ModuleLifecycle {
   readonly beforeHandle?: GlobalBeforeHandle;
@@ -236,7 +268,7 @@ export function defineModule<
 >(
   prefix: Prefix & ValidRoutePath<Prefix>,
 
-  define: (route: RouteBuilder<Prefix>) => Routes,
+  define: (route: ModuleRouteBuilder<Prefix>) => Routes,
 ): ModuleRef<Prefix, Routes>;
 
 export function defineModule<
@@ -247,7 +279,7 @@ export function defineModule<
 
   lifecycle: ModuleLifecycle,
 
-  define: (route: RouteBuilder<Prefix>) => Routes,
+  define: (route: ModuleRouteBuilder<Prefix>) => Routes,
 ): ModuleRef<Prefix, Routes>;
 
 export function defineModule<
@@ -259,7 +291,7 @@ export function defineModule<
 
   resolveScope: ModuleScopeResolver<Scope>,
 
-  define: (route: ApplicationScopeBuilder<Scope, Prefix>) => Routes,
+  define: (route: ModuleScopeBuilder<Scope, Prefix>) => Routes,
 ): ModuleRef<Prefix, Routes>;
 
 export function defineModule<
@@ -273,7 +305,7 @@ export function defineModule<
 
   lifecycle: ModuleScopeLifecycle<Scope>,
 
-  define: (route: ApplicationScopeBuilder<Scope, Prefix>) => Routes,
+  define: (route: ModuleScopeBuilder<Scope, Prefix>) => Routes,
 ): ModuleRef<Prefix, Routes>;
 
 export function defineModule(
@@ -292,10 +324,14 @@ export function defineModule(
    */
   if (defineOrLifecycle === undefined) {
     const define = defineLifecycleOrResolve as (
-      route: RouteBuilder<string>,
+      route: ModuleRouteBuilder<string>,
     ) => ModuleRoutes;
 
-    const route = createStaticModuleRouteBuilder(prefix, runtimeRoutes);
+    const route = createStaticModuleRouteBuilder(
+      prefix,
+      runtimeRoutes,
+      undefined,
+    );
 
     const routes = define(route);
 
@@ -313,7 +349,11 @@ export function defineModule(
       defineOrLifecycle as ModuleScopeLifecycle<object>,
     );
 
-    const route = createScopedModuleRouteBuilder(prefix, runtimeRoutes);
+    const route = createScopedModuleRouteBuilder(
+      prefix,
+      runtimeRoutes,
+      lifecycle,
+    );
 
     const routes = defineScoped(route);
 
@@ -337,10 +377,14 @@ export function defineModule(
       defineLifecycleOrResolve as ModuleScopeResolver<object>;
 
     const define = defineOrLifecycle as (
-      route: ApplicationScopeBuilder<object, string>,
+      route: ModuleScopeBuilder<object, string>,
     ) => ModuleRoutes;
 
-    const route = createScopedModuleRouteBuilder(prefix, runtimeRoutes);
+    const route = createScopedModuleRouteBuilder(
+      prefix,
+      runtimeRoutes,
+      undefined,
+    );
 
     const routes = define(route);
 
@@ -359,10 +403,14 @@ export function defineModule(
   const lifecycle = normalizeStaticModuleLifecycle(defineLifecycleOrResolve);
 
   const define = defineOrLifecycle as (
-    route: RouteBuilder<string>,
+    route: ModuleRouteBuilder<string>,
   ) => ModuleRoutes;
 
-  const route = createStaticModuleRouteBuilder(prefix, runtimeRoutes);
+  const route = createStaticModuleRouteBuilder(
+    prefix,
+    runtimeRoutes,
+    lifecycle,
+  );
 
   const routes = define(route);
 
@@ -470,7 +518,7 @@ function instantiateModuleRuntimeRoutes(
   }
 
   const routes = definition.routes.map((route) =>
-    bindApplicationScopeRoute(route, scope),
+    bindModuleApplicationScopeRoute(route, scope),
   );
 
   const lifecycle = definition.lifecycle;
@@ -506,28 +554,68 @@ function createStaticModuleRouteBuilder(
   prefix: string,
 
   runtimeRoutes: RuntimeRouteRecord[],
-): RouteBuilder<string> {
-  return new RouteBuilder(
-    prefix,
 
-    (runtimeRoute) => {
-      runtimeRoutes.push(runtimeRoute);
-    },
-  );
+  lifecycle: RuntimeModuleLifecycle | undefined,
+): ModuleRouteBuilder<string> {
+  const register = (runtimeRoute: RuntimeRouteRecord) => {
+    runtimeRoutes.push(runtimeRoute);
+  };
+
+  const builder = new RouteBuilder(prefix, register);
+
+  const beforeHandle =
+    lifecycle?.kind === "static" ? lifecycle.beforeHandle : undefined;
+
+  const afterHandle =
+    lifecycle?.kind === "static" ? lifecycle.afterHandle : undefined;
+
+  Object.defineProperty(builder, "requestScope", {
+    value: (derive: ModuleRequestScopeDerive<never, object>) =>
+      createModuleRequestScopeBuilder(
+        prefix,
+        derive,
+        register,
+        false,
+        beforeHandle,
+        afterHandle,
+      ),
+  });
+
+  return builder as ModuleRouteBuilder<string>;
 }
 
 function createScopedModuleRouteBuilder(
   prefix: string,
 
   runtimeRoutes: RuntimeRouteRecord[],
-): ApplicationScopeBuilder<object, string> {
-  return new RouteBuilder(
-    prefix,
 
-    (runtimeRoute) => {
-      runtimeRoutes.push(runtimeRoute);
-    },
-  ) as unknown as ApplicationScopeBuilder<object, string>;
+  lifecycle: RuntimeModuleLifecycle | undefined,
+): ModuleScopeBuilder<object, string> {
+  const register = (runtimeRoute: RuntimeRouteRecord) => {
+    runtimeRoutes.push(runtimeRoute);
+  };
+
+  const builder = new RouteBuilder(prefix, register);
+
+  const beforeHandle =
+    lifecycle?.kind === "scoped" ? lifecycle.beforeHandle : undefined;
+
+  const afterHandle =
+    lifecycle?.kind === "scoped" ? lifecycle.afterHandle : undefined;
+
+  Object.defineProperty(builder, "requestScope", {
+    value: (derive: ModuleRequestScopeDerive<object, object>) =>
+      createModuleRequestScopeBuilder(
+        prefix,
+        derive,
+        register,
+        true,
+        beforeHandle,
+        afterHandle,
+      ),
+  });
+
+  return builder as unknown as ModuleScopeBuilder<object, string>;
 }
 
 function normalizeStaticModuleLifecycle(
@@ -588,6 +676,17 @@ function bindModuleLifecycleRoutes(
     afterHandle === undefined ? undefined : ([afterHandle] as const);
 
   for (const route of routes) {
+    /*
+     * Module request-scope routes captured their module lifecycle
+     * callbacks in their immutable definition-time plan.
+     *
+     * Scoped plans receive the concrete module scope separately at
+     * mount time, so no lifecycle wrapper is needed here.
+     */
+    if (route.moduleRequestScope !== undefined) {
+      continue;
+    }
+
     if (beforeHooks !== undefined) {
       route.beforeHandle = compileBeforeHandle(beforeHooks, route.beforeHandle);
 
