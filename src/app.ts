@@ -12,7 +12,11 @@ import type { Plugin, PluginCompositionDeclaration } from "./plugin";
 
 import { mountModuleRuntimeRoutes } from "./module";
 
-import { enqueueApplicationStartup, readyApplication } from "./startup";
+import {
+  closeApplication,
+  enqueueApplicationStartup,
+  readyApplication,
+} from "./startup";
 
 import type { ApplicationStartupTask } from "./startup";
 
@@ -311,6 +315,10 @@ export class Gelis extends RouteBuilder<""> {
 
   ready(): Promise<void> {
     return readyApplication(this);
+  }
+
+  close(): Promise<void> {
+    return closeApplication(this);
   }
 
   scope<const Scope extends object>(

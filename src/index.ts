@@ -5,6 +5,7 @@ export { defineCapability, definePlugin, PluginInstallError } from "./plugin";
 export type {
   Capability,
   Plugin,
+  PluginCleanup,
   PluginInstallErrorCode,
   PluginRouteBuilder,
   PluginSetup,

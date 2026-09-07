@@ -19,6 +19,7 @@ import type { RuntimeRouteRecord } from "./runtime/types";
 import {
   enqueueApplicationStartup,
   hasPendingApplicationStartup,
+  registerApplicationCleanup,
 } from "./startup";
 
 export const GELIS_CAPABILITY_REQUIRE_RUNTIME = Symbol(
@@ -109,6 +110,8 @@ interface PluginRuntimeState {
 interface PluginInstallFrame {
   readonly plugin: Plugin;
 
+  readonly application: object;
+
   readonly state: PluginRuntimeState;
 
   readonly pendingCapabilities: Map<object, CapabilityEntry>;
@@ -128,8 +131,12 @@ interface PluginStartupFrame {
   active: boolean;
 }
 
+export type PluginCleanup = () => void | PromiseLike<void>;
+
 export interface PluginStartupContext extends CapabilitySetupContext {
   readonly [PLUGIN_STARTUP_RUNTIME]: PluginStartupFrame;
+
+  cleanup(callback: PluginCleanup): void;
 }
 
 export type PluginStartup = (
@@ -326,6 +333,11 @@ class PluginStartupContextRuntime implements PluginStartupContext {
 
     return committed.value;
   };
+  cleanup(callback: PluginCleanup): void {
+    const startupFrame = getActivePluginStartupFrame(this);
+
+    registerApplicationCleanup(startupFrame.installFrame.application, callback);
+  }
 
   deactivate(): void {
     this[PLUGIN_STARTUP_RUNTIME].active = false;
@@ -415,6 +427,8 @@ export function installPlugin(
 
   const frame: PluginInstallFrame = {
     plugin,
+
+    application,
 
     state,
 
