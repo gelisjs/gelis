@@ -4,10 +4,11 @@ import type { ApplicationScopeBuilder } from "./application-scope";
 
 import { createRequestScopeBuilder } from "./request-scope";
 
-import type {
-  RequestScopeBuilder,
-  RequestScopeDerive,
-} from "./request-scope";
+import type { RequestScopeBuilder, RequestScopeDerive } from "./request-scope";
+
+import { installPlugin } from "./plugin";
+
+import type { Plugin } from "./plugin";
 
 import { getModuleRuntimeRoutes } from "./module";
 
@@ -214,6 +215,12 @@ export class Gelis extends RouteBuilder<""> {
     );
 
     this.#state = state;
+  }
+
+  use(plugin: Plugin): this {
+    installPlugin(this, plugin);
+
+    return this;
   }
 
   scope<const Scope extends object>(

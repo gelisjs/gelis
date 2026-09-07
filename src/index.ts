@@ -1,5 +1,14 @@
 export { Gelis } from "./app";
 
+export { defineCapability, definePlugin } from "./plugin";
+
+export type {
+  Capability,
+  Plugin,
+  PluginSetup,
+  PluginSetupContext,
+} from "./plugin";
+
 export type {
   ApplicationScopeBuilder,
   ApplicationScopeHandler,
