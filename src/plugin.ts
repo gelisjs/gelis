@@ -16,6 +16,20 @@ import type { OnError } from "./error";
 
 import type { RuntimeRouteRecord } from "./runtime/types";
 
+export const GELIS_CAPABILITY_REQUIRE_RUNTIME = Symbol(
+  "gelis.capability.require.runtime",
+);
+
+export type CapabilityRequireRuntime = (
+  capability: object,
+
+  capabilityName: string,
+) => unknown;
+
+export interface CapabilitySetupContext {
+  readonly [GELIS_CAPABILITY_REQUIRE_RUNTIME]: CapabilityRequireRuntime;
+}
+
 const PLUGIN_SETUP_RUNTIME = Symbol("gelis.plugin.setup.runtime");
 
 type PluginRouteMethodName =
@@ -97,7 +111,7 @@ interface PluginInstallFrame {
   active: boolean;
 }
 
-export interface PluginSetupContext {
+export interface PluginSetupContext extends CapabilitySetupContext {
   readonly [PLUGIN_SETUP_RUNTIME]: PluginInstallFrame;
 
   readonly routes: PluginRouteBuilder;
@@ -122,7 +136,7 @@ export interface PluginSetupContext {
 export interface Capability<Value> {
   readonly name: string;
 
-  require(context: PluginSetupContext): Value;
+  require(context: CapabilitySetupContext): Value;
 
   provide(
     context: PluginSetupContext,
@@ -151,6 +165,22 @@ class PluginSetupContextRuntime implements PluginSetupContext {
 
     this.#routes = undefined;
   }
+
+  readonly [GELIS_CAPABILITY_REQUIRE_RUNTIME]: CapabilityRequireRuntime = (
+    capability,
+
+    capabilityName,
+  ) => {
+    const frame = getActivePluginInstallFrame(this);
+
+    const entry = frame.state.capabilities.get(capability);
+
+    if (entry === undefined) {
+      throw missingDependencyError(frame.plugin.name, capabilityName);
+    }
+
+    return entry.value;
+  };
 
   get routes(): PluginRouteBuilder {
     const frame = getActivePluginInstallFrame(this);
@@ -230,15 +260,11 @@ export function defineCapability(name: string): Capability<never> {
     name,
 
     require(context) {
-      const frame = getActivePluginInstallFrame(context);
+      return context[GELIS_CAPABILITY_REQUIRE_RUNTIME](
+        capability,
 
-      const entry = frame.state.capabilities.get(capability);
-
-      if (entry === undefined) {
-        throw missingDependencyError(frame.plugin.name, name);
-      }
-
-      return entry.value as never;
+        name,
+      ) as never;
     },
 
     provide(context, value) {
@@ -358,6 +384,24 @@ export function installPlugin(
     }
   }
 }
+
+export function readInstalledCapability(
+  application: object,
+
+  capability: object,
+): unknown | typeof MISSING_CAPABILITY {
+  const state = applicationPluginStates.get(application);
+
+  if (state === undefined) {
+    return MISSING_CAPABILITY;
+  }
+
+  const entry = state.capabilities.get(capability);
+
+  return entry === undefined ? MISSING_CAPABILITY : entry.value;
+}
+
+export const MISSING_CAPABILITY = Symbol("gelis.capability.missing");
 
 function declarePluginRoute(
   frame: PluginInstallFrame,

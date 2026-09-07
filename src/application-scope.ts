@@ -1,5 +1,7 @@
 import { RouteBuilder } from "./route-builder";
 
+import type { JoinRoutePath } from "./route-builder";
+
 import type {
   HttpMethod,
   InferImplicitResponses,
@@ -47,6 +49,7 @@ type LifecycleAfter<
 
 export type ApplicationScopeHandler<Path extends string, Scope, Result> = (
   context: RouteContext<Path>,
+
   scope: Scope,
 ) => Result;
 
@@ -80,14 +83,19 @@ export type ApplicationScopeLifecycleFor<
 interface ApplicationScopeRouteMethod<
   Method extends HttpMethod,
   Scope extends object,
+  Prefix extends string,
 > {
   <const Path extends string, Result>(
     path: Path & ValidRoutePath<Path>,
 
-    handler: ApplicationScopeHandler<Path, Scope, Result>,
+    handler: ApplicationScopeHandler<
+      JoinRoutePath<Prefix, Path>,
+      Scope,
+      Result
+    >,
 
     lifecycle?: ApplicationScopeLifecycleFor<
-      Path,
+      JoinRoutePath<Prefix, Path>,
       Scope,
       undefined,
       undefined,
@@ -96,8 +104,8 @@ interface ApplicationScopeRouteMethod<
     >,
   ): RouteRef<
     Method,
-    Path,
-    RouteRequestContract<InferPathParams<Path>>,
+    JoinRoutePath<Prefix, Path>,
+    RouteRequestContract<InferPathParams<JoinRoutePath<Prefix, Path>>>,
     InferImplicitResponses<Result>
   >;
 
@@ -113,7 +121,7 @@ interface ApplicationScopeRouteMethod<
 
     handler: (
       context: RouteHandlerContextFor<
-        Path,
+        JoinRoutePath<Prefix, Path>,
         RouteOptionsFor<Query, Body, undefined>
       >,
 
@@ -121,7 +129,7 @@ interface ApplicationScopeRouteMethod<
     ) => Result,
 
     lifecycle?: ApplicationScopeLifecycleFor<
-      Path,
+      JoinRoutePath<Prefix, Path>,
       Scope,
       Query,
       Body,
@@ -130,8 +138,11 @@ interface ApplicationScopeRouteMethod<
     >,
   ): RouteRef<
     Method,
-    Path,
-    RouteRequestFor<Path, RouteOptionsFor<Query, Body, undefined>>,
+    JoinRoutePath<Prefix, Path>,
+    RouteRequestFor<
+      JoinRoutePath<Prefix, Path>,
+      RouteOptionsFor<Query, Body, undefined>
+    >,
     RouteResponsesFor<RouteOptionsFor<Query, Body, undefined>, Result>
   >;
 
@@ -149,7 +160,7 @@ interface ApplicationScopeRouteMethod<
 
     handler: (
       context: RouteHandlerContextFor<
-        Path,
+        JoinRoutePath<Prefix, Path>,
         RouteOptionsFor<Query, Body, Responses>
       >,
 
@@ -157,7 +168,7 @@ interface ApplicationScopeRouteMethod<
     ) => RouteHandlerResultFor<Responses>,
 
     lifecycle?: ApplicationScopeLifecycleFor<
-      Path,
+      JoinRoutePath<Prefix, Path>,
       Scope,
       Query,
       Body,
@@ -166,8 +177,11 @@ interface ApplicationScopeRouteMethod<
     >,
   ): RouteRef<
     Method,
-    Path,
-    RouteRequestFor<Path, RouteOptionsFor<Query, Body, Responses>>,
+    JoinRoutePath<Prefix, Path>,
+    RouteRequestFor<
+      JoinRoutePath<Prefix, Path>,
+      RouteOptionsFor<Query, Body, Responses>
+    >,
     RouteResponsesFor<
       RouteOptionsFor<Query, Body, Responses>,
       RouteHandlerResultFor<Responses>
@@ -175,16 +189,23 @@ interface ApplicationScopeRouteMethod<
   >;
 }
 
-interface ApplicationScopeGenericRouteMethod<Scope extends object> {
+interface ApplicationScopeGenericRouteMethod<
+  Scope extends object,
+  Prefix extends string,
+> {
   <const Method extends HttpMethod, const Path extends string, Result>(
     method: Method,
 
     path: Path & ValidRoutePath<Path>,
 
-    handler: ApplicationScopeHandler<Path, Scope, Result>,
+    handler: ApplicationScopeHandler<
+      JoinRoutePath<Prefix, Path>,
+      Scope,
+      Result
+    >,
 
     lifecycle?: ApplicationScopeLifecycleFor<
-      Path,
+      JoinRoutePath<Prefix, Path>,
       Scope,
       undefined,
       undefined,
@@ -193,8 +214,8 @@ interface ApplicationScopeGenericRouteMethod<Scope extends object> {
     >,
   ): RouteRef<
     Method,
-    Path,
-    RouteRequestContract<InferPathParams<Path>>,
+    JoinRoutePath<Prefix, Path>,
+    RouteRequestContract<InferPathParams<JoinRoutePath<Prefix, Path>>>,
     InferImplicitResponses<Result>
   >;
 
@@ -213,7 +234,7 @@ interface ApplicationScopeGenericRouteMethod<Scope extends object> {
 
     handler: (
       context: RouteHandlerContextFor<
-        Path,
+        JoinRoutePath<Prefix, Path>,
         RouteOptionsFor<Query, Body, undefined>
       >,
 
@@ -221,7 +242,7 @@ interface ApplicationScopeGenericRouteMethod<Scope extends object> {
     ) => Result,
 
     lifecycle?: ApplicationScopeLifecycleFor<
-      Path,
+      JoinRoutePath<Prefix, Path>,
       Scope,
       Query,
       Body,
@@ -230,8 +251,11 @@ interface ApplicationScopeGenericRouteMethod<Scope extends object> {
     >,
   ): RouteRef<
     Method,
-    Path,
-    RouteRequestFor<Path, RouteOptionsFor<Query, Body, undefined>>,
+    JoinRoutePath<Prefix, Path>,
+    RouteRequestFor<
+      JoinRoutePath<Prefix, Path>,
+      RouteOptionsFor<Query, Body, undefined>
+    >,
     RouteResponsesFor<RouteOptionsFor<Query, Body, undefined>, Result>
   >;
 
@@ -252,7 +276,7 @@ interface ApplicationScopeGenericRouteMethod<Scope extends object> {
 
     handler: (
       context: RouteHandlerContextFor<
-        Path,
+        JoinRoutePath<Prefix, Path>,
         RouteOptionsFor<Query, Body, Responses>
       >,
 
@@ -260,7 +284,7 @@ interface ApplicationScopeGenericRouteMethod<Scope extends object> {
     ) => RouteHandlerResultFor<Responses>,
 
     lifecycle?: ApplicationScopeLifecycleFor<
-      Path,
+      JoinRoutePath<Prefix, Path>,
       Scope,
       Query,
       Body,
@@ -269,8 +293,11 @@ interface ApplicationScopeGenericRouteMethod<Scope extends object> {
     >,
   ): RouteRef<
     Method,
-    Path,
-    RouteRequestFor<Path, RouteOptionsFor<Query, Body, Responses>>,
+    JoinRoutePath<Prefix, Path>,
+    RouteRequestFor<
+      JoinRoutePath<Prefix, Path>,
+      RouteOptionsFor<Query, Body, Responses>
+    >,
     RouteResponsesFor<
       RouteOptionsFor<Query, Body, Responses>,
       RouteHandlerResultFor<Responses>
@@ -278,37 +305,44 @@ interface ApplicationScopeGenericRouteMethod<Scope extends object> {
   >;
 }
 
-export interface ApplicationScopeBuilder<Scope extends object> {
-  readonly get: ApplicationScopeRouteMethod<"GET", Scope>;
+export interface ApplicationScopeBuilder<
+  Scope extends object,
+  Prefix extends string = "",
+> {
+  readonly get: ApplicationScopeRouteMethod<"GET", Scope, Prefix>;
 
-  readonly post: ApplicationScopeRouteMethod<"POST", Scope>;
+  readonly post: ApplicationScopeRouteMethod<"POST", Scope, Prefix>;
 
-  readonly put: ApplicationScopeRouteMethod<"PUT", Scope>;
+  readonly put: ApplicationScopeRouteMethod<"PUT", Scope, Prefix>;
 
-  readonly patch: ApplicationScopeRouteMethod<"PATCH", Scope>;
+  readonly patch: ApplicationScopeRouteMethod<"PATCH", Scope, Prefix>;
 
-  readonly delete: ApplicationScopeRouteMethod<"DELETE", Scope>;
+  readonly delete: ApplicationScopeRouteMethod<"DELETE", Scope, Prefix>;
 
-  readonly options: ApplicationScopeRouteMethod<"OPTIONS", Scope>;
+  readonly options: ApplicationScopeRouteMethod<"OPTIONS", Scope, Prefix>;
 
-  readonly head: ApplicationScopeRouteMethod<"HEAD", Scope>;
+  readonly head: ApplicationScopeRouteMethod<"HEAD", Scope, Prefix>;
 
-  readonly route: ApplicationScopeGenericRouteMethod<Scope>;
+  readonly route: ApplicationScopeGenericRouteMethod<Scope, Prefix>;
 }
 
 type ScopedRuntimeHandler<Scope> = (
   context: RuntimeRouteContext,
+
   scope: Scope,
 ) => unknown;
 
 type ScopedRuntimeBeforeHandle<Scope> = (
   context: RuntimeRouteContext,
+
   scope: Scope,
 ) => unknown | PromiseLike<unknown>;
 
 type ScopedRuntimeAfterHandle<Scope> = (
   context: RuntimeRouteContext,
+
   result: unknown,
+
   scope: Scope,
 ) => void | PromiseLike<void>;
 
@@ -320,23 +354,28 @@ type ScopedRuntimeAfterHandle<Scope> = (
  * references. Application context only adapts scoped callbacks once during
  * registration before the runtime route enters the application.
  */
-export function createApplicationScopeBuilder<const Scope extends object>(
+export function createApplicationScopeBuilder<
+  const Scope extends object,
+  const Prefix extends string = "",
+>(
   scope: Scope,
 
   register: RuntimeRouteRegister,
-): ApplicationScopeBuilder<Scope> {
+
+  prefix: Prefix = "" as Prefix,
+): ApplicationScopeBuilder<Scope, Prefix> {
   const builder = new RouteBuilder(
-    "",
+    prefix,
 
     (route) => {
       register(bindApplicationScopeRoute(route, scope));
     },
   );
 
-  return builder as unknown as ApplicationScopeBuilder<Scope>;
+  return builder as unknown as ApplicationScopeBuilder<Scope, Prefix>;
 }
 
-function bindApplicationScopeRoute<Scope extends object>(
+export function bindApplicationScopeRoute<Scope extends object>(
   route: RuntimeRouteRecord,
 
   scope: Scope,

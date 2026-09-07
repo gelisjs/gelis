@@ -10,7 +10,7 @@ import { installPlugin } from "./plugin";
 
 import type { Plugin, PluginCompositionDeclaration } from "./plugin";
 
-import { getModuleRuntimeRoutes } from "./module";
+import { instantiateModuleRuntimeRoutes } from "./module";
 
 import { pathnameFromUrl } from "./runtime/url";
 
@@ -453,21 +453,9 @@ export class Gelis extends RouteBuilder<""> {
   mount<const Prefix extends string, const Routes extends ModuleRoutes>(
     module: ModuleRef<Prefix, Routes>,
   ): void {
-    const routes = getModuleRuntimeRoutes(module);
+    const routes = instantiateModuleRuntimeRoutes(this, module);
 
-    for (const template of routes) {
-      /*
-       * Modules are templates shared between
-       * applications.
-       *
-       * Never compile application-global
-       * lifecycle directly into the module's
-       * original runtime record.
-       */
-      const route: RuntimeRouteRecord = {
-        ...template,
-      };
-
+    for (const route of routes) {
       registerAppRuntimeRoute(this.#state, route);
     }
   }
