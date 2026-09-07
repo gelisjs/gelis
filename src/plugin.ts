@@ -37,6 +37,8 @@ export interface CapabilitySetupContext {
 
 const PLUGIN_SETUP_RUNTIME = Symbol("gelis.plugin.setup.runtime");
 
+const PLUGIN_STARTUP_RUNTIME = Symbol("gelis.plugin.startup.runtime");
+
 type PluginRouteMethodName =
   | "get"
   | "post"
@@ -93,6 +95,8 @@ export class PluginInstallError extends Error {
 interface CapabilityEntry {
   readonly value: unknown;
 
+  readonly capabilityName: string;
+
   readonly providerPluginName: string;
 }
 
@@ -118,7 +122,15 @@ interface PluginInstallFrame {
   setupActive: boolean;
 }
 
-export interface PluginStartupContext extends CapabilitySetupContext {}
+interface PluginStartupFrame {
+  readonly installFrame: PluginInstallFrame;
+
+  active: boolean;
+}
+
+export interface PluginStartupContext extends CapabilitySetupContext {
+  readonly [PLUGIN_STARTUP_RUNTIME]: PluginStartupFrame;
+}
 
 export type PluginStartup = (
   context: PluginStartupContext,
@@ -154,7 +166,7 @@ export interface Capability<Value> {
   require(context: CapabilitySetupContext): Value;
 
   provide(
-    context: PluginSetupContext,
+    context: PluginSetupContext | PluginStartupContext,
 
     value: Value,
   ): void;
@@ -277,28 +289,36 @@ class PluginSetupContextRuntime implements PluginSetupContext {
 }
 
 class PluginStartupContextRuntime implements PluginStartupContext {
-  #active = true;
+  readonly [PLUGIN_STARTUP_RUNTIME]: PluginStartupFrame;
 
-  constructor(private readonly frame: PluginInstallFrame) {}
+  constructor(frame: PluginInstallFrame) {
+    this[PLUGIN_STARTUP_RUNTIME] = {
+      installFrame: frame,
+
+      active: true,
+    };
+  }
 
   readonly [GELIS_CAPABILITY_REQUIRE_RUNTIME]: CapabilityRequireRuntime = (
     capability,
 
     capabilityName,
   ) => {
-    this.#assertActive();
+    const startupFrame = getActivePluginStartupFrame(this);
 
-    const pending = this.frame.pendingCapabilities.get(capability);
+    const frame = startupFrame.installFrame;
+
+    const pending = frame.pendingCapabilities.get(capability);
 
     if (pending !== undefined) {
       return pending.value;
     }
 
-    const committed = this.frame.state.capabilities.get(capability);
+    const committed = frame.state.capabilities.get(capability);
 
     if (committed === undefined) {
       throw missingDependencyError(
-        this.frame.plugin.name,
+        frame.plugin.name,
 
         capabilityName,
       );
@@ -308,13 +328,7 @@ class PluginStartupContextRuntime implements PluginStartupContext {
   };
 
   deactivate(): void {
-    this.#active = false;
-  }
-
-  #assertActive(): void {
-    if (!this.#active) {
-      throw startupContextInactiveError(this.frame.plugin.name);
-    }
+    this[PLUGIN_STARTUP_RUNTIME].active = false;
   }
 }
 
@@ -331,7 +345,7 @@ export function defineCapability(name: string): Capability<never> {
     },
 
     provide(context, value) {
-      const frame = getActivePluginInstallFrame(context);
+      const frame = getActiveCapabilityProviderFrame(context);
 
       const pending = frame.pendingCapabilities.get(capability);
 
@@ -355,6 +369,8 @@ export function defineCapability(name: string): Capability<never> {
 
       frame.pendingCapabilities.set(capability, {
         value,
+
+        capabilityName: name,
 
         providerPluginName: frame.plugin.name,
       });
@@ -497,10 +513,26 @@ async function runPluginStartup(frame: PluginInstallFrame): Promise<void> {
 }
 
 function commitPluginInstallation(frame: PluginInstallFrame): void {
+  validatePendingCapabilities(frame);
+
   frame.commitComposition(frame.composition);
 
   for (const [capability, entry] of frame.pendingCapabilities) {
     frame.state.capabilities.set(capability, entry);
+  }
+}
+
+function validatePendingCapabilities(frame: PluginInstallFrame): void {
+  for (const [capability, pending] of frame.pendingCapabilities) {
+    const committed = frame.state.capabilities.get(capability);
+
+    if (committed !== undefined) {
+      throw capabilityAlreadyProvidedError(
+        frame.plugin.name,
+        pending.capabilityName,
+        committed.providerPluginName,
+      );
+    }
   }
 }
 
@@ -517,6 +549,20 @@ function assertPluginInstallFrameActive(frame: PluginInstallFrame): void {
   if (!frame.setupActive) {
     throw setupContextInactiveError(frame.plugin.name);
   }
+}
+
+function getActiveCapabilityProviderFrame(
+  context: PluginSetupContext | PluginStartupContext,
+): PluginInstallFrame {
+  if (PLUGIN_SETUP_RUNTIME in context) {
+    return getActivePluginInstallFrame(context);
+  }
+
+  if (PLUGIN_STARTUP_RUNTIME in context) {
+    return getActivePluginStartupFrame(context).installFrame;
+  }
+
+  throw new Error("Invalid Gelis capability provider context");
 }
 
 function getActivePluginInstallFrame(
@@ -536,6 +582,22 @@ function getPluginInstallFrame(
 
   if (frame === undefined) {
     throw new Error("Invalid Gelis plugin setup context");
+  }
+
+  return frame;
+}
+
+function getActivePluginStartupFrame(
+  context: PluginStartupContext,
+): PluginStartupFrame {
+  const frame = context[PLUGIN_STARTUP_RUNTIME];
+
+  if (frame === undefined) {
+    throw new Error("Invalid Gelis plugin startup context");
+  }
+
+  if (!frame.active) {
+    throw startupContextInactiveError(frame.installFrame.plugin.name);
   }
 
   return frame;
