@@ -19,6 +19,11 @@ import type {
   CapabilitySetupContext,
 } from "./plugin";
 
+import {
+  enqueueApplicationStartup,
+  hasPendingApplicationStartup,
+} from "./startup";
+
 import { RouteBuilder } from "./route-builder";
 
 import type {
@@ -66,7 +71,7 @@ export interface ModuleSetupContext extends CapabilitySetupContext {}
 
 export type ModuleScopeResolver<Scope extends object> = (
   setup: ModuleSetupContext,
-) => Scope;
+) => Scope | PromiseLike<Scope>;
 
 interface StaticModuleRequestScopeFactory {
   <const Prefix extends string, const RequestScope extends object>(
@@ -210,6 +215,10 @@ interface ModuleSetupFrame {
 }
 
 type ModuleMountCommit = (routes: readonly RuntimeRouteRecord[]) => void;
+
+type ModuleRuntimeInstantiation =
+  | readonly RuntimeRouteRecord[]
+  | Promise<readonly RuntimeRouteRecord[]>;
 
 class ModuleSetupContextRuntime implements ModuleSetupContext {
   readonly #frame: ModuleSetupFrame;
@@ -439,22 +448,71 @@ export function mountModuleRuntimeRoutes(
   /*
    * Reserve identity before dependency resolution.
    *
-   * This makes a re-entrant mount of the same Module object fail immediately.
-   * The reservation is removed on every failed mount, so dependency or route
-   * failures remain retryable.
+   * Purely synchronous failures before an async startup boundary remain
+   * retryable. Once a mount is accepted into startup staging, any later
+   * startup failure is terminal for the application and the reservation
+   * intentionally remains owned by that application.
    */
   mounted.add(module);
 
-  let mountSucceeded = false;
+  let mountAccepted = false;
 
   try {
+    /*
+     * Preserve source order after the first asynchronous startup boundary.
+     *
+     * A later module must not resolve dependencies or commit routes ahead of
+     * an earlier plugin/module that is still pending startup.
+     */
+    if (hasPendingApplicationStartup(application)) {
+      enqueueApplicationStartup(
+        application,
+
+        async () => {
+          const routes = await instantiateModuleRuntimeRoutes(
+            application,
+            module,
+          );
+
+          commit(routes);
+        },
+      );
+
+      mountAccepted = true;
+
+      return;
+    }
+
     const routes = instantiateModuleRuntimeRoutes(application, module);
+
+    if (isPromiseLike(routes)) {
+      /*
+       * The resolver has already crossed an async boundary.
+       * Attach a rejection observer immediately so a resolver that rejects
+       * before ready() is called cannot surface as an unhandled rejection.
+       */
+      const pendingRoutes = Promise.resolve(routes);
+
+      void pendingRoutes.catch(() => undefined);
+
+      enqueueApplicationStartup(
+        application,
+
+        async () => {
+          commit(await pendingRoutes);
+        },
+      );
+
+      mountAccepted = true;
+
+      return;
+    }
 
     commit(routes);
 
-    mountSucceeded = true;
+    mountAccepted = true;
   } finally {
-    if (!mountSucceeded) {
+    if (!mountAccepted) {
       mounted.delete(module);
     }
   }
@@ -464,7 +522,7 @@ function instantiateModuleRuntimeRoutes(
   application: object,
 
   module: AnyModuleRef,
-): readonly RuntimeRouteRecord[] {
+): ModuleRuntimeInstantiation {
   const definition = (module as unknown as RuntimeModule)[
     moduleRuntimeDefinition
   ];
@@ -503,20 +561,42 @@ function instantiateModuleRuntimeRoutes(
 
   const setup = new ModuleSetupContextRuntime(frame);
 
-  let scope: object;
+  let scope: object | PromiseLike<object>;
 
   try {
     scope = resolveScope(setup);
-
-    if (isPromiseLike(scope)) {
-      void Promise.resolve(scope).catch(() => undefined);
-
-      throw moduleAsyncScopeUnsupportedError(module.prefix);
-    }
-  } finally {
+  } catch (error) {
     frame.active = false;
+
+    throw error;
   }
 
+  if (isPromiseLike(scope)) {
+    return Promise.resolve(scope).then(
+      (resolvedScope) => {
+        frame.active = false;
+
+        return bindScopedModuleRuntimeRoutes(definition, resolvedScope);
+      },
+
+      (error) => {
+        frame.active = false;
+
+        throw error;
+      },
+    );
+  }
+
+  frame.active = false;
+
+  return bindScopedModuleRuntimeRoutes(definition, scope);
+}
+
+function bindScopedModuleRuntimeRoutes(
+  definition: RuntimeModuleDefinition,
+
+  scope: object,
+): readonly RuntimeRouteRecord[] {
   const routes = definition.routes.map((route) =>
     bindModuleApplicationScopeRoute(route, scope),
   );
@@ -761,18 +841,6 @@ function moduleSetupContextInactiveError(
   );
 }
 
-function moduleAsyncScopeUnsupportedError(
-  modulePrefix: string,
-): ModuleMountError {
-  return new ModuleMountError(
-    "MODULE_ASYNC_SCOPE_UNSUPPORTED",
-
-    `Async module scope resolution is not supported for "${modulePrefix}"`,
-
-    modulePrefix,
-  );
-}
-
 function moduleAlreadyMountedError(modulePrefix: string): ModuleMountError {
   return new ModuleMountError(
     "MODULE_ALREADY_MOUNTED",
@@ -783,7 +851,9 @@ function moduleAlreadyMountedError(modulePrefix: string): ModuleMountError {
   );
 }
 
-function isPromiseLike(value: unknown): value is PromiseLike<unknown> {
+function isPromiseLike<Value>(
+  value: Value | PromiseLike<Value>,
+): value is PromiseLike<Value> {
   return (
     value !== null &&
     (typeof value === "object" || typeof value === "function") &&

@@ -203,14 +203,14 @@ describe("module capability resolution semantics", () => {
     );
   });
 
-  test("rejects asynchronous module scope resolution with stable error identity", () => {
+  test("supports asynchronous module scope resolution through app.ready", async () => {
     const app = new Gelis();
 
-    const asyncResolver = (async (_setup: ModuleSetupContext) => ({
-      ready: true as const,
-    })) as unknown as ModuleScopeResolver<{
+    const asyncResolver: ModuleScopeResolver<{
       readonly ready: true;
-    }>;
+    }> = async (_setup) => ({
+      ready: true as const,
+    });
 
     const module = defineModule(
       "/async-module",
@@ -222,21 +222,21 @@ describe("module capability resolution semantics", () => {
       }),
     );
 
-    let thrown: unknown;
+    app.mount(module);
 
-    try {
-      app.mount(module);
-    } catch (error) {
-      thrown = error;
-    }
+    const beforeReady = await app.fetch(
+      new Request("http://gelis.test/async-module"),
+    );
 
-    expect(thrown).toBeInstanceOf(ModuleMountError);
+    expect(beforeReady.status).toBe(404);
 
-    const error = thrown as ModuleMountError;
+    await app.ready();
 
-    expect(error.code).toBe("MODULE_ASYNC_SCOPE_UNSUPPORTED");
+    const response = await app.fetch(
+      new Request("http://gelis.test/async-module"),
+    );
 
-    expect(error.modulePrefix).toBe("/async-module");
+    expect(await response.json()).toBe(true);
   });
 
   test("allows a failed mount to be retried after its dependency becomes available", async () => {
