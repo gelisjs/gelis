@@ -44,6 +44,12 @@ export function enqueueApplicationStartup(
   state.tasks.push(task);
 }
 
+export function hasPendingApplicationStartup(application: object): boolean {
+  const state = applicationStartupStates.get(application);
+
+  return state !== undefined && state.phase !== "ready";
+}
+
 export function readyApplication(application: object): Promise<void> {
   let state = applicationStartupStates.get(application);
 

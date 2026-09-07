@@ -16,6 +16,11 @@ import type { OnError } from "./error";
 
 import type { RuntimeRouteRecord } from "./runtime/types";
 
+import {
+  enqueueApplicationStartup,
+  hasPendingApplicationStartup,
+} from "./startup";
+
 export const GELIS_CAPABILITY_REQUIRE_RUNTIME = Symbol(
   "gelis.capability.require.runtime",
 );
@@ -106,15 +111,25 @@ interface PluginInstallFrame {
 
   readonly composition: PluginCompositionDeclaration;
 
+  readonly startupCallbacks: PluginStartup[];
+
   readonly commitComposition: PluginCompositionCommit;
 
-  active: boolean;
+  setupActive: boolean;
 }
+
+export interface PluginStartupContext extends CapabilitySetupContext {}
+
+export type PluginStartup = (
+  context: PluginStartupContext,
+) => void | PromiseLike<void>;
 
 export interface PluginSetupContext extends CapabilitySetupContext {
   readonly [PLUGIN_SETUP_RUNTIME]: PluginInstallFrame;
 
   readonly routes: PluginRouteBuilder;
+
+  startup(callback: PluginStartup): void;
 
   onRequest(hook: OnRequest): void;
 
@@ -202,6 +217,12 @@ class PluginSetupContextRuntime implements PluginSetupContext {
     return routes;
   }
 
+  startup(callback: PluginStartup): void {
+    const frame = getActivePluginInstallFrame(this);
+
+    frame.startupCallbacks.push(callback);
+  }
+
   onRequest(hook: OnRequest): void {
     const frame = getActivePluginInstallFrame(this);
 
@@ -252,6 +273,48 @@ class PluginSetupContextRuntime implements PluginSetupContext {
         declarePluginRoute(frame, route);
       },
     );
+  }
+}
+
+class PluginStartupContextRuntime implements PluginStartupContext {
+  #active = true;
+
+  constructor(private readonly frame: PluginInstallFrame) {}
+
+  readonly [GELIS_CAPABILITY_REQUIRE_RUNTIME]: CapabilityRequireRuntime = (
+    capability,
+
+    capabilityName,
+  ) => {
+    this.#assertActive();
+
+    const pending = this.frame.pendingCapabilities.get(capability);
+
+    if (pending !== undefined) {
+      return pending.value;
+    }
+
+    const committed = this.frame.state.capabilities.get(capability);
+
+    if (committed === undefined) {
+      throw missingDependencyError(
+        this.frame.plugin.name,
+
+        capabilityName,
+      );
+    }
+
+    return committed.value;
+  };
+
+  deactivate(): void {
+    this.#active = false;
+  }
+
+  #assertActive(): void {
+    if (!this.#active) {
+      throw startupContextInactiveError(this.frame.plugin.name);
+    }
   }
 }
 
@@ -332,7 +395,7 @@ export function installPlugin(
 
   state.pluginInstallations.add(plugin);
 
-  let installationSucceeded = false;
+  let installationAccepted = false;
 
   const frame: PluginInstallFrame = {
     plugin,
@@ -353,9 +416,11 @@ export function installPlugin(
       afterHandleHooks: [],
     },
 
+    startupCallbacks: [],
+
     commitComposition,
 
-    active: true,
+    setupActive: true,
   };
 
   const context = new PluginSetupContextRuntime(frame);
@@ -369,17 +434,29 @@ export function installPlugin(
       throw asyncSetupUnsupportedError(plugin.name);
     }
 
-    frame.commitComposition(frame.composition);
+    const requiresStartupStaging =
+      frame.startupCallbacks.length !== 0 ||
+      hasPendingApplicationStartup(application);
 
-    for (const [capability, entry] of frame.pendingCapabilities) {
-      state.capabilities.set(capability, entry);
+    if (requiresStartupStaging) {
+      enqueueApplicationStartup(
+        application,
+
+        async () => {
+          await runPluginStartup(frame);
+
+          commitPluginInstallation(frame);
+        },
+      );
+    } else {
+      commitPluginInstallation(frame);
     }
 
-    installationSucceeded = true;
+    installationAccepted = true;
   } finally {
-    frame.active = false;
+    frame.setupActive = false;
 
-    if (!installationSucceeded) {
+    if (!installationAccepted) {
       state.pluginInstallations.delete(plugin);
     }
   }
@@ -403,6 +480,30 @@ export function readInstalledCapability(
 
 export const MISSING_CAPABILITY = Symbol("gelis.capability.missing");
 
+async function runPluginStartup(frame: PluginInstallFrame): Promise<void> {
+  const callbacks = frame.startupCallbacks;
+
+  for (let index = 0; index < callbacks.length; index++) {
+    const callback = callbacks[index]!;
+
+    const context = new PluginStartupContextRuntime(frame);
+
+    try {
+      await callback(context);
+    } finally {
+      context.deactivate();
+    }
+  }
+}
+
+function commitPluginInstallation(frame: PluginInstallFrame): void {
+  frame.commitComposition(frame.composition);
+
+  for (const [capability, entry] of frame.pendingCapabilities) {
+    frame.state.capabilities.set(capability, entry);
+  }
+}
+
 function declarePluginRoute(
   frame: PluginInstallFrame,
   route: RuntimeRouteRecord,
@@ -413,7 +514,7 @@ function declarePluginRoute(
 }
 
 function assertPluginInstallFrameActive(frame: PluginInstallFrame): void {
-  if (!frame.active) {
+  if (!frame.setupActive) {
     throw setupContextInactiveError(frame.plugin.name);
   }
 }
@@ -478,6 +579,16 @@ function setupContextInactiveError(pluginName: string): PluginInstallError {
     "PLUGIN_SETUP_CONTEXT_INACTIVE",
 
     `Plugin setup context for "${pluginName}" is no longer active`,
+
+    pluginName,
+  );
+}
+
+function startupContextInactiveError(pluginName: string): PluginInstallError {
+  return new PluginInstallError(
+    "PLUGIN_SETUP_CONTEXT_INACTIVE",
+
+    `Plugin startup context for "${pluginName}" is no longer active`,
 
     pluginName,
   );

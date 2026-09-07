@@ -42,6 +42,7 @@ type SetupStringKeys = Extract<keyof PluginSetupContext, string>;
 
 type FrozenSetupStringKeys =
   | "routes"
+  | "startup"
   | "onRequest"
   | "onError"
   | "onBeforeHandle"

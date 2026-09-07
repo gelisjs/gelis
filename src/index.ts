@@ -9,6 +9,8 @@ export type {
   PluginRouteBuilder,
   PluginSetup,
   PluginSetupContext,
+  PluginStartup,
+  PluginStartupContext,
 } from "./plugin";
 
 export type {
