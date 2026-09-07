@@ -39,11 +39,11 @@ declare const moduleRouteBuilderPrefixBrand: unique symbol;
 
 declare const moduleScopedRouteBuilderScopeBrand: unique symbol;
 
-interface ModuleRouteBuilderState<Prefix extends string> {
+export interface ModuleRouteBuilderState<Prefix extends string> {
   readonly [moduleRouteBuilderPrefixBrand]: Prefix;
 }
 
-interface ModuleScopedRouteBuilderState<
+export interface ModuleScopedRouteBuilderState<
   Scope extends object,
   Prefix extends string,
 > extends ModuleRouteBuilderState<Prefix> {

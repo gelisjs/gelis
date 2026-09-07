@@ -23,7 +23,9 @@ import { RouteBuilder } from "./route-builder";
 
 import type {
   ModulePlainRouteBuilder,
+  ModuleRouteBuilderState,
   ModuleScopedRouteBuilder,
+  ModuleScopedRouteBuilderState,
 } from "./module-route-surface";
 
 import { compileAfterHandle, compileBeforeHandle } from "./runtime/lifecycle";
@@ -52,8 +54,6 @@ import type {
 
 export type ModuleRoutes = Readonly<Record<string, AnyRouteRef>>;
 
-type AnyModulePublicRoutes = Readonly<Record<string, unknown>>;
-
 type ModulePublicRoutes<Routes extends ModuleRoutes> = {
   -readonly [Name in keyof Routes]: RouteContractOf<Routes[Name]>;
 };
@@ -68,29 +68,36 @@ export type ModuleScopeResolver<Scope extends object> = (
   setup: ModuleSetupContext,
 ) => Scope;
 
-type StaticModuleRequestScopeFactory<Prefix extends string> = <
-  const RequestScope extends object,
->(
-  derive: ModuleRequestScopeDerive<never, RequestScope>,
-) => ModuleRequestScopeBuilder<never, RequestScope, Prefix>;
+interface StaticModuleRequestScopeFactory {
+  <const Prefix extends string, const RequestScope extends object>(
+    this: ModuleRouteBuilderState<Prefix>,
 
-type ScopedModuleRequestScopeFactory<
-  ModuleScope extends object,
-  Prefix extends string,
-> = <const RequestScope extends object>(
-  derive: ModuleRequestScopeDerive<ModuleScope, RequestScope>,
-) => ModuleRequestScopeBuilder<ModuleScope, RequestScope, Prefix>;
+    derive: ModuleRequestScopeDerive<never, RequestScope>,
+  ): ModuleRequestScopeBuilder<never, RequestScope, Prefix>;
+}
+
+interface ScopedModuleRequestScopeFactory {
+  <
+    const ModuleScope extends object,
+    const Prefix extends string,
+    const RequestScope extends object,
+  >(
+    this: ModuleScopedRouteBuilderState<ModuleScope, Prefix>,
+
+    derive: ModuleRequestScopeDerive<ModuleScope, RequestScope>,
+  ): ModuleRequestScopeBuilder<ModuleScope, RequestScope, Prefix>;
+}
 
 export type ModuleRouteBuilder<Prefix extends string> =
   ModulePlainRouteBuilder<Prefix> & {
-    readonly requestScope: StaticModuleRequestScopeFactory<Prefix>;
+    readonly requestScope: StaticModuleRequestScopeFactory;
   };
 
 export type ModuleScopeBuilder<
   Scope extends object,
   Prefix extends string,
 > = ModuleScopedRouteBuilder<Scope, Prefix> & {
-  readonly requestScope: ScopedModuleRequestScopeFactory<Scope, Prefix>;
+  readonly requestScope: ScopedModuleRequestScopeFactory;
 };
 
 export interface ModuleLifecycle {
@@ -140,15 +147,12 @@ export class ModuleMountError extends Error {
 interface ModuleRefInternal<
   Prefix extends string,
   Routes extends ModuleRoutes,
-  PublicRoutes extends AnyModulePublicRoutes,
 > {
   readonly prefix: Prefix;
 
   readonly routes: Routes;
 
-  readonly [moduleRefBrand]: {
-    readonly publicRoutes: PublicRoutes;
-  };
+  readonly [moduleRefBrand]: true;
 }
 
 interface StaticRuntimeModuleLifecycle {
@@ -238,29 +242,21 @@ class ModuleSetupContextRuntime implements ModuleSetupContext {
 export type ModuleRef<
   Prefix extends string,
   Routes extends ModuleRoutes,
-> = ModuleRefInternal<Prefix, Routes, ModulePublicRoutes<Routes>>;
+> = ModuleRefInternal<Prefix, Routes>;
 
-export type AnyModuleRef = ModuleRefInternal<
-  string,
-  ModuleRoutes,
-  AnyModulePublicRoutes
->;
+export type AnyModuleRef = ModuleRefInternal<string, ModuleRoutes>;
 
 export type ModulePublicContractOf<Module> =
-  Module extends ModuleRefInternal<string, ModuleRoutes, infer PublicRoutes>
-    ? PublicRoutes
+  Module extends ModuleRefInternal<string, infer Routes>
+    ? ModulePublicRoutes<Routes>
     : never;
 
 export type ModuleContractOf<Module> =
-  Module extends ModuleRefInternal<
-    infer Prefix,
-    ModuleRoutes,
-    infer PublicRoutes
-  >
+  Module extends ModuleRefInternal<infer Prefix, infer Routes>
     ? {
         prefix: Prefix;
 
-        routes: PublicRoutes;
+        routes: ModulePublicRoutes<Routes>;
       }
     : never;
 

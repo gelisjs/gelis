@@ -8,7 +8,7 @@ import { spawnSync } from "node:child_process";
 
 import { fileURLToPath } from "node:url";
 
-import "./generate.mts";
+import "./generate.invalid-unretained-control.mts";
 
 const HERE = fileURLToPath(new URL(".", import.meta.url));
 
@@ -43,9 +43,7 @@ type Scenario = (typeof SCENARIOS)[number];
  * direct-composition-control:
  *   equivalent ordinary routes, application scopes,
  *   request scopes, and request-local lifecycle are
- *   registered directly on Gelis. Each composition
- *   unit also retains its named RouteRef map so
- *   contract-retention cost is symmetric with modules.
+ *   registered directly on Gelis.
  *
  * module-composition:
  *   the equivalent mixed workload is declared through
@@ -210,9 +208,7 @@ writeFileSync(
   )}\n`,
 );
 
-console.log(
-  "\nGelis P8-C8 module type scalability gate v2 — retained-route control",
-);
+console.log("\nGelis P8-C8 module type scalability gate");
 
 console.log(`Runtime:       ${metadata.runtime}`);
 
