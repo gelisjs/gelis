@@ -75,8 +75,10 @@ export type {
 
 export type {
   ModuleContractOf,
+  ModuleLifecycle,
   ModuleMountErrorCode,
   ModuleRef,
+  ModuleScopeLifecycle,
   ModuleScopeResolver,
   ModuleSetupContext,
 } from "./module";

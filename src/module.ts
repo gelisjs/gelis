@@ -15,11 +15,29 @@ import type {
 
 import { RouteBuilder } from "./route-builder";
 
-import type { AnyRouteRef, RouteContractOf } from "./route";
+import { compileAfterHandle, compileBeforeHandle } from "./runtime/lifecycle";
+
+import {
+  RUNTIME_ROUTE_AFTER_HANDLE,
+  RUNTIME_ROUTE_BEFORE_HANDLE,
+} from "./runtime/types";
+
+import type {
+  AnyRouteRef,
+  GlobalAfterHandle,
+  GlobalBeforeHandle,
+  GlobalRouteContext,
+  RouteContractOf,
+} from "./route";
 
 import type { ValidRoutePath } from "./types/path";
 
-import type { RuntimeRouteRecord } from "./runtime/types";
+import type {
+  RuntimeAfterHandle,
+  RuntimeBeforeHandle,
+  RuntimeRouteContext,
+  RuntimeRouteRecord,
+} from "./runtime/types";
 
 export type ModuleRoutes = Readonly<Record<string, AnyRouteRef>>;
 
@@ -38,6 +56,28 @@ export interface ModuleSetupContext extends CapabilitySetupContext {}
 export type ModuleScopeResolver<Scope extends object> = (
   setup: ModuleSetupContext,
 ) => Scope;
+
+export interface ModuleLifecycle {
+  readonly beforeHandle?: GlobalBeforeHandle;
+
+  readonly afterHandle?: GlobalAfterHandle;
+}
+
+export interface ModuleScopeLifecycle<Scope extends object> {
+  readonly beforeHandle?: (
+    context: GlobalRouteContext,
+
+    scope: Scope,
+  ) => unknown | PromiseLike<unknown>;
+
+  readonly afterHandle?: (
+    context: GlobalRouteContext,
+
+    result: unknown,
+
+    scope: Scope,
+  ) => void | PromiseLike<void>;
+}
 
 export type ModuleMountErrorCode =
   | "MODULE_DEPENDENCY_MISSING"
@@ -75,10 +115,46 @@ interface ModuleRefInternal<
   };
 }
 
+interface StaticRuntimeModuleLifecycle {
+  readonly kind: "static";
+
+  readonly beforeHandle: RuntimeBeforeHandle | undefined;
+
+  readonly afterHandle: RuntimeAfterHandle | undefined;
+}
+
+type ScopedRuntimeModuleBeforeHandle = (
+  context: RuntimeRouteContext,
+
+  scope: object,
+) => unknown | PromiseLike<unknown>;
+
+type ScopedRuntimeModuleAfterHandle = (
+  context: RuntimeRouteContext,
+
+  result: unknown,
+
+  scope: object,
+) => void | PromiseLike<void>;
+
+interface ScopedRuntimeModuleLifecycle {
+  readonly kind: "scoped";
+
+  readonly beforeHandle: ScopedRuntimeModuleBeforeHandle | undefined;
+
+  readonly afterHandle: ScopedRuntimeModuleAfterHandle | undefined;
+}
+
+type RuntimeModuleLifecycle =
+  | StaticRuntimeModuleLifecycle
+  | ScopedRuntimeModuleLifecycle;
+
 interface RuntimeModuleDefinition {
   readonly routes: readonly RuntimeRouteRecord[];
 
   readonly resolveScope: ModuleScopeResolver<object> | undefined;
+
+  readonly lifecycle: RuntimeModuleLifecycle | undefined;
 }
 
 interface RuntimeModule {
@@ -165,6 +241,17 @@ export function defineModule<
 
 export function defineModule<
   const Prefix extends string,
+  const Routes extends ModuleRoutes,
+>(
+  prefix: Prefix & ValidRoutePath<Prefix>,
+
+  lifecycle: ModuleLifecycle,
+
+  define: (route: RouteBuilder<Prefix>) => Routes,
+): ModuleRef<Prefix, Routes>;
+
+export function defineModule<
+  const Prefix extends string,
   const Scope extends object,
   const Routes extends ModuleRoutes,
 >(
@@ -175,48 +262,111 @@ export function defineModule<
   define: (route: ApplicationScopeBuilder<Scope, Prefix>) => Routes,
 ): ModuleRef<Prefix, Routes>;
 
+export function defineModule<
+  const Prefix extends string,
+  const Scope extends object,
+  const Routes extends ModuleRoutes,
+>(
+  prefix: Prefix & ValidRoutePath<Prefix>,
+
+  resolveScope: ModuleScopeResolver<Scope>,
+
+  lifecycle: ModuleScopeLifecycle<Scope>,
+
+  define: (route: ApplicationScopeBuilder<Scope, Prefix>) => Routes,
+): ModuleRef<Prefix, Routes>;
+
 export function defineModule(
   prefix: string,
 
-  defineOrResolve: (...args: any[]) => unknown,
+  defineLifecycleOrResolve: any,
 
-  defineScoped?: (...args: any[]) => unknown,
+  defineOrLifecycle?: any,
+
+  defineScoped?: any,
 ): AnyModuleRef {
   const runtimeRoutes: RuntimeRouteRecord[] = [];
 
-  if (defineScoped === undefined) {
-    const route = new RouteBuilder(
-      prefix,
+  /*
+   * Existing two-argument static module.
+   */
+  if (defineOrLifecycle === undefined) {
+    const define = defineLifecycleOrResolve as (
+      route: RouteBuilder<string>,
+    ) => ModuleRoutes;
 
-      (runtimeRoute) => {
-        runtimeRoutes.push(runtimeRoute);
-      },
-    );
+    const route = createStaticModuleRouteBuilder(prefix, runtimeRoutes);
 
-    const routes = defineOrResolve(route) as ModuleRoutes;
+    const routes = define(route);
 
-    return createModuleRef(prefix, routes, runtimeRoutes, undefined);
+    return createModuleRef(prefix, routes, runtimeRoutes, undefined, undefined);
   }
 
-  const route = new RouteBuilder(
-    prefix,
+  /*
+   * Four-argument scoped module with module lifecycle.
+   */
+  if (defineScoped !== undefined) {
+    const resolveScope =
+      defineLifecycleOrResolve as ModuleScopeResolver<object>;
 
-    (runtimeRoute) => {
-      runtimeRoutes.push(runtimeRoute);
-    },
-  ) as unknown as ApplicationScopeBuilder<object, string>;
+    const lifecycle = normalizeScopedModuleLifecycle(
+      defineOrLifecycle as ModuleScopeLifecycle<object>,
+    );
 
-  const routes = defineScoped(route) as ModuleRoutes;
+    const route = createScopedModuleRouteBuilder(prefix, runtimeRoutes);
 
-  return createModuleRef(
-    prefix,
+    const routes = defineScoped(route);
 
-    routes,
+    return createModuleRef(
+      prefix,
+      routes,
+      runtimeRoutes,
+      resolveScope,
+      lifecycle,
+    );
+  }
 
-    runtimeRoutes,
+  /*
+   * Existing three-argument scoped module.
+   *
+   * The second argument is necessarily a function here:
+   * static lifecycle uses an object in the second position.
+   */
+  if (typeof defineLifecycleOrResolve === "function") {
+    const resolveScope =
+      defineLifecycleOrResolve as ModuleScopeResolver<object>;
 
-    defineOrResolve as ModuleScopeResolver<object>,
-  );
+    const define = defineOrLifecycle as (
+      route: ApplicationScopeBuilder<object, string>,
+    ) => ModuleRoutes;
+
+    const route = createScopedModuleRouteBuilder(prefix, runtimeRoutes);
+
+    const routes = define(route);
+
+    return createModuleRef(
+      prefix,
+      routes,
+      runtimeRoutes,
+      resolveScope,
+      undefined,
+    );
+  }
+
+  /*
+   * Three-argument static module with module lifecycle.
+   */
+  const lifecycle = normalizeStaticModuleLifecycle(defineLifecycleOrResolve);
+
+  const define = defineOrLifecycle as (
+    route: RouteBuilder<string>,
+  ) => ModuleRoutes;
+
+  const route = createStaticModuleRouteBuilder(prefix, runtimeRoutes);
+
+  const routes = define(route);
+
+  return createModuleRef(prefix, routes, runtimeRoutes, undefined, lifecycle);
 }
 
 export function mountModuleRuntimeRoutes(
@@ -274,7 +424,25 @@ function instantiateModuleRuntimeRoutes(
   const resolveScope = definition.resolveScope;
 
   if (resolveScope === undefined) {
-    return definition.routes.map(cloneRuntimeRoute);
+    const routes = definition.routes.map(cloneRuntimeRoute);
+
+    const lifecycle = definition.lifecycle;
+
+    if (lifecycle === undefined) {
+      return routes;
+    }
+
+    if (lifecycle.kind !== "static") {
+      throw new Error("Invalid Gelis static module lifecycle");
+    }
+
+    bindModuleLifecycleRoutes(
+      routes,
+      lifecycle.beforeHandle,
+      lifecycle.afterHandle,
+    );
+
+    return routes;
   }
 
   const frame: ModuleSetupFrame = {
@@ -301,9 +469,137 @@ function instantiateModuleRuntimeRoutes(
     frame.active = false;
   }
 
-  return definition.routes.map((route) =>
+  const routes = definition.routes.map((route) =>
     bindApplicationScopeRoute(route, scope),
   );
+
+  const lifecycle = definition.lifecycle;
+
+  if (lifecycle === undefined) {
+    return routes;
+  }
+
+  if (lifecycle.kind !== "scoped") {
+    throw new Error("Invalid Gelis scoped module lifecycle");
+  }
+
+  const scopedBeforeHandle = lifecycle.beforeHandle;
+
+  const beforeHandle: RuntimeBeforeHandle | undefined =
+    scopedBeforeHandle === undefined
+      ? undefined
+      : (context) => scopedBeforeHandle(context, scope);
+
+  const scopedAfterHandle = lifecycle.afterHandle;
+
+  const afterHandle: RuntimeAfterHandle | undefined =
+    scopedAfterHandle === undefined
+      ? undefined
+      : (context, result) => scopedAfterHandle(context, result, scope);
+
+  bindModuleLifecycleRoutes(routes, beforeHandle, afterHandle);
+
+  return routes;
+}
+
+function createStaticModuleRouteBuilder(
+  prefix: string,
+
+  runtimeRoutes: RuntimeRouteRecord[],
+): RouteBuilder<string> {
+  return new RouteBuilder(
+    prefix,
+
+    (runtimeRoute) => {
+      runtimeRoutes.push(runtimeRoute);
+    },
+  );
+}
+
+function createScopedModuleRouteBuilder(
+  prefix: string,
+
+  runtimeRoutes: RuntimeRouteRecord[],
+): ApplicationScopeBuilder<object, string> {
+  return new RouteBuilder(
+    prefix,
+
+    (runtimeRoute) => {
+      runtimeRoutes.push(runtimeRoute);
+    },
+  ) as unknown as ApplicationScopeBuilder<object, string>;
+}
+
+function normalizeStaticModuleLifecycle(
+  lifecycle: ModuleLifecycle,
+): RuntimeModuleLifecycle | undefined {
+  const beforeHandle = lifecycle.beforeHandle;
+
+  const afterHandle = lifecycle.afterHandle;
+
+  if (beforeHandle === undefined && afterHandle === undefined) {
+    return undefined;
+  }
+
+  return {
+    kind: "static",
+
+    beforeHandle: beforeHandle as RuntimeBeforeHandle | undefined,
+
+    afterHandle: afterHandle as RuntimeAfterHandle | undefined,
+  };
+}
+
+function normalizeScopedModuleLifecycle(
+  lifecycle: ModuleScopeLifecycle<object>,
+): RuntimeModuleLifecycle | undefined {
+  const beforeHandle = lifecycle.beforeHandle;
+
+  const afterHandle = lifecycle.afterHandle;
+
+  if (beforeHandle === undefined && afterHandle === undefined) {
+    return undefined;
+  }
+
+  return {
+    kind: "scoped",
+
+    beforeHandle: beforeHandle as ScopedRuntimeModuleBeforeHandle | undefined,
+
+    afterHandle: afterHandle as ScopedRuntimeModuleAfterHandle | undefined,
+  };
+}
+
+function bindModuleLifecycleRoutes(
+  routes: readonly RuntimeRouteRecord[],
+
+  beforeHandle: RuntimeBeforeHandle | undefined,
+
+  afterHandle: RuntimeAfterHandle | undefined,
+): void {
+  if (beforeHandle === undefined && afterHandle === undefined) {
+    return;
+  }
+
+  const beforeHooks =
+    beforeHandle === undefined ? undefined : ([beforeHandle] as const);
+
+  const afterHooks =
+    afterHandle === undefined ? undefined : ([afterHandle] as const);
+
+  for (const route of routes) {
+    if (beforeHooks !== undefined) {
+      route.beforeHandle = compileBeforeHandle(beforeHooks, route.beforeHandle);
+
+      route.flags |= RUNTIME_ROUTE_BEFORE_HANDLE;
+    }
+
+    if (afterHooks !== undefined) {
+      route.afterHandle = compileAfterHandle(afterHooks, route.afterHandle);
+
+      route.flags |= RUNTIME_ROUTE_AFTER_HANDLE;
+    }
+  }
 }
 
 function createModuleRef(
@@ -314,6 +610,8 @@ function createModuleRef(
   runtimeRoutes: readonly RuntimeRouteRecord[],
 
   resolveScope: ModuleScopeResolver<object> | undefined,
+
+  lifecycle: RuntimeModuleLifecycle | undefined,
 ): AnyModuleRef {
   return {
     prefix,
@@ -324,6 +622,8 @@ function createModuleRef(
       routes: runtimeRoutes,
 
       resolveScope,
+
+      lifecycle,
     },
   } as unknown as AnyModuleRef;
 }
