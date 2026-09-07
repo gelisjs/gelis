@@ -228,7 +228,7 @@ describe("module capability resolution semantics", () => {
       new Request("http://gelis.test/async-module"),
     );
 
-    expect(beforeReady.status).toBe(404);
+    expect(beforeReady.status).toBe(503);
 
     await app.ready();
 

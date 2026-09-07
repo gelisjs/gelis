@@ -15,6 +15,8 @@ import { mountModuleRuntimeRoutes } from "./module";
 import {
   closeApplication,
   enqueueApplicationStartup,
+  GELIS_APPLICATION_REQUEST_GATE_CHANGED,
+  isApplicationRequestBlocked,
   readyApplication,
 } from "./startup";
 
@@ -114,6 +116,15 @@ type RuntimeRouteInvoker = (
   body: unknown,
 ) => Response | Promise<Response>;
 
+const unavailableApplicationFetch: RuntimeFetch = () =>
+  new Response(
+    "Service Unavailable",
+
+    {
+      status: 503,
+    },
+  );
+
 export interface GelisInternalRouter {
   register(route: RuntimeRouteRecord): void;
 
@@ -181,11 +192,33 @@ export class Gelis extends RouteBuilder<""> {
   #recompileApplicationFetch(): void {
     const state = this.#state;
 
+    const startupBlocked = isApplicationRequestBlocked(this);
+
+    const hasApplicationLifecycle =
+      (state.onRequestHooks !== undefined &&
+        state.onRequestHooks.length !== 0) ||
+      (state.onErrorHooks !== undefined && state.onErrorHooks.length !== 0);
+
+    /*
+     * Restore the prototype hot path whenever neither startup gating
+     * nor application-level request/error lifecycle needs a wrapper.
+     *
+     * This means a startup-enabled application also returns to the
+     * normal direct fetch path after successful ready() when possible.
+     */
+    if (!startupBlocked && !hasApplicationLifecycle) {
+      if (Object.prototype.hasOwnProperty.call(this, "fetch")) {
+        delete (this as unknown as { fetch?: RuntimeFetch }).fetch;
+      }
+
+      return;
+    }
+
     let routedFetch = state.routedFetch;
 
     /*
-     * Capture the original routed fetch exactly
-     * once, before any app-level wrapper exists.
+     * Capture the original routed fetch exactly once, before any
+     * application-level specialization exists.
      */
     if (routedFetch === undefined) {
       routedFetch = this.fetch.bind(this);
@@ -193,11 +226,13 @@ export class Gelis extends RouteBuilder<""> {
       state.routedFetch = routedFetch;
     }
 
-    const compiledFetch = compileApplicationFetch(
-      routedFetch,
-      state.onRequestHooks,
-      state.onErrorHooks,
-    );
+    const compiledFetch = startupBlocked
+      ? unavailableApplicationFetch
+      : compileApplicationFetch(
+          routedFetch,
+          state.onRequestHooks,
+          state.onErrorHooks,
+        );
 
     Object.defineProperty(this, "fetch", {
       configurable: true,
@@ -319,6 +354,10 @@ export class Gelis extends RouteBuilder<""> {
 
   close(): Promise<void> {
     return closeApplication(this);
+  }
+
+  [GELIS_APPLICATION_REQUEST_GATE_CHANGED](): void {
+    this.#recompileApplicationFetch();
   }
 
   scope<const Scope extends object>(

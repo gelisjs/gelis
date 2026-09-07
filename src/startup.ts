@@ -19,6 +19,16 @@ interface ApplicationStartupState {
   readyPromise: Promise<void> | undefined;
 
   closePromise: Promise<void> | undefined;
+
+  closeRequested: boolean;
+}
+
+export const GELIS_APPLICATION_REQUEST_GATE_CHANGED = Symbol(
+  "gelis.application.request-gate.changed",
+);
+
+interface ApplicationRequestGateObserver {
+  [GELIS_APPLICATION_REQUEST_GATE_CHANGED](): void;
 }
 
 const applicationStartupStates = new WeakMap<object, ApplicationStartupState>();
@@ -45,14 +55,18 @@ export function enqueueApplicationStartup(
       readyPromise: undefined,
 
       closePromise: undefined,
+
+      closeRequested: false,
     };
 
     applicationStartupStates.set(application, state);
 
+    notifyApplicationRequestGateChanged(application);
+
     return;
   }
 
-  if (state.phase !== "pending") {
+  if (state.phase !== "pending" || state.closeRequested) {
     throw new Error(
       "Cannot register Gelis startup work after application readiness has begun",
     );
@@ -80,7 +94,19 @@ export function registerApplicationCleanup(
 export function hasPendingApplicationStartup(application: object): boolean {
   const state = applicationStartupStates.get(application);
 
-  return state !== undefined && state.phase !== "ready";
+  return (
+    state !== undefined && (state.phase !== "ready" || state.closeRequested)
+  );
+}
+
+export function isApplicationRequestBlocked(application: object): boolean {
+  const state = applicationStartupStates.get(application);
+
+  if (state === undefined) {
+    return false;
+  }
+
+  return state.closeRequested || state.phase !== "ready";
 }
 
 export function readyApplication(application: object): Promise<void> {
@@ -97,6 +123,8 @@ export function readyApplication(application: object): Promise<void> {
       readyPromise: resolvedReadyPromise,
 
       closePromise: undefined,
+
+      closeRequested: false,
     };
 
     applicationStartupStates.set(application, state);
@@ -110,7 +138,7 @@ export function readyApplication(application: object): Promise<void> {
     return existing;
   }
 
-  if (state.phase === "closed") {
+  if (state.phase === "closed" || state.closeRequested) {
     const closedPromise = Promise.reject(applicationClosedError());
 
     state.readyPromise = closedPromise;
@@ -142,10 +170,18 @@ export function readyApplication(application: object): Promise<void> {
       }
 
       current.phase = "ready";
+
+      /*
+       * If close() was requested while startup was running, requests
+       * remain blocked. The observer recompiles using closeRequested.
+       */
+      notifyApplicationRequestGateChanged(application);
     } catch (error) {
       current.phase = "failed";
 
       const cleanupErrors = await drainCleanupStack(current.cleanups);
+
+      notifyApplicationRequestGateChanged(application);
 
       if (cleanupErrors.length === 0) {
         throw error;
@@ -182,9 +218,13 @@ export function closeApplication(application: object): Promise<void> {
       readyPromise: undefined,
 
       closePromise: resolvedClosePromise,
+
+      closeRequested: true,
     };
 
     applicationStartupStates.set(application, state);
+
+    notifyApplicationRequestGateChanged(application);
 
     return resolvedClosePromise;
   }
@@ -194,6 +234,14 @@ export function closeApplication(application: object): Promise<void> {
   if (existing !== undefined) {
     return existing;
   }
+
+  state.closeRequested = true;
+
+  /*
+   * Gate requests immediately when close() begins, before asynchronous
+   * cleanup work runs.
+   */
+  notifyApplicationRequestGateChanged(application);
 
   /*
    * Closing an application that has never started must not trigger
@@ -205,6 +253,8 @@ export function closeApplication(application: object): Promise<void> {
     state.phase = "closed";
 
     state.closePromise = resolvedClosePromise;
+
+    notifyApplicationRequestGateChanged(application);
 
     return resolvedClosePromise;
   }
@@ -241,6 +291,8 @@ export function closeApplication(application: object): Promise<void> {
       current.tasks.length = 0;
 
       current.phase = "closed";
+
+      notifyApplicationRequestGateChanged(application);
     }
   })();
 
@@ -265,6 +317,16 @@ async function drainCleanupStack(
   }
 
   return errors;
+}
+
+function notifyApplicationRequestGateChanged(application: object): void {
+  const observer = (application as Partial<ApplicationRequestGateObserver>)[
+    GELIS_APPLICATION_REQUEST_GATE_CHANGED
+  ];
+
+  if (typeof observer === "function") {
+    observer.call(application);
+  }
 }
 
 function cleanupFailureError(errors: readonly unknown[]): unknown {

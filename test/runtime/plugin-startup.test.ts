@@ -80,7 +80,7 @@ describe("plugin startup lifecycle", () => {
       new Request("http://gelis.test/delayed"),
     );
 
-    expect(beforeReady.status).toBe(404);
+    expect(beforeReady.status).toBe(503);
 
     const ready = app.ready();
 
@@ -90,7 +90,7 @@ describe("plugin startup lifecycle", () => {
       new Request("http://gelis.test/delayed"),
     );
 
-    expect(whilePending.status).toBe(404);
+    expect(whilePending.status).toBe(503);
 
     release();
 
@@ -173,7 +173,7 @@ describe("plugin startup lifecycle", () => {
       new Request("http://gelis.test/never-committed"),
     );
 
-    expect(response.status).toBe(404);
+    expect(response.status).toBe(503);
   });
 
   test("stages later plugin composition behind an earlier pending startup", async () => {
@@ -220,8 +220,8 @@ describe("plugin startup lifecycle", () => {
       new Request("http://gelis.test/second"),
     );
 
-    expect(beforeFirst.status).toBe(404);
-    expect(beforeSecond.status).toBe(404);
+    expect(beforeFirst.status).toBe(503);
+    expect(beforeSecond.status).toBe(503);
 
     const ready = app.ready();
 
@@ -231,7 +231,7 @@ describe("plugin startup lifecycle", () => {
       new Request("http://gelis.test/second"),
     );
 
-    expect(pendingSecond.status).toBe(404);
+    expect(pendingSecond.status).toBe(503);
 
     release();
 

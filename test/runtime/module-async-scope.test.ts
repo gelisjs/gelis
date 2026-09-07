@@ -52,7 +52,7 @@ describe("async module scope resolution", () => {
       new Request("http://gelis.test/async-scope"),
     );
 
-    expect(beforeReady.status).toBe(404);
+    expect(beforeReady.status).toBe(503);
 
     const ready = app.ready();
 
@@ -60,7 +60,7 @@ describe("async module scope resolution", () => {
       new Request("http://gelis.test/async-scope"),
     );
 
-    expect(whilePending.status).toBe(404);
+    expect(whilePending.status).toBe(503);
 
     release();
 
@@ -160,7 +160,7 @@ describe("async module scope resolution", () => {
       new Request("http://gelis.test/plugin-dependent-module"),
     );
 
-    expect(beforeReady.status).toBe(404);
+    expect(beforeReady.status).toBe(503);
 
     const ready = app.ready();
 
@@ -276,7 +276,7 @@ describe("async module scope resolution", () => {
       new Request("http://gelis.test/async-failure"),
     );
 
-    expect(response.status).toBe(404);
+    expect(response.status).toBe(503);
 
     await expect(app.ready()).rejects.toBe(failure);
   });
@@ -321,7 +321,7 @@ describe("async module scope resolution", () => {
       new Request("http://gelis.test/second-static-module"),
     );
 
-    expect(secondBeforeReady.status).toBe(404);
+    expect(secondBeforeReady.status).toBe(503);
 
     const ready = app.ready();
 
@@ -329,7 +329,7 @@ describe("async module scope resolution", () => {
       new Request("http://gelis.test/second-static-module"),
     );
 
-    expect(secondWhilePending.status).toBe(404);
+    expect(secondWhilePending.status).toBe(503);
 
     release();
 

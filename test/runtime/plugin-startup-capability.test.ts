@@ -225,7 +225,7 @@ describe("plugin startup capabilities", () => {
       new Request("http://gelis.test/duplicate-provider-route"),
     );
 
-    expect(response.status).toBe(404);
+    expect(response.status).toBe(503);
   });
 
   test("revalidates setup-provided capabilities at staged commit time", async () => {
@@ -278,7 +278,7 @@ describe("plugin startup capabilities", () => {
       new Request("http://gelis.test/second-provider-route"),
     );
 
-    expect(response.status).toBe(404);
+    expect(response.status).toBe(503);
   });
 
   test("invalidates startup capability provide after the callback finishes", async () => {

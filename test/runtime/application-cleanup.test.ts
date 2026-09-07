@@ -165,7 +165,7 @@ describe("application cleanup lifecycle", () => {
       new Request("http://gelis.test/collision"),
     );
 
-    expect(await response.text()).toBe("existing");
+    expect(response.status).toBe(503);
   });
 
   test("close before ready does not start pending resource acquisition", async () => {
