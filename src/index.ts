@@ -34,7 +34,7 @@ export type {
 
 export { defineContract } from "./contract";
 
-export { defineModule } from "./module";
+export { defineModule, ModuleMountError } from "./module";
 
 export { ResponseContractError } from "./error";
 
@@ -73,7 +73,13 @@ export type {
   RouteRequestContract,
 } from "./route";
 
-export type { ModuleContractOf, ModuleRef } from "./module";
+export type {
+  ModuleContractOf,
+  ModuleMountErrorCode,
+  ModuleRef,
+  ModuleScopeResolver,
+  ModuleSetupContext,
+} from "./module";
 
 export type {
   ApiContractOf,

@@ -39,6 +39,27 @@ export type ModuleScopeResolver<Scope extends object> = (
   setup: ModuleSetupContext,
 ) => Scope;
 
+export type ModuleMountErrorCode =
+  | "MODULE_DEPENDENCY_MISSING"
+  | "MODULE_SETUP_CONTEXT_INACTIVE"
+  | "MODULE_ASYNC_SCOPE_UNSUPPORTED";
+
+export class ModuleMountError extends Error {
+  override readonly name = "ModuleMountError";
+
+  constructor(
+    readonly code: ModuleMountErrorCode,
+
+    message: string,
+
+    readonly modulePrefix: string,
+
+    readonly capabilityName?: string,
+  ) {
+    super(message);
+  }
+}
+
 interface ModuleRefInternal<
   Prefix extends string,
   Routes extends ModuleRoutes,
@@ -86,17 +107,13 @@ class ModuleSetupContextRuntime implements ModuleSetupContext {
     const frame = this.#frame;
 
     if (!frame.active) {
-      throw new Error(
-        `Module setup context for "${frame.prefix}" is no longer active`,
-      );
+      throw moduleSetupContextInactiveError(frame.prefix);
     }
 
     const value = readInstalledCapability(frame.application, capability);
 
     if (value === MISSING_CAPABILITY) {
-      throw new Error(
-        `Missing capability dependency "${capabilityName}" required by module "${frame.prefix}"`,
-      );
+      throw moduleDependencyMissingError(frame.prefix, capabilityName);
     }
 
     return value;
@@ -230,9 +247,7 @@ export function instantiateModuleRuntimeRoutes(
     if (isPromiseLike(scope)) {
       void Promise.resolve(scope).catch(() => undefined);
 
-      throw new Error(
-        `Async module scope resolution is not supported for "${module.prefix}"`,
-      );
+      throw moduleAsyncScopeUnsupportedError(module.prefix);
     }
   } finally {
     frame.active = false;
@@ -269,6 +284,46 @@ function cloneRuntimeRoute(route: RuntimeRouteRecord): RuntimeRouteRecord {
   return {
     ...route,
   };
+}
+
+function moduleDependencyMissingError(
+  modulePrefix: string,
+
+  capabilityName: string,
+): ModuleMountError {
+  return new ModuleMountError(
+    "MODULE_DEPENDENCY_MISSING",
+
+    `Missing capability dependency "${capabilityName}" required by module "${modulePrefix}"`,
+
+    modulePrefix,
+
+    capabilityName,
+  );
+}
+
+function moduleSetupContextInactiveError(
+  modulePrefix: string,
+): ModuleMountError {
+  return new ModuleMountError(
+    "MODULE_SETUP_CONTEXT_INACTIVE",
+
+    `Module setup context for "${modulePrefix}" is no longer active`,
+
+    modulePrefix,
+  );
+}
+
+function moduleAsyncScopeUnsupportedError(
+  modulePrefix: string,
+): ModuleMountError {
+  return new ModuleMountError(
+    "MODULE_ASYNC_SCOPE_UNSUPPORTED",
+
+    `Async module scope resolution is not supported for "${modulePrefix}"`,
+
+    modulePrefix,
+  );
 }
 
 function isPromiseLike(value: unknown): value is PromiseLike<unknown> {
