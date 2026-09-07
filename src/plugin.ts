@@ -22,6 +22,8 @@ import {
   registerApplicationCleanup,
 } from "./startup";
 
+import { isAotCaptureApplication } from "./aot-capture";
+
 export const GELIS_CAPABILITY_REQUIRE_RUNTIME = Symbol(
   "gelis.capability.require.runtime",
 );
@@ -462,6 +464,21 @@ export function installPlugin(
       void Promise.resolve(result).catch(() => undefined);
 
       throw asyncSetupUnsupportedError(plugin.name);
+    }
+
+    /*
+     * AOT build capture records synchronous declaration shape only.
+     *
+     * Explicit startup callbacks are deliberately not queued or run here.
+     * Plugin routes/hooks declared during synchronous setup must still be
+     * visible to the route collector.
+     */
+    if (isAotCaptureApplication(application)) {
+      commitPluginInstallation(frame);
+
+      installationAccepted = true;
+
+      return;
     }
 
     const requiresStartupStaging =

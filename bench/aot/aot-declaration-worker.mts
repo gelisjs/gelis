@@ -2,7 +2,7 @@ import { Gelis } from "../../src/index.ts";
 
 import { RouteBuilder } from "../../src/route-builder.ts";
 
-import { createAotAppSession } from "../../src/tooling/aot-app.ts";
+import { createAotBuildAppSession } from "../../src/tooling/aot-app.ts";
 
 import type {
   RuntimeRouteHandler,
@@ -68,7 +68,7 @@ if (scenario === "builder") {
 } else if (scenario === "aot-app") {
   const constructStarted = performance.now();
 
-  const session = createAotAppSession();
+  const session = createAotBuildAppSession();
 
   constructMs = performance.now() - constructStarted;
 

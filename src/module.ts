@@ -24,6 +24,8 @@ import {
   hasPendingApplicationStartup,
 } from "./startup";
 
+import { isAotCaptureApplication } from "./aot-capture";
+
 import { RouteBuilder } from "./route-builder";
 
 import type {
@@ -459,6 +461,20 @@ export function mountModuleRuntimeRoutes(
 
   try {
     /*
+     * AOT build capture needs the module's route shape but must never
+     * execute the real module scope resolver.
+     */
+    if (isAotCaptureApplication(application)) {
+      const routes = instantiateAotCaptureModuleRuntimeRoutes(module);
+
+      commit(routes);
+
+      mountAccepted = true;
+
+      return;
+    }
+
+    /*
      * Preserve source order after the first asynchronous startup boundary.
      *
      * A later module must not resolve dependencies or commit routes ahead of
@@ -516,6 +532,45 @@ export function mountModuleRuntimeRoutes(
       mounted.delete(module);
     }
   }
+}
+
+const AOT_CAPTURE_MODULE_SCOPE = Object.freeze({});
+
+function instantiateAotCaptureModuleRuntimeRoutes(
+  module: AnyModuleRef,
+): readonly RuntimeRouteRecord[] {
+  const definition = (module as unknown as RuntimeModule)[
+    moduleRuntimeDefinition
+  ];
+
+  /*
+   * Scoped modules are bound to a placeholder object solely to preserve
+   * their runtime route shape. No handler/lifecycle callback executes
+   * during collection, so the real scope value is unnecessary.
+   */
+  if (definition.resolveScope !== undefined) {
+    return bindScopedModuleRuntimeRoutes(definition, AOT_CAPTURE_MODULE_SCOPE);
+  }
+
+  const routes = definition.routes.map(cloneRuntimeRoute);
+
+  const lifecycle = definition.lifecycle;
+
+  if (lifecycle === undefined) {
+    return routes;
+  }
+
+  if (lifecycle.kind !== "static") {
+    throw new Error("Invalid Gelis static module lifecycle");
+  }
+
+  bindModuleLifecycleRoutes(
+    routes,
+    lifecycle.beforeHandle,
+    lifecycle.afterHandle,
+  );
+
+  return routes;
 }
 
 function instantiateModuleRuntimeRoutes(

@@ -2,6 +2,8 @@ import { GELIS_INTERNAL_RUNTIME, Gelis } from "../app";
 
 import type { GelisInternalRouter } from "../app";
 
+import { markAotCaptureApplication } from "../aot-capture";
+
 import { hydrateRouterSnapshot } from "../runtime/router-snapshot";
 
 import type { RouterSnapshot } from "../runtime/router-snapshot";
@@ -42,8 +44,32 @@ class CollectOnlyRouter implements GelisInternalRouter {
   }
 }
 
+/*
+ * Runtime AOT declaration session.
+ *
+ * Declarations execute with normal Gelis semantics. Startup work and
+ * async module scope resolution therefore remain runtime-owned.
+ */
 export function createAotAppSession(): AotAppSession {
+  return createSession(false);
+}
+
+/*
+ * Build-time AOT declaration capture.
+ *
+ * Startup callbacks and module scope resolvers must never execute here.
+ * Core composition detects this marker and records only declaration shape.
+ */
+export function createAotBuildAppSession(): AotAppSession {
+  return createSession(true);
+}
+
+function createSession(captureOnly: boolean): AotAppSession {
   const app = new Gelis();
+
+  if (captureOnly) {
+    markAotCaptureApplication(app);
+  }
 
   const control = app[GELIS_INTERNAL_RUNTIME]();
 

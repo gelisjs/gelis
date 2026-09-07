@@ -2,7 +2,10 @@ import { describe, expect, test } from "bun:test";
 
 import { defineModule, Gelis } from "../../src";
 
-import { createAotAppSession } from "../../src/tooling/aot-app";
+import {
+  createAotAppSession,
+  createAotBuildAppSession,
+} from "../../src/tooling/aot-app";
 
 import { compileRouterSnapshot } from "../../src/tooling/router-snapshot-compiler";
 
@@ -26,7 +29,7 @@ describe("Gelis AOT application session", () => {
      * Handler identity/content is deliberately
      * different from runtime.
      */
-    const build = createAotAppSession();
+    const build = createAotBuildAppSession();
 
     defineApplication(build.app, "build");
 
