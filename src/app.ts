@@ -12,6 +12,10 @@ import type { Plugin, PluginCompositionDeclaration } from "./plugin";
 
 import { mountModuleRuntimeRoutes } from "./module";
 
+import { enqueueApplicationStartup, readyApplication } from "./startup";
+
+import type { ApplicationStartupTask } from "./startup";
+
 import { pathnameFromUrl } from "./runtime/url";
 
 import { RouteBuilder } from "./route-builder";
@@ -156,6 +160,8 @@ interface AppRuntimeState {
 export const GELIS_INTERNAL_RUNTIME = Symbol("gelis.internal.runtime");
 
 export interface GelisInternalRuntimeControl {
+  enqueueStartup(task: ApplicationStartupTask): void;
+
   installRouter(router: GelisInternalRouter): void;
 
   installPrebuiltRuntime(
@@ -303,6 +309,10 @@ export class Gelis extends RouteBuilder<""> {
     return this;
   }
 
+  ready(): Promise<void> {
+    return readyApplication(this);
+  }
+
   scope<const Scope extends object>(
     scope: Scope,
   ): ApplicationScopeBuilder<Scope> {
@@ -334,7 +344,13 @@ export class Gelis extends RouteBuilder<""> {
   [GELIS_INTERNAL_RUNTIME](): GelisInternalRuntimeControl {
     const state = this.#state;
 
+    const application = this;
+
     return {
+      enqueueStartup(task: ApplicationStartupTask): void {
+        enqueueApplicationStartup(application, task);
+      },
+
       installRouter(router: GelisInternalRouter): void {
         state.router = router;
       },
