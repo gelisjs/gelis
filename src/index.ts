@@ -1,10 +1,11 @@
 export { Gelis } from "./app";
 
-export { defineCapability, definePlugin } from "./plugin";
+export { defineCapability, definePlugin, PluginInstallError } from "./plugin";
 
 export type {
   Capability,
   Plugin,
+  PluginInstallErrorCode,
   PluginSetup,
   PluginSetupContext,
 } from "./plugin";

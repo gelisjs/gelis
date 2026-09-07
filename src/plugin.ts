@@ -1,7 +1,37 @@
 const PLUGIN_SETUP_RUNTIME = Symbol("gelis.plugin.setup.runtime");
 
+export type PluginInstallErrorCode =
+  | "PLUGIN_DEPENDENCY_MISSING"
+  | "PLUGIN_CAPABILITY_ALREADY_PROVIDED"
+  | "PLUGIN_SETUP_CONTEXT_INACTIVE"
+  | "PLUGIN_ASYNC_SETUP_UNSUPPORTED";
+
+export class PluginInstallError extends Error {
+  override readonly name = "PluginInstallError";
+
+  constructor(
+    readonly code: PluginInstallErrorCode,
+
+    message: string,
+
+    readonly pluginName: string,
+
+    readonly capabilityName?: string,
+
+    readonly providerPluginName?: string,
+  ) {
+    super(message);
+  }
+}
+
+interface CapabilityEntry {
+  readonly value: unknown;
+
+  readonly providerPluginName: string;
+}
+
 interface PluginRuntimeState {
-  readonly capabilities: Map<object, unknown>;
+  readonly capabilities: Map<object, CapabilityEntry>;
 }
 
 interface PluginInstallFrame {
@@ -9,7 +39,9 @@ interface PluginInstallFrame {
 
   readonly state: PluginRuntimeState;
 
-  readonly pendingCapabilities: Map<object, unknown>;
+  readonly pendingCapabilities: Map<object, CapabilityEntry>;
+
+  active: boolean;
 }
 
 export interface PluginSetupContext {
@@ -21,7 +53,11 @@ export interface Capability<Value> {
 
   require(context: PluginSetupContext): Value;
 
-  provide(context: PluginSetupContext, value: Value): void;
+  provide(
+    context: PluginSetupContext,
+
+    value: Value,
+  ): void;
 }
 
 export type PluginSetup = (context: PluginSetupContext) => void;
@@ -39,38 +75,45 @@ export function defineCapability(name: string): Capability<never> {
     name,
 
     require(context) {
-      const frame = getPluginInstallFrame(context);
+      const frame = getActivePluginInstallFrame(context);
 
-      const pending = frame.pendingCapabilities;
+      const entry = frame.state.capabilities.get(capability);
 
-      if (pending.has(capability)) {
-        return pending.get(capability) as never;
+      if (entry === undefined) {
+        throw missingDependencyError(frame.plugin.name, name);
       }
 
-      const capabilities = frame.state.capabilities;
-
-      if (!capabilities.has(capability)) {
-        throw new Error(
-          `Missing capability dependency "${name}" required by plugin "${frame.plugin.name}"`,
-        );
-      }
-
-      return capabilities.get(capability) as never;
+      return entry.value as never;
     },
 
     provide(context, value) {
-      const frame = getPluginInstallFrame(context);
+      const frame = getActivePluginInstallFrame(context);
 
-      if (
-        frame.pendingCapabilities.has(capability) ||
-        frame.state.capabilities.has(capability)
-      ) {
-        throw new Error(
-          `Capability "${name}" is already provided while installing plugin "${frame.plugin.name}"`,
+      const pending = frame.pendingCapabilities.get(capability);
+
+      if (pending !== undefined) {
+        throw capabilityAlreadyProvidedError(
+          frame.plugin.name,
+          name,
+          pending.providerPluginName,
         );
       }
 
-      frame.pendingCapabilities.set(capability, value);
+      const committed = frame.state.capabilities.get(capability);
+
+      if (committed !== undefined) {
+        throw capabilityAlreadyProvidedError(
+          frame.plugin.name,
+          name,
+          committed.providerPluginName,
+        );
+      }
+
+      frame.pendingCapabilities.set(capability, {
+        value,
+
+        providerPluginName: frame.plugin.name,
+      });
     },
   };
 
@@ -102,21 +145,41 @@ export function installPlugin(application: object, plugin: Plugin): void {
     state,
 
     pendingCapabilities: new Map(),
+
+    active: true,
   };
 
   const context: PluginSetupContext = {
     [PLUGIN_SETUP_RUNTIME]: frame,
   };
 
-  const result = plugin.setup(context);
+  try {
+    const result = plugin.setup(context);
 
-  if (isPromiseLike(result)) {
-    throw new Error(`Async setup is not supported for plugin "${plugin.name}"`);
+    if (isPromiseLike(result)) {
+      void Promise.resolve(result).catch(() => undefined);
+
+      throw asyncSetupUnsupportedError(plugin.name);
+    }
+
+    for (const [capability, entry] of frame.pendingCapabilities) {
+      state.capabilities.set(capability, entry);
+    }
+  } finally {
+    frame.active = false;
+  }
+}
+
+function getActivePluginInstallFrame(
+  context: PluginSetupContext,
+): PluginInstallFrame {
+  const frame = getPluginInstallFrame(context);
+
+  if (!frame.active) {
+    throw setupContextInactiveError(frame.plugin.name);
   }
 
-  for (const [capability, value] of frame.pendingCapabilities) {
-    state.capabilities.set(capability, value);
-  }
+  return frame;
 }
 
 function getPluginInstallFrame(
@@ -129,6 +192,59 @@ function getPluginInstallFrame(
   }
 
   return frame;
+}
+
+function missingDependencyError(
+  pluginName: string,
+  capabilityName: string,
+): PluginInstallError {
+  return new PluginInstallError(
+    "PLUGIN_DEPENDENCY_MISSING",
+
+    `Missing capability dependency "${capabilityName}" required by plugin "${pluginName}"`,
+
+    pluginName,
+
+    capabilityName,
+  );
+}
+
+function capabilityAlreadyProvidedError(
+  pluginName: string,
+  capabilityName: string,
+  providerPluginName: string,
+): PluginInstallError {
+  return new PluginInstallError(
+    "PLUGIN_CAPABILITY_ALREADY_PROVIDED",
+
+    `Capability "${capabilityName}" is already provided by plugin "${providerPluginName}" while installing plugin "${pluginName}"`,
+
+    pluginName,
+
+    capabilityName,
+
+    providerPluginName,
+  );
+}
+
+function setupContextInactiveError(pluginName: string): PluginInstallError {
+  return new PluginInstallError(
+    "PLUGIN_SETUP_CONTEXT_INACTIVE",
+
+    `Plugin setup context for "${pluginName}" is no longer active`,
+
+    pluginName,
+  );
+}
+
+function asyncSetupUnsupportedError(pluginName: string): PluginInstallError {
+  return new PluginInstallError(
+    "PLUGIN_ASYNC_SETUP_UNSUPPORTED",
+
+    `Async setup is not supported for plugin "${pluginName}"`,
+
+    pluginName,
+  );
 }
 
 function isPromiseLike(value: unknown): value is PromiseLike<unknown> {
