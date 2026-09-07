@@ -48,7 +48,8 @@ type ConsumerOnlySetup = Expect<Equal<SetupStringKeys, never>>;
 type FrozenModuleMountErrorCodes =
   | "MODULE_DEPENDENCY_MISSING"
   | "MODULE_SETUP_CONTEXT_INACTIVE"
-  | "MODULE_ASYNC_SCOPE_UNSUPPORTED";
+  | "MODULE_ASYNC_SCOPE_UNSUPPORTED"
+  | "MODULE_ALREADY_MOUNTED";
 
 type ErrorCodes = Expect<
   Equal<ModuleMountErrorCode, FrozenModuleMountErrorCodes>

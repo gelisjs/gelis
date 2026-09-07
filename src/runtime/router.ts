@@ -59,92 +59,53 @@ export class Router {
   register(route: RuntimeRouteRecord): void {
     const table = this.getOrCreateMethod(route.method);
 
-    const segments = splitPath(route.path);
+    registerRouteIntoTable(table, route);
+  }
 
-    const paramNames: string[] = [];
-
-    let hasParams = false;
-
-    for (const segment of segments) {
-      if (segment.startsWith(":")) {
-        hasParams = true;
-
-        paramNames.push(segment.slice(1));
-      }
-    }
-
-    /*
-     * Exact static routes are unchanged.
-     */
-    if (!hasParams) {
-      if (table.staticRoutes.has(route.path)) {
-        throw duplicateRoute(route);
-      }
-
-      table.staticRoutes.set(route.path, route);
-
+  /*
+   * Registers one composition batch transactionally.
+   *
+   * Only HTTP method tables touched by the batch are
+   * copied. The active router is replaced only after
+   * every route has registered successfully.
+   *
+   * Duplicate detection therefore uses Router's
+   * canonical topology directly instead of a second
+   * string-normalization pass.
+   */
+  registerBatchAtomic(routes: readonly RuntimeRouteRecord[]): void {
+    if (routes.length === 0) {
       return;
     }
 
-    const finalSegment = segments[segments.length - 1];
+    const nextMethods = new Map(this.#methods);
 
-    const trailingParamName =
-      paramNames.length === 1 && finalSegment?.startsWith(":")
-        ? paramNames[0]
-        : undefined;
+    const writableMethods = new Map<string, MethodRoutes>();
 
-    /*
-     * As long as this method only contains
-     * trailing-param dynamic routes, keep them
-     * entirely in the fast map.
-     */
-    if (trailingParamName !== undefined && !table.usesDynamicTrie) {
-      const slash = route.path.lastIndexOf("/");
+    for (const route of routes) {
+      let table = writableMethods.get(route.method);
 
-      if (slash >= 0) {
-        const prefix = route.path.slice(0, slash + 1);
+      if (table === undefined) {
+        const existing = nextMethods.get(route.method);
 
-        let trailingParamRoutes = table.trailingParamRoutes;
+        table =
+          existing === undefined
+            ? createMethodRoutes()
+            : cloneMethodRoutes(existing);
 
-        if (!trailingParamRoutes) {
-          trailingParamRoutes = new Map();
+        writableMethods.set(route.method, table);
 
-          table.trailingParamRoutes = trailingParamRoutes;
-        }
-
-        if (trailingParamRoutes.has(prefix)) {
-          throw duplicateRoute(route);
-        }
-
-        trailingParamRoutes.set(prefix, {
-          route,
-
-          paramName: trailingParamName,
-        });
-
-        return;
+        nextMethods.set(route.method, table);
       }
+
+      registerRouteIntoTable(table, route);
     }
 
     /*
-     * First generic dynamic route switches the
-     * entire method to the general trie.
-     *
-     * Existing trailing-param routes are migrated
-     * once at registration time. Request-time code
-     * then never needs to probe the fast map first.
+     * No mutation of the active method map occurred
+     * before this point.
      */
-    if (!table.usesDynamicTrie) {
-      migrateTrailingRoutesToTrie(table);
-
-      table.usesDynamicTrie = true;
-    }
-
-    registerDynamicRoute(
-      table.dynamicRoot,
-
-      route,
-    );
+    this.#methods = nextMethods;
   }
 
   match(method: string, pathname: string): RuntimeRouteMatch | undefined {
@@ -258,20 +219,149 @@ export class Router {
       return existing;
     }
 
-    const created: MethodRoutes = {
-      staticRoutes: new Map(),
-
-      trailingParamRoutes: undefined,
-
-      dynamicRoot: createDynamicNode(),
-
-      usesDynamicTrie: false,
-    };
+    const created = createMethodRoutes();
 
     this.#methods.set(method, created);
 
     return created;
   }
+}
+
+function createMethodRoutes(): MethodRoutes {
+  return {
+    staticRoutes: new Map(),
+
+    trailingParamRoutes: undefined,
+
+    dynamicRoot: createDynamicNode(),
+
+    usesDynamicTrie: false,
+  };
+}
+
+function cloneMethodRoutes(table: MethodRoutes): MethodRoutes {
+  return {
+    staticRoutes: new Map(table.staticRoutes),
+
+    trailingParamRoutes:
+      table.trailingParamRoutes === undefined
+        ? undefined
+        : new Map(table.trailingParamRoutes),
+
+    dynamicRoot: cloneDynamicNode(table.dynamicRoot),
+
+    usesDynamicTrie: table.usesDynamicTrie,
+  };
+}
+
+function cloneDynamicNode(node: DynamicNode): DynamicNode {
+  let staticChildren: Map<string, DynamicNode> | undefined;
+
+  const existingStaticChildren = node.staticChildren;
+
+  if (existingStaticChildren !== undefined) {
+    staticChildren = new Map();
+
+    for (const [segment, child] of existingStaticChildren) {
+      staticChildren.set(segment, cloneDynamicNode(child));
+    }
+  }
+
+  return {
+    staticChildren,
+
+    paramChild:
+      node.paramChild === undefined
+        ? undefined
+        : cloneDynamicNode(node.paramChild),
+
+    /*
+     * DynamicRoute is immutable after registration.
+     * The transactional tree may safely share the
+     * already-installed route leaf value.
+     */
+    route: node.route,
+  };
+}
+
+function registerRouteIntoTable(
+  table: MethodRoutes,
+
+  route: RuntimeRouteRecord,
+): void {
+  const segments = splitPath(route.path);
+
+  const paramNames: string[] = [];
+
+  let hasParams = false;
+
+  for (const segment of segments) {
+    if (segment.startsWith(":")) {
+      hasParams = true;
+
+      paramNames.push(segment.slice(1));
+    }
+  }
+
+  /*
+   * Exact static routes.
+   */
+  if (!hasParams) {
+    if (table.staticRoutes.has(route.path)) {
+      throw duplicateRoute(route);
+    }
+
+    table.staticRoutes.set(route.path, route);
+
+    return;
+  }
+
+  const finalSegment = segments[segments.length - 1];
+
+  const trailingParamName =
+    paramNames.length === 1 && finalSegment?.startsWith(":")
+      ? paramNames[0]
+      : undefined;
+
+  if (trailingParamName !== undefined && !table.usesDynamicTrie) {
+    const slash = route.path.lastIndexOf("/");
+
+    if (slash >= 0) {
+      const prefix = route.path.slice(0, slash + 1);
+
+      let trailingParamRoutes = table.trailingParamRoutes;
+
+      if (!trailingParamRoutes) {
+        trailingParamRoutes = new Map();
+
+        table.trailingParamRoutes = trailingParamRoutes;
+      }
+
+      if (trailingParamRoutes.has(prefix)) {
+        throw duplicateRoute(route);
+      }
+
+      trailingParamRoutes.set(prefix, {
+        route,
+
+        paramName: trailingParamName,
+      });
+
+      return;
+    }
+  }
+
+  if (!table.usesDynamicTrie) {
+    migrateTrailingRoutesToTrie(table);
+
+    table.usesDynamicTrie = true;
+  }
+
+  registerDynamicRoute(
+    table.dynamicRoot,
+
+    route,
+  );
 }
 
 function migrateTrailingRoutesToTrie(table: MethodRoutes): void {

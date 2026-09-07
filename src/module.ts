@@ -42,7 +42,8 @@ export type ModuleScopeResolver<Scope extends object> = (
 export type ModuleMountErrorCode =
   | "MODULE_DEPENDENCY_MISSING"
   | "MODULE_SETUP_CONTEXT_INACTIVE"
-  | "MODULE_ASYNC_SCOPE_UNSUPPORTED";
+  | "MODULE_ASYNC_SCOPE_UNSUPPORTED"
+  | "MODULE_ALREADY_MOUNTED";
 
 export class ModuleMountError extends Error {
   override readonly name = "ModuleMountError";
@@ -91,6 +92,8 @@ interface ModuleSetupFrame {
 
   active: boolean;
 }
+
+type ModuleMountCommit = (routes: readonly RuntimeRouteRecord[]) => void;
 
 class ModuleSetupContextRuntime implements ModuleSetupContext {
   readonly #frame: ModuleSetupFrame;
@@ -148,6 +151,8 @@ export type ModuleContractOf<Module> =
         routes: PublicRoutes;
       }
     : never;
+
+const applicationModuleMounts = new WeakMap<object, Set<AnyModuleRef>>();
 
 export function defineModule<
   const Prefix extends string,
@@ -214,7 +219,50 @@ export function defineModule(
   );
 }
 
-export function instantiateModuleRuntimeRoutes(
+export function mountModuleRuntimeRoutes(
+  application: object,
+
+  module: AnyModuleRef,
+
+  commit: ModuleMountCommit,
+): void {
+  let mounted = applicationModuleMounts.get(application);
+
+  if (mounted === undefined) {
+    mounted = new Set();
+
+    applicationModuleMounts.set(application, mounted);
+  }
+
+  if (mounted.has(module)) {
+    throw moduleAlreadyMountedError(module.prefix);
+  }
+
+  /*
+   * Reserve identity before dependency resolution.
+   *
+   * This makes a re-entrant mount of the same Module object fail immediately.
+   * The reservation is removed on every failed mount, so dependency or route
+   * failures remain retryable.
+   */
+  mounted.add(module);
+
+  let mountSucceeded = false;
+
+  try {
+    const routes = instantiateModuleRuntimeRoutes(application, module);
+
+    commit(routes);
+
+    mountSucceeded = true;
+  } finally {
+    if (!mountSucceeded) {
+      mounted.delete(module);
+    }
+  }
+}
+
+function instantiateModuleRuntimeRoutes(
   application: object,
 
   module: AnyModuleRef,
@@ -321,6 +369,16 @@ function moduleAsyncScopeUnsupportedError(
     "MODULE_ASYNC_SCOPE_UNSUPPORTED",
 
     `Async module scope resolution is not supported for "${modulePrefix}"`,
+
+    modulePrefix,
+  );
+}
+
+function moduleAlreadyMountedError(modulePrefix: string): ModuleMountError {
+  return new ModuleMountError(
+    "MODULE_ALREADY_MOUNTED",
+
+    `Module "${modulePrefix}" cannot be mounted more than once on the same application`,
 
     modulePrefix,
   );

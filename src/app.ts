@@ -10,7 +10,7 @@ import { installPlugin } from "./plugin";
 
 import type { Plugin, PluginCompositionDeclaration } from "./plugin";
 
-import { instantiateModuleRuntimeRoutes } from "./module";
+import { mountModuleRuntimeRoutes } from "./module";
 
 import { pathnameFromUrl } from "./runtime/url";
 
@@ -103,6 +103,14 @@ type RuntimeRouteInvoker = (
 
 export interface GelisInternalRouter {
   register(route: RuntimeRouteRecord): void;
+
+  /*
+   * Normal Router supports transactional composition.
+   *
+   * Specialized collection routers may omit this
+   * operation and use the compatibility fallback.
+   */
+  registerBatchAtomic?(routes: readonly RuntimeRouteRecord[]): void;
 
   match(
     method: string,
@@ -453,11 +461,15 @@ export class Gelis extends RouteBuilder<""> {
   mount<const Prefix extends string, const Routes extends ModuleRoutes>(
     module: ModuleRef<Prefix, Routes>,
   ): void {
-    const routes = instantiateModuleRuntimeRoutes(this, module);
+    mountModuleRuntimeRoutes(
+      this,
 
-    for (const route of routes) {
-      registerAppRuntimeRoute(this.#state, route);
-    }
+      module,
+
+      (routes) => {
+        commitModuleRuntimeRoutesAtomic(this.#state, routes);
+      },
+    );
   }
 
   fetch(request: Request): Response | Promise<Response> {
@@ -738,6 +750,109 @@ export class Gelis extends RouteBuilder<""> {
       }
     }
   }
+}
+
+function commitModuleRuntimeRoutesAtomic(
+  state: AppRuntimeState,
+
+  routes: readonly RuntimeRouteRecord[],
+): void {
+  if (routes.length === 0) {
+    return;
+  }
+
+  const registerBatchAtomic = state.router.registerBatchAtomic;
+
+  /*
+   * The normal Router owns the optimized atomic
+   * composition path.
+   *
+   * Collection/specialized internal routers keep
+   * compatibility with the existing prevalidation
+   * path. This path is not the production request
+   * router fast path.
+   */
+  if (registerBatchAtomic === undefined) {
+    validatePluginCompositionRoutes(state, routes);
+
+    for (const route of routes) {
+      registerAppRuntimeRoute(state, route);
+    }
+
+    return;
+  }
+
+  const localBeforeHooks = state.localBeforeHooks;
+
+  const localAfterHooks = state.localAfterHooks;
+
+  /*
+   * No application-global lifecycle exists.
+   *
+   * RouteBuilder already compiled every route-local
+   * execution plan, so the router batch can be
+   * committed directly.
+   */
+  if (localBeforeHooks === undefined || localAfterHooks === undefined) {
+    registerBatchAtomic.call(state.router, routes);
+
+    const routeIdentityKeys = state.routeIdentityKeys;
+
+    if (routeIdentityKeys !== undefined) {
+      for (const route of routes) {
+        routeIdentityKeys.add(runtimeRouteIdentityKey(route));
+      }
+    }
+
+    state.routes.push(...routes);
+
+    return;
+  }
+
+  /*
+   * Global lifecycle is already active.
+   *
+   * Prepare the effective route objects first, but
+   * do not mutate application bookkeeping until the
+   * router transaction succeeds.
+   */
+  const pendingBeforeHooks = new Array<RuntimeBeforeHandle | undefined>(
+    routes.length,
+  );
+
+  const pendingAfterHooks = new Array<RuntimeAfterHandle | undefined>(
+    routes.length,
+  );
+
+  for (let index = 0; index < routes.length; index++) {
+    const route = routes[index]!;
+
+    const localBeforeHandle = route.beforeHandle;
+
+    const localAfterHandle = route.afterHandle;
+
+    pendingBeforeHooks[index] = localBeforeHandle;
+
+    pendingAfterHooks[index] = localAfterHandle;
+
+    applyLifecyclePlan(state, route, localBeforeHandle, localAfterHandle);
+  }
+
+  registerBatchAtomic.call(state.router, routes);
+
+  const routeIdentityKeys = state.routeIdentityKeys;
+
+  if (routeIdentityKeys !== undefined) {
+    for (const route of routes) {
+      routeIdentityKeys.add(runtimeRouteIdentityKey(route));
+    }
+  }
+
+  localBeforeHooks.push(...pendingBeforeHooks);
+
+  localAfterHooks.push(...pendingAfterHooks);
+
+  state.routes.push(...routes);
 }
 
 function validatePluginCompositionRoutes(
