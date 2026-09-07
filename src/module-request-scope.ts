@@ -189,149 +189,31 @@ export type ModuleRequestScopeLifecycleFor<
   >;
 };
 
-interface ModuleRequestScopeRouteMethod<
-  Method extends HttpMethod,
+declare const moduleRequestScopeBuilderStateBrand: unique symbol;
+
+interface ModuleRequestScopeBuilderState<
   ModuleScope extends object,
   RequestScope extends object,
   Prefix extends string,
 > {
-  <const Path extends string, Result>(
-    path: Path & ValidRoutePath<Path>,
+  readonly [moduleRequestScopeBuilderStateBrand]: {
+    readonly moduleScope: ModuleScope;
 
-    handler: ModuleRequestScopeHandler<
-      JoinRoutePath<Prefix, Path>,
-      ModuleScope,
-      RequestScope,
-      Result
-    >,
+    readonly requestScope: RequestScope;
 
-    lifecycle?: ModuleRequestScopeLifecycleFor<
-      JoinRoutePath<Prefix, Path>,
-      ModuleScope,
-      RequestScope,
-      undefined,
-      undefined,
-      undefined,
-      Result
-    >,
-  ): RouteRef<
-    Method,
-    JoinRoutePath<Prefix, Path>,
-    RouteRequestContract<InferPathParams<JoinRoutePath<Prefix, Path>>>,
-    InferImplicitResponses<Result>
-  >;
-
-  <
-    const Path extends string,
-    const Query extends StandardSchemaV1 | undefined = undefined,
-    const Body extends StandardSchemaV1 | undefined = undefined,
-    Result = unknown,
-  >(
-    path: Path & ValidRoutePath<Path>,
-
-    options: RouteOptionsFor<Query, Body, undefined>,
-
-    handler: [ModuleScope] extends [never]
-      ? (
-          context: RouteHandlerContextFor<
-            JoinRoutePath<Prefix, Path>,
-            RouteOptionsFor<Query, Body, undefined>
-          >,
-
-          requestScope: RequestScope,
-        ) => Result
-      : (
-          context: RouteHandlerContextFor<
-            JoinRoutePath<Prefix, Path>,
-            RouteOptionsFor<Query, Body, undefined>
-          >,
-
-          moduleScope: ModuleScope,
-
-          requestScope: RequestScope,
-        ) => Result,
-
-    lifecycle?: ModuleRequestScopeLifecycleFor<
-      JoinRoutePath<Prefix, Path>,
-      ModuleScope,
-      RequestScope,
-      Query,
-      Body,
-      undefined,
-      Result
-    >,
-  ): RouteRef<
-    Method,
-    JoinRoutePath<Prefix, Path>,
-    RouteRequestFor<
-      JoinRoutePath<Prefix, Path>,
-      RouteOptionsFor<Query, Body, undefined>
-    >,
-    RouteResponsesFor<RouteOptionsFor<Query, Body, undefined>, Result>
-  >;
-
-  <
-    const Path extends string,
-    const Responses extends ResponseContractMap,
-    const Query extends StandardSchemaV1 | undefined = undefined,
-    const Body extends StandardSchemaV1 | undefined = undefined,
-  >(
-    path: Path & ValidRoutePath<Path>,
-
-    options: RouteOptionsFor<Query, Body, Responses> & {
-      readonly responses: Responses;
-    },
-
-    handler: [ModuleScope] extends [never]
-      ? (
-          context: RouteHandlerContextFor<
-            JoinRoutePath<Prefix, Path>,
-            RouteOptionsFor<Query, Body, Responses>
-          >,
-
-          requestScope: RequestScope,
-        ) => RouteHandlerResultFor<Responses>
-      : (
-          context: RouteHandlerContextFor<
-            JoinRoutePath<Prefix, Path>,
-            RouteOptionsFor<Query, Body, Responses>
-          >,
-
-          moduleScope: ModuleScope,
-
-          requestScope: RequestScope,
-        ) => RouteHandlerResultFor<Responses>,
-
-    lifecycle?: ModuleRequestScopeLifecycleFor<
-      JoinRoutePath<Prefix, Path>,
-      ModuleScope,
-      RequestScope,
-      Query,
-      Body,
-      Responses,
-      RouteHandlerResultFor<Responses>
-    >,
-  ): RouteRef<
-    Method,
-    JoinRoutePath<Prefix, Path>,
-    RouteRequestFor<
-      JoinRoutePath<Prefix, Path>,
-      RouteOptionsFor<Query, Body, Responses>
-    >,
-    RouteResponsesFor<
-      RouteOptionsFor<Query, Body, Responses>,
-      RouteHandlerResultFor<Responses>
-    >
-  >;
+    readonly prefix: Prefix;
+  };
 }
 
-interface ModuleRequestScopeGenericRouteMethod<
-  ModuleScope extends object,
-  RequestScope extends object,
-  Prefix extends string,
-> {
-  <const Method extends HttpMethod, const Path extends string, Result>(
-    method: Method,
+interface SharedModuleRequestScopeRouteMethod<Method extends HttpMethod> {
+  <
+    const ModuleScope extends object,
+    const RequestScope extends object,
+    const Prefix extends string,
+    const Path extends string,
+    Result,
+  >(
+    this: ModuleRequestScopeBuilderState<ModuleScope, RequestScope, Prefix>,
 
     path: Path & ValidRoutePath<Path>,
 
@@ -359,13 +241,15 @@ interface ModuleRequestScopeGenericRouteMethod<
   >;
 
   <
-    const Method extends HttpMethod,
+    const ModuleScope extends object,
+    const RequestScope extends object,
+    const Prefix extends string,
     const Path extends string,
     const Query extends StandardSchemaV1 | undefined = undefined,
     const Body extends StandardSchemaV1 | undefined = undefined,
     Result = unknown,
   >(
-    method: Method,
+    this: ModuleRequestScopeBuilderState<ModuleScope, RequestScope, Prefix>,
 
     path: Path & ValidRoutePath<Path>,
 
@@ -411,13 +295,15 @@ interface ModuleRequestScopeGenericRouteMethod<
   >;
 
   <
-    const Method extends HttpMethod,
+    const ModuleScope extends object,
+    const RequestScope extends object,
+    const Prefix extends string,
     const Path extends string,
     const Responses extends ResponseContractMap,
     const Query extends StandardSchemaV1 | undefined = undefined,
     const Body extends StandardSchemaV1 | undefined = undefined,
   >(
-    method: Method,
+    this: ModuleRequestScopeBuilderState<ModuleScope, RequestScope, Prefix>,
 
     path: Path & ValidRoutePath<Path>,
 
@@ -468,66 +354,188 @@ interface ModuleRequestScopeGenericRouteMethod<
   >;
 }
 
-export interface ModuleRequestScopeBuilder<
+interface SharedModuleRequestScopeGenericRouteMethod {
+  <
+    const ModuleScope extends object,
+    const RequestScope extends object,
+    const Prefix extends string,
+    const Method extends HttpMethod,
+    const Path extends string,
+    Result,
+  >(
+    this: ModuleRequestScopeBuilderState<ModuleScope, RequestScope, Prefix>,
+
+    method: Method,
+
+    path: Path & ValidRoutePath<Path>,
+
+    handler: ModuleRequestScopeHandler<
+      JoinRoutePath<Prefix, Path>,
+      ModuleScope,
+      RequestScope,
+      Result
+    >,
+
+    lifecycle?: ModuleRequestScopeLifecycleFor<
+      JoinRoutePath<Prefix, Path>,
+      ModuleScope,
+      RequestScope,
+      undefined,
+      undefined,
+      undefined,
+      Result
+    >,
+  ): RouteRef<
+    Method,
+    JoinRoutePath<Prefix, Path>,
+    RouteRequestContract<InferPathParams<JoinRoutePath<Prefix, Path>>>,
+    InferImplicitResponses<Result>
+  >;
+
+  <
+    const ModuleScope extends object,
+    const RequestScope extends object,
+    const Prefix extends string,
+    const Method extends HttpMethod,
+    const Path extends string,
+    const Query extends StandardSchemaV1 | undefined = undefined,
+    const Body extends StandardSchemaV1 | undefined = undefined,
+    Result = unknown,
+  >(
+    this: ModuleRequestScopeBuilderState<ModuleScope, RequestScope, Prefix>,
+
+    method: Method,
+
+    path: Path & ValidRoutePath<Path>,
+
+    options: RouteOptionsFor<Query, Body, undefined>,
+
+    handler: [ModuleScope] extends [never]
+      ? (
+          context: RouteHandlerContextFor<
+            JoinRoutePath<Prefix, Path>,
+            RouteOptionsFor<Query, Body, undefined>
+          >,
+
+          requestScope: RequestScope,
+        ) => Result
+      : (
+          context: RouteHandlerContextFor<
+            JoinRoutePath<Prefix, Path>,
+            RouteOptionsFor<Query, Body, undefined>
+          >,
+
+          moduleScope: ModuleScope,
+
+          requestScope: RequestScope,
+        ) => Result,
+
+    lifecycle?: ModuleRequestScopeLifecycleFor<
+      JoinRoutePath<Prefix, Path>,
+      ModuleScope,
+      RequestScope,
+      Query,
+      Body,
+      undefined,
+      Result
+    >,
+  ): RouteRef<
+    Method,
+    JoinRoutePath<Prefix, Path>,
+    RouteRequestFor<
+      JoinRoutePath<Prefix, Path>,
+      RouteOptionsFor<Query, Body, undefined>
+    >,
+    RouteResponsesFor<RouteOptionsFor<Query, Body, undefined>, Result>
+  >;
+
+  <
+    const ModuleScope extends object,
+    const RequestScope extends object,
+    const Prefix extends string,
+    const Method extends HttpMethod,
+    const Path extends string,
+    const Responses extends ResponseContractMap,
+    const Query extends StandardSchemaV1 | undefined = undefined,
+    const Body extends StandardSchemaV1 | undefined = undefined,
+  >(
+    this: ModuleRequestScopeBuilderState<ModuleScope, RequestScope, Prefix>,
+
+    method: Method,
+
+    path: Path & ValidRoutePath<Path>,
+
+    options: RouteOptionsFor<Query, Body, Responses> & {
+      readonly responses: Responses;
+    },
+
+    handler: [ModuleScope] extends [never]
+      ? (
+          context: RouteHandlerContextFor<
+            JoinRoutePath<Prefix, Path>,
+            RouteOptionsFor<Query, Body, Responses>
+          >,
+
+          requestScope: RequestScope,
+        ) => RouteHandlerResultFor<Responses>
+      : (
+          context: RouteHandlerContextFor<
+            JoinRoutePath<Prefix, Path>,
+            RouteOptionsFor<Query, Body, Responses>
+          >,
+
+          moduleScope: ModuleScope,
+
+          requestScope: RequestScope,
+        ) => RouteHandlerResultFor<Responses>,
+
+    lifecycle?: ModuleRequestScopeLifecycleFor<
+      JoinRoutePath<Prefix, Path>,
+      ModuleScope,
+      RequestScope,
+      Query,
+      Body,
+      Responses,
+      RouteHandlerResultFor<Responses>
+    >,
+  ): RouteRef<
+    Method,
+    JoinRoutePath<Prefix, Path>,
+    RouteRequestFor<
+      JoinRoutePath<Prefix, Path>,
+      RouteOptionsFor<Query, Body, Responses>
+    >,
+    RouteResponsesFor<
+      RouteOptionsFor<Query, Body, Responses>,
+      RouteHandlerResultFor<Responses>
+    >
+  >;
+}
+
+interface SharedModuleRequestScopeRouteSurface {
+  readonly get: SharedModuleRequestScopeRouteMethod<"GET">;
+
+  readonly post: SharedModuleRequestScopeRouteMethod<"POST">;
+
+  readonly put: SharedModuleRequestScopeRouteMethod<"PUT">;
+
+  readonly patch: SharedModuleRequestScopeRouteMethod<"PATCH">;
+
+  readonly delete: SharedModuleRequestScopeRouteMethod<"DELETE">;
+
+  readonly options: SharedModuleRequestScopeRouteMethod<"OPTIONS">;
+
+  readonly head: SharedModuleRequestScopeRouteMethod<"HEAD">;
+
+  readonly route: SharedModuleRequestScopeGenericRouteMethod;
+}
+
+export type ModuleRequestScopeBuilder<
   ModuleScope extends object,
   RequestScope extends object,
   Prefix extends string = "",
-> {
-  readonly get: ModuleRequestScopeRouteMethod<
-    "GET",
-    ModuleScope,
-    RequestScope,
-    Prefix
-  >;
-
-  readonly post: ModuleRequestScopeRouteMethod<
-    "POST",
-    ModuleScope,
-    RequestScope,
-    Prefix
-  >;
-
-  readonly put: ModuleRequestScopeRouteMethod<
-    "PUT",
-    ModuleScope,
-    RequestScope,
-    Prefix
-  >;
-
-  readonly patch: ModuleRequestScopeRouteMethod<
-    "PATCH",
-    ModuleScope,
-    RequestScope,
-    Prefix
-  >;
-
-  readonly delete: ModuleRequestScopeRouteMethod<
-    "DELETE",
-    ModuleScope,
-    RequestScope,
-    Prefix
-  >;
-
-  readonly options: ModuleRequestScopeRouteMethod<
-    "OPTIONS",
-    ModuleScope,
-    RequestScope,
-    Prefix
-  >;
-
-  readonly head: ModuleRequestScopeRouteMethod<
-    "HEAD",
-    ModuleScope,
-    RequestScope,
-    Prefix
-  >;
-
-  readonly route: ModuleRequestScopeGenericRouteMethod<
-    ModuleScope,
-    RequestScope,
-    Prefix
-  >;
-}
+> = SharedModuleRequestScopeRouteSurface &
+  ModuleRequestScopeBuilderState<ModuleScope, RequestScope, Prefix>;
 
 export function createModuleRequestScopeBuilder<
   ModuleScope extends object,

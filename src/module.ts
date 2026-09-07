@@ -1,5 +1,3 @@
-import type { ApplicationScopeBuilder } from "./application-scope";
-
 import {
   bindModuleApplicationScopeRoute,
   createModuleRequestScopeBuilder,
@@ -22,6 +20,11 @@ import type {
 } from "./plugin";
 
 import { RouteBuilder } from "./route-builder";
+
+import type {
+  ModulePlainRouteBuilder,
+  ModuleScopedRouteBuilder,
+} from "./module-route-surface";
 
 import { compileAfterHandle, compileBeforeHandle } from "./runtime/lifecycle";
 
@@ -78,14 +81,15 @@ type ScopedModuleRequestScopeFactory<
   derive: ModuleRequestScopeDerive<ModuleScope, RequestScope>,
 ) => ModuleRequestScopeBuilder<ModuleScope, RequestScope, Prefix>;
 
-export type ModuleRouteBuilder<Prefix extends string> = RouteBuilder<Prefix> & {
-  readonly requestScope: StaticModuleRequestScopeFactory<Prefix>;
-};
+export type ModuleRouteBuilder<Prefix extends string> =
+  ModulePlainRouteBuilder<Prefix> & {
+    readonly requestScope: StaticModuleRequestScopeFactory<Prefix>;
+  };
 
 export type ModuleScopeBuilder<
   Scope extends object,
   Prefix extends string,
-> = ApplicationScopeBuilder<Scope, Prefix> & {
+> = ModuleScopedRouteBuilder<Scope, Prefix> & {
   readonly requestScope: ScopedModuleRequestScopeFactory<Scope, Prefix>;
 };
 
@@ -581,7 +585,7 @@ function createStaticModuleRouteBuilder(
       ),
   });
 
-  return builder as ModuleRouteBuilder<string>;
+  return builder as unknown as ModuleRouteBuilder<string>;
 }
 
 function createScopedModuleRouteBuilder(
