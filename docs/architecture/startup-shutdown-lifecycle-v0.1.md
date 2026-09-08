@@ -1,6 +1,6 @@
 # P8-D Startup / Shutdown Lifecycle Architecture v0.1
 
-**Phase:** P8-D1 — Semantic Contract  
+**Phase:** P8-D8 — Public Lifecycle API Freeze
 **Status:** ACCEPTED / FROZEN  
 **Branch baseline:** `architecture/composition-v0.1`  
 **Baseline commit:** `775ef9d49d5fe750d76ac4fb880d1b8c5bf5fffc`
@@ -301,7 +301,217 @@ Logical CPUs: 12
 
 P8-D7 is accepted. No lifecycle performance threshold was relaxed after benchmark results were observed.
 
-## Planned implementation sequence
+## P8-D8 public lifecycle API freeze
+
+P8-D8 freezes the public startup, shutdown, and Bun lifecycle surface after correctness, AOT safety, package isolation, zero-unused runtime validation, and type-scalability validation have passed.
+
+### Application lifecycle
+
+The public application lifecycle is:
+
+```ts
+app.ready(): Promise<void>
+app.close(): Promise<void>
+```
+
+`ready()` is the explicit startup barrier.
+
+Frozen semantics:
+
+- requests never trigger application startup;
+- startup work executes in deterministic source order;
+- repeated `ready()` calls are idempotent and share the same completion;
+- successful startup makes the application serveable;
+- startup failure is terminal for that application instance;
+- cleanup registered by already-acquired resources is run as rollback when later startup fails;
+- calling `ready()` after the application has been closed rejects.
+
+`close()` is the explicit application-resource shutdown boundary.
+
+Frozen semantics:
+
+- repeated `close()` calls are idempotent and share the same completion;
+- request serving is blocked as soon as closing begins;
+- closing before startup begins does not acquire startup resources;
+- closing while startup is already running waits for startup to settle;
+- successfully acquired application resources are released in reverse acquisition order;
+- cleanup handlers are attempted at most once;
+- cleanup continues through individual cleanup failures and reports failure after the cleanup stack has been drained.
+
+Transport shutdown remains adapter-owned. `app.close()` does not implicitly stop a Bun, Node, or other runtime listener.
+
+### Plugin startup
+
+The public plugin startup registration surface is:
+
+```ts
+setup.startup(callback): void
+```
+
+with:
+
+```ts
+type PluginStartup = (
+  context: PluginStartupContext,
+) => void | PromiseLike<void>;
+```
+
+Raw asynchronous `PluginSetup` remains unsupported. Asynchronous acquisition belongs inside `setup.startup(...)`.
+
+`PluginStartupContext` is intentionally a resource/capability context, not a route-composition surface.
+
+It may:
+
+- require capabilities;
+- provide capabilities;
+- register application cleanup.
+
+It may not:
+
+- register routes;
+- register request lifecycle;
+- recursively register more startup work.
+
+The startup context is valid only while its startup callback is active.
+
+Using a captured startup context after that callback has finished reports:
+
+```text
+PLUGIN_STARTUP_CONTEXT_INACTIVE
+```
+
+Setup-context invalidation remains separately identified by:
+
+```text
+PLUGIN_SETUP_CONTEXT_INACTIVE
+```
+
+### Cleanup registration
+
+The public cleanup surface is:
+
+```ts
+startup.cleanup(callback): void
+```
+
+with:
+
+```ts
+type PluginCleanup = () => void | PromiseLike<void>;
+```
+
+Cleanup handlers are application-owned resources. They execute in LIFO order during normal application close or startup rollback.
+
+Cleanup registration is valid only while the corresponding startup callback is active.
+
+### Asynchronous module scope
+
+The public scoped-module resolver remains:
+
+```ts
+type ModuleScopeResolver<Scope extends object> = (
+  setup: ModuleSetupContext,
+) => Scope | PromiseLike<Scope>;
+```
+
+A Promise-like module scope is startup work and participates in the same explicit `app.ready()` barrier and source-order guarantees.
+
+Module routes are not committed before asynchronous scope resolution succeeds.
+
+### Bun runtime surface
+
+The Bun integration is frozen under:
+
+```ts
+import { serve, serveReady } from "gelis/bun";
+```
+
+The synchronous surface is:
+
+```ts
+serve(
+  app: Gelis,
+  options?: GelisBunOptions,
+): Bun.Server<undefined>
+```
+
+Frozen semantics:
+
+- `serve()` remains synchronous;
+- it does not trigger `app.ready()`;
+- it is the zero-unused fast path;
+- it rejects applications that are still startup-blocked, failed, or closed;
+- its request transport remains direct `app.fetch.bind(app)`.
+
+The lifecycle-aware surface is:
+
+```ts
+serveReady(
+  app: Gelis,
+  options?: GelisBunOptions,
+): Promise<GelisBunLifecycleServer>
+```
+
+with:
+
+```ts
+interface GelisBunLifecycleServer {
+  readonly server: Bun.Server<undefined>;
+
+  close(closeActiveConnections?: boolean): Promise<void>;
+}
+```
+
+Frozen semantics:
+
+- `serveReady()` awaits application readiness before opening the listener;
+- failed startup cannot leave a Bun listener accepting requests;
+- lifecycle-server `close()` is idempotent;
+- lifecycle-server shutdown stops/drains the Bun transport before calling `app.close()`.
+
+### Error stability
+
+Public error-code literals are part of the frozen API where an explicit Gelis error-code type exists.
+
+P8-D8 distinguishes setup-context and startup-context invalidation:
+
+```text
+PLUGIN_SETUP_CONTEXT_INACTIVE
+PLUGIN_STARTUP_CONTEXT_INACTIVE
+```
+
+Operational failures from user startup callbacks and cleanup callbacks continue to propagate through `ready()` / `close()` according to the established lifecycle semantics.
+
+Exact human-readable error message text is not frozen as API.
+
+### Freeze conclusion
+
+The following names and signatures are frozen for the P8 lifecycle architecture:
+
+```text
+Gelis.ready()
+Gelis.close()
+
+PluginSetupContext.startup()
+PluginStartup
+PluginStartupContext
+PluginStartupContext.cleanup()
+PluginCleanup
+
+ModuleScopeResolver
+
+gelis/bun
+serve()
+serveReady()
+GelisBunOptions
+GelisBunLifecycleServer
+GelisBunLifecycleServer.server
+GelisBunLifecycleServer.close()
+```
+
+Future lifecycle work may extend the framework through new additive surfaces, but it must not silently change these contracts or reintroduce lifecycle cost into applications that do not use lifecycle features.
+
+## Implementation sequence
 
 P8-D2: internal startup coordinator and `app.ready()`  
 P8-D3: explicit plugin startup registration and source-order staging  

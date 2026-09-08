@@ -328,7 +328,7 @@ describe("plugin startup lifecycle", () => {
     } catch (error) {
       expect(error).toBeInstanceOf(PluginInstallError);
       expect((error as PluginInstallError).code).toBe(
-        "PLUGIN_SETUP_CONTEXT_INACTIVE",
+        "PLUGIN_STARTUP_CONTEXT_INACTIVE",
       );
     }
   });

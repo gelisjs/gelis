@@ -74,6 +74,7 @@ export type PluginInstallErrorCode =
   | "PLUGIN_DEPENDENCY_MISSING"
   | "PLUGIN_CAPABILITY_ALREADY_PROVIDED"
   | "PLUGIN_SETUP_CONTEXT_INACTIVE"
+  | "PLUGIN_STARTUP_CONTEXT_INACTIVE"
   | "PLUGIN_ASYNC_SETUP_UNSUPPORTED"
   | "PLUGIN_ALREADY_INSTALLED";
 
@@ -679,7 +680,7 @@ function setupContextInactiveError(pluginName: string): PluginInstallError {
 
 function startupContextInactiveError(pluginName: string): PluginInstallError {
   return new PluginInstallError(
-    "PLUGIN_SETUP_CONTEXT_INACTIVE",
+    "PLUGIN_STARTUP_CONTEXT_INACTIVE",
 
     `Plugin startup context for "${pluginName}" is no longer active`,
 

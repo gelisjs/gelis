@@ -335,7 +335,7 @@ describe("application cleanup lifecycle", () => {
     expect(thrown).toBeInstanceOf(PluginInstallError);
 
     expect((thrown as PluginInstallError).code).toBe(
-      "PLUGIN_SETUP_CONTEXT_INACTIVE",
+      "PLUGIN_STARTUP_CONTEXT_INACTIVE",
     );
   });
 });
