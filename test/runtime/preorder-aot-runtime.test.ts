@@ -49,6 +49,38 @@ describe("Gelis preorder AOT runtime", () => {
     expect(await second.text()).toBe("second");
   });
 
+  test("serves QUERY routes", async () => {
+    const artifact = await compileArtifact([
+      {
+        method: "QUERY",
+
+        path: "/search",
+      },
+    ]);
+
+    const app = new Gelis();
+
+    install(
+      app,
+
+      artifact,
+
+      [() => "query"],
+    );
+
+    const response = await app.fetch(
+      new Request(
+        "http://gelis.test/search",
+
+        {
+          method: "QUERY",
+        },
+      ),
+    );
+
+    expect(await response.text()).toBe("query");
+  });
+
   test("serves trailing-param routes", async () => {
     const artifact = await compileArtifact([
       {
@@ -372,7 +404,8 @@ type RouteShape = {
     | "PATCH"
     | "DELETE"
     | "OPTIONS"
-    | "HEAD";
+    | "HEAD"
+    | "QUERY";
 
   readonly path: string;
 };

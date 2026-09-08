@@ -681,6 +681,7 @@ function asHttpMethod(value: string): HttpMethod {
     case "DELETE":
     case "OPTIONS":
     case "HEAD":
+    case "QUERY":
       return value;
 
     default:

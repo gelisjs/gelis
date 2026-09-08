@@ -623,6 +623,7 @@ function asHttpMethod(method: string): HttpMethod {
     case "DELETE":
     case "OPTIONS":
     case "HEAD":
+    case "QUERY":
       return method;
 
     default:

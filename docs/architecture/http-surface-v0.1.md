@@ -329,10 +329,16 @@ AOT source recognition
 AOT semantic-plan projection
   PASS
 
+flat AOT runtime QUERY hydration
+  PASS
+
+preorder AOT runtime QUERY hydration
+  PASS
+
 full Gelis check
-  428 pass
+  430 pass
   0 fail
-  1213 expect() calls
+  1215 expect() calls
 ```
 
 ## Deliberately not frozen by P9-B
