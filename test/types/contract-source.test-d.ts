@@ -3,7 +3,6 @@ import { Gelis, inspectContract } from "../../src";
 import type {
   ApplicationContractSnapshot,
   ContractRouteSnapshot,
-  HttpMethod,
   OpenAPIRouteMetadata,
   ResponseContractMap,
   RouteContractOf,
@@ -45,9 +44,7 @@ type SnapshotRoute = ApplicationContractSnapshot["routes"][number];
 
 type _SnapshotRoute = Expect<Equal<SnapshotRoute, ContractRouteSnapshot>>;
 
-type _MethodIsGeneral = Expect<
-  Equal<ContractRouteSnapshot["method"], HttpMethod>
->;
+type _MethodIsGeneral = Expect<Equal<ContractRouteSnapshot["method"], string>>;
 
 type _PathIsGeneral = Expect<Equal<ContractRouteSnapshot["path"], string>>;
 

@@ -1,6 +1,6 @@
 import { GELIS_INTERNAL_RUNTIME, type Gelis } from "../app";
 
-import type { HttpMethod } from "../route";
+import { assertRouteMethod } from "../http-method";
 
 import { PREORDER_AOT_ARTIFACT_VERSION } from "./preorder-aot-artifact";
 
@@ -113,8 +113,10 @@ export function bindPreorderRoutes(
       throw new Error(`Invalid Gelis preorder AOT method id: ${methodId}`);
     }
 
+    assertHttpMethodToken(methodName);
+
     routes[index] = {
-      method: asHttpMethod(methodName),
+      method: methodName,
 
       path,
 
@@ -179,7 +181,7 @@ export function hydratePreorderRouter(
       throw new Error(`Invalid Gelis preorder AOT method id: ${methodId}`);
     }
 
-    asHttpMethod(methodName);
+    assertHttpMethodToken(methodName);
 
     if (runtimeMethods.has(methodName)) {
       throw new Error(`Duplicate Gelis preorder AOT method: ${methodName}`);
@@ -612,21 +614,4 @@ function routeAt(
   }
 
   return route;
-}
-
-function asHttpMethod(method: string): HttpMethod {
-  switch (method) {
-    case "GET":
-    case "POST":
-    case "PUT":
-    case "PATCH":
-    case "DELETE":
-    case "OPTIONS":
-    case "HEAD":
-    case "QUERY":
-      return method;
-
-    default:
-      throw new Error(`Invalid Gelis preorder AOT HTTP method: ${method}`);
-  }
 }

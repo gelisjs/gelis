@@ -4,15 +4,7 @@ import type { OpenAPIRouteMetadata } from "./openapi";
 
 import type { InferPathParams } from "./types/path";
 
-export type HttpMethod =
-  | "GET"
-  | "POST"
-  | "PUT"
-  | "PATCH"
-  | "DELETE"
-  | "OPTIONS"
-  | "HEAD"
-  | "QUERY";
+export type { HttpMethod } from "./http-method";
 
 export interface RouteRequestContract<
   Params = Record<never, never>,
@@ -389,7 +381,7 @@ export type RouteResponsesFor<Options, Result> = Options extends {
 declare const routeRefBrand: unique symbol;
 
 export interface RouteRef<
-  Method extends HttpMethod,
+  Method extends string,
   Path extends string,
   Request extends RouteRequestContract<unknown, unknown, unknown> =
     RouteRequestContract<InferPathParams<Path>>,
@@ -407,7 +399,7 @@ export interface RouteRef<
 }
 
 export type AnyRouteRef = RouteRef<
-  HttpMethod,
+  string,
   string,
   RouteRequestContract<unknown, unknown, unknown>,
   RouteResponses

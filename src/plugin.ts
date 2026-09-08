@@ -51,6 +51,7 @@ type PluginRouteMethodName =
   | "options"
   | "head"
   | "query"
+  | "all"
   | "route";
 
 export type PluginRouteBuilder = Pick<RouteBuilder<"">, PluginRouteMethodName>;

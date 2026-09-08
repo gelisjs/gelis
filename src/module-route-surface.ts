@@ -3,6 +3,8 @@ import type {
   ApplicationScopeLifecycleFor,
 } from "./application-scope";
 
+import type { ValidHttpMethodLiteral } from "./http-method";
+
 import type {
   HttpMethod,
   InferImplicitResponses,
@@ -50,7 +52,7 @@ export interface ModuleScopedRouteBuilderState<
   readonly [moduleScopedRouteBuilderScopeBrand]: Scope;
 }
 
-interface ModulePlainRouteMethod<Method extends HttpMethod> {
+interface ModulePlainRouteMethod<Method extends HttpMethod | "*"> {
   <const Prefix extends string, const Path extends string, Result>(
     this: ModuleRouteBuilderState<Prefix>,
 
@@ -155,13 +157,13 @@ interface ModulePlainRouteMethod<Method extends HttpMethod> {
 interface ModulePlainGenericRouteMethod {
   <
     const Prefix extends string,
-    const Method extends HttpMethod,
+    const Method extends string,
     const Path extends string,
     Result,
   >(
     this: ModuleRouteBuilderState<Prefix>,
 
-    method: Method,
+    method: Method & ValidHttpMethodLiteral<Method>,
 
     path: Path & ValidRoutePath<Path>,
 
@@ -183,7 +185,7 @@ interface ModulePlainGenericRouteMethod {
 
   <
     const Prefix extends string,
-    const Method extends HttpMethod,
+    const Method extends string,
     const Path extends string,
     const Query extends StandardSchemaV1 | undefined = undefined,
     const Body extends StandardSchemaV1 | undefined = undefined,
@@ -191,7 +193,7 @@ interface ModulePlainGenericRouteMethod {
   >(
     this: ModuleRouteBuilderState<Prefix>,
 
-    method: Method,
+    method: Method & ValidHttpMethodLiteral<Method>,
 
     path: Path & ValidRoutePath<Path>,
 
@@ -223,7 +225,7 @@ interface ModulePlainGenericRouteMethod {
 
   <
     const Prefix extends string,
-    const Method extends HttpMethod,
+    const Method extends string,
     const Path extends string,
     const Responses extends ResponseContractMap,
     const Query extends StandardSchemaV1 | undefined = undefined,
@@ -231,7 +233,7 @@ interface ModulePlainGenericRouteMethod {
   >(
     this: ModuleRouteBuilderState<Prefix>,
 
-    method: Method,
+    method: Method & ValidHttpMethodLiteral<Method>,
 
     path: Path & ValidRoutePath<Path>,
 
@@ -284,10 +286,12 @@ interface SharedModulePlainRouteSurface {
 
   readonly query: ModulePlainRouteMethod<"QUERY">;
 
+  readonly all: ModulePlainRouteMethod<"*">;
+
   readonly route: ModulePlainGenericRouteMethod;
 }
 
-interface ModuleScopedRouteMethod<Method extends HttpMethod> {
+interface ModuleScopedRouteMethod<Method extends HttpMethod | "*"> {
   <
     const Scope extends object,
     const Prefix extends string,
@@ -411,13 +415,13 @@ interface ModuleScopedGenericRouteMethod {
   <
     const Scope extends object,
     const Prefix extends string,
-    const Method extends HttpMethod,
+    const Method extends string,
     const Path extends string,
     Result,
   >(
     this: ModuleScopedRouteBuilderState<Scope, Prefix>,
 
-    method: Method,
+    method: Method & ValidHttpMethodLiteral<Method>,
 
     path: Path & ValidRoutePath<Path>,
 
@@ -445,7 +449,7 @@ interface ModuleScopedGenericRouteMethod {
   <
     const Scope extends object,
     const Prefix extends string,
-    const Method extends HttpMethod,
+    const Method extends string,
     const Path extends string,
     const Query extends StandardSchemaV1 | undefined = undefined,
     const Body extends StandardSchemaV1 | undefined = undefined,
@@ -453,7 +457,7 @@ interface ModuleScopedGenericRouteMethod {
   >(
     this: ModuleScopedRouteBuilderState<Scope, Prefix>,
 
-    method: Method,
+    method: Method & ValidHttpMethodLiteral<Method>,
 
     path: Path & ValidRoutePath<Path>,
 
@@ -489,7 +493,7 @@ interface ModuleScopedGenericRouteMethod {
   <
     const Scope extends object,
     const Prefix extends string,
-    const Method extends HttpMethod,
+    const Method extends string,
     const Path extends string,
     const Responses extends ResponseContractMap,
     const Query extends StandardSchemaV1 | undefined = undefined,
@@ -497,7 +501,7 @@ interface ModuleScopedGenericRouteMethod {
   >(
     this: ModuleScopedRouteBuilderState<Scope, Prefix>,
 
-    method: Method,
+    method: Method & ValidHttpMethodLiteral<Method>,
 
     path: Path & ValidRoutePath<Path>,
 
@@ -552,6 +556,8 @@ interface SharedModuleScopedRouteSurface {
   readonly head: ModuleScopedRouteMethod<"HEAD">;
 
   readonly query: ModuleScopedRouteMethod<"QUERY">;
+
+  readonly all: ModuleScopedRouteMethod<"*">;
 
   readonly route: ModuleScopedGenericRouteMethod;
 }

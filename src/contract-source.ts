@@ -2,7 +2,7 @@ import type { Gelis } from "./app";
 
 import type { OpenAPIRouteMetadata } from "./openapi";
 
-import type { HttpMethod, ResponseContractMap } from "./route";
+import type { ResponseContractMap } from "./route";
 
 import type { StandardSchemaV1 } from "./schema";
 
@@ -16,7 +16,7 @@ import type { StandardSchemaV1 } from "./schema";
 export const GELIS_CONTRACT_SOURCE = Symbol("gelis.contract-source");
 
 export interface ContractRouteSnapshot {
-  readonly method: HttpMethod;
+  readonly method: string;
 
   readonly path: string;
 

@@ -1,6 +1,6 @@
 import { GELIS_INTERNAL_RUNTIME, type Gelis } from "../app";
 
-import type { HttpMethod } from "../route";
+import { assertRouteMethod } from "../http-method";
 
 import { FLAT_AOT_ARTIFACT_VERSION } from "./flat-aot-artifact";
 
@@ -129,7 +129,9 @@ export function bindFlatRoutes(
       throw new Error(`Invalid Gelis flat AOT method id: ${methodId}`);
     }
 
-    const method = asHttpMethod(methodName);
+    assertHttpMethodToken(methodName);
+
+    const method = methodName;
 
     routes[index] = {
       method,
@@ -225,7 +227,7 @@ export function hydrateFlatRouter(
       throw new Error(`Invalid Gelis flat AOT method id: ${methodId}`);
     }
 
-    asHttpMethod(methodName);
+    assertHttpMethodToken(methodName);
 
     if (runtimeMethods.has(methodName)) {
       throw new Error(`Duplicate Gelis flat AOT method: ${methodName}`);
@@ -670,21 +672,4 @@ function routeAt(
   }
 
   return route;
-}
-
-function asHttpMethod(value: string): HttpMethod {
-  switch (value) {
-    case "GET":
-    case "POST":
-    case "PUT":
-    case "PATCH":
-    case "DELETE":
-    case "OPTIONS":
-    case "HEAD":
-    case "QUERY":
-      return value;
-
-    default:
-      throw new Error(`Unsupported Gelis flat AOT HTTP method: ${value}`);
-  }
 }

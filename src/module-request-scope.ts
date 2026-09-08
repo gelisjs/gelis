@@ -1,5 +1,7 @@
 import { bindApplicationScopeRoute } from "./application-scope";
 
+import type { ValidHttpMethodLiteral } from "./http-method";
+
 import { RouteBuilder } from "./route-builder";
 
 import type { JoinRoutePath } from "./route-builder";
@@ -205,7 +207,7 @@ interface ModuleRequestScopeBuilderState<
   };
 }
 
-interface SharedModuleRequestScopeRouteMethod<Method extends HttpMethod> {
+interface SharedModuleRequestScopeRouteMethod<Method extends HttpMethod | "*"> {
   <
     const ModuleScope extends object,
     const RequestScope extends object,
@@ -359,13 +361,13 @@ interface SharedModuleRequestScopeGenericRouteMethod {
     const ModuleScope extends object,
     const RequestScope extends object,
     const Prefix extends string,
-    const Method extends HttpMethod,
+    const Method extends string,
     const Path extends string,
     Result,
   >(
     this: ModuleRequestScopeBuilderState<ModuleScope, RequestScope, Prefix>,
 
-    method: Method,
+    method: Method & ValidHttpMethodLiteral<Method>,
 
     path: Path & ValidRoutePath<Path>,
 
@@ -396,7 +398,7 @@ interface SharedModuleRequestScopeGenericRouteMethod {
     const ModuleScope extends object,
     const RequestScope extends object,
     const Prefix extends string,
-    const Method extends HttpMethod,
+    const Method extends string,
     const Path extends string,
     const Query extends StandardSchemaV1 | undefined = undefined,
     const Body extends StandardSchemaV1 | undefined = undefined,
@@ -404,7 +406,7 @@ interface SharedModuleRequestScopeGenericRouteMethod {
   >(
     this: ModuleRequestScopeBuilderState<ModuleScope, RequestScope, Prefix>,
 
-    method: Method,
+    method: Method & ValidHttpMethodLiteral<Method>,
 
     path: Path & ValidRoutePath<Path>,
 
@@ -453,7 +455,7 @@ interface SharedModuleRequestScopeGenericRouteMethod {
     const ModuleScope extends object,
     const RequestScope extends object,
     const Prefix extends string,
-    const Method extends HttpMethod,
+    const Method extends string,
     const Path extends string,
     const Responses extends ResponseContractMap,
     const Query extends StandardSchemaV1 | undefined = undefined,
@@ -461,7 +463,7 @@ interface SharedModuleRequestScopeGenericRouteMethod {
   >(
     this: ModuleRequestScopeBuilderState<ModuleScope, RequestScope, Prefix>,
 
-    method: Method,
+    method: Method & ValidHttpMethodLiteral<Method>,
 
     path: Path & ValidRoutePath<Path>,
 
@@ -528,6 +530,8 @@ interface SharedModuleRequestScopeRouteSurface {
   readonly head: SharedModuleRequestScopeRouteMethod<"HEAD">;
 
   readonly query: SharedModuleRequestScopeRouteMethod<"QUERY">;
+
+  readonly all: SharedModuleRequestScopeRouteMethod<"*">;
 
   readonly route: SharedModuleRequestScopeGenericRouteMethod;
 }

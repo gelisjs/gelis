@@ -1,5 +1,7 @@
 import { RouteBuilder } from "./route-builder";
 
+import type { ValidHttpMethodLiteral } from "./http-method";
+
 import type { JoinRoutePath } from "./route-builder";
 
 import type {
@@ -81,7 +83,7 @@ export type ApplicationScopeLifecycleFor<
 };
 
 interface ApplicationScopeRouteMethod<
-  Method extends HttpMethod,
+  Method extends HttpMethod | "*",
   Scope extends object,
   Prefix extends string,
 > {
@@ -193,8 +195,8 @@ interface ApplicationScopeGenericRouteMethod<
   Scope extends object,
   Prefix extends string,
 > {
-  <const Method extends HttpMethod, const Path extends string, Result>(
-    method: Method,
+  <const Method extends string, const Path extends string, Result>(
+    method: Method & ValidHttpMethodLiteral<Method>,
 
     path: Path & ValidRoutePath<Path>,
 
@@ -220,13 +222,13 @@ interface ApplicationScopeGenericRouteMethod<
   >;
 
   <
-    const Method extends HttpMethod,
+    const Method extends string,
     const Path extends string,
     const Query extends StandardSchemaV1 | undefined = undefined,
     const Body extends StandardSchemaV1 | undefined = undefined,
     Result = unknown,
   >(
-    method: Method,
+    method: Method & ValidHttpMethodLiteral<Method>,
 
     path: Path & ValidRoutePath<Path>,
 
@@ -260,13 +262,13 @@ interface ApplicationScopeGenericRouteMethod<
   >;
 
   <
-    const Method extends HttpMethod,
+    const Method extends string,
     const Path extends string,
     const Responses extends ResponseContractMap,
     const Query extends StandardSchemaV1 | undefined = undefined,
     const Body extends StandardSchemaV1 | undefined = undefined,
   >(
-    method: Method,
+    method: Method & ValidHttpMethodLiteral<Method>,
 
     path: Path & ValidRoutePath<Path>,
 
@@ -324,6 +326,8 @@ export interface ApplicationScopeBuilder<
   readonly head: ApplicationScopeRouteMethod<"HEAD", Scope, Prefix>;
 
   readonly query: ApplicationScopeRouteMethod<"QUERY", Scope, Prefix>;
+
+  readonly all: ApplicationScopeRouteMethod<"*", Scope, Prefix>;
 
   readonly route: ApplicationScopeGenericRouteMethod<Scope, Prefix>;
 }

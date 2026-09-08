@@ -42,6 +42,10 @@ import {
   RUNTIME_ROUTE_CONTRACT_METADATA,
 } from "./runtime/contract-metadata";
 
+import { ALL_ROUTE_METHOD, assertHttpMethodToken } from "./http-method";
+
+import type { ValidHttpMethodLiteral } from "./http-method";
+
 export type JoinRoutePath<
   Prefix extends string,
   Path extends string,
@@ -1055,10 +1059,133 @@ export class RouteBuilder<Prefix extends string = ""> {
   }
 
   /*
+   * ALL pseudo-method without options.
+   *
+   * "*" is an internal/server routing marker, not a wire method.
+   * Exact HTTP-method routes always take precedence at dispatch.
+   */
+  all<const Path extends string, Result>(
+    path: Path & ValidRoutePath<Path>,
+
+    handler: RouteHandler<JoinRoutePath<Prefix, Path>, never, never, Result>,
+
+    lifecycle?: RouteLifecycleFor<
+      JoinRoutePath<Prefix, Path>,
+      undefined,
+      undefined,
+      undefined,
+      Result
+    >,
+  ): RouteRef<
+    "*",
+    JoinRoutePath<Prefix, Path>,
+    RouteRequestContract<InferPathParams<JoinRoutePath<Prefix, Path>>>,
+    InferImplicitResponses<Result>
+  >;
+
+  /*
+   * ALL with options but without an explicit
+   * response contract.
+   */
+  all<
+    const Path extends string,
+    const Query extends StandardSchemaV1 | undefined = undefined,
+    const Body extends StandardSchemaV1 | undefined = undefined,
+    Result = unknown,
+  >(
+    path: Path & ValidRoutePath<Path>,
+
+    options: RouteOptionsFor<Query, Body, undefined>,
+
+    handler: (
+      context: RouteHandlerContextFor<
+        JoinRoutePath<Prefix, Path>,
+        RouteOptionsFor<Query, Body, undefined>
+      >,
+    ) => Result,
+
+    lifecycle?: RouteLifecycleFor<
+      JoinRoutePath<Prefix, Path>,
+      Query,
+      Body,
+      undefined,
+      Result
+    >,
+  ): RouteRef<
+    "*",
+    JoinRoutePath<Prefix, Path>,
+    RouteRequestFor<
+      JoinRoutePath<Prefix, Path>,
+      RouteOptionsFor<Query, Body, undefined>
+    >,
+    RouteResponsesFor<RouteOptionsFor<Query, Body, undefined>, Result>
+  >;
+
+  /*
+   * ALL with an explicit response contract.
+   */
+  all<
+    const Path extends string,
+    const Responses extends ResponseContractMap,
+    const Query extends StandardSchemaV1 | undefined = undefined,
+    const Body extends StandardSchemaV1 | undefined = undefined,
+  >(
+    path: Path & ValidRoutePath<Path>,
+
+    options: RouteOptionsFor<Query, Body, Responses> & {
+      readonly responses: Responses;
+    },
+
+    handler: (
+      context: RouteHandlerContextFor<
+        JoinRoutePath<Prefix, Path>,
+        RouteOptionsFor<Query, Body, Responses>
+      >,
+    ) => RouteHandlerResultFor<Responses>,
+
+    lifecycle?: RouteLifecycleFor<
+      JoinRoutePath<Prefix, Path>,
+      Query,
+      Body,
+      Responses,
+      RouteHandlerResultFor<Responses>
+    >,
+  ): RouteRef<
+    "*",
+    JoinRoutePath<Prefix, Path>,
+    RouteRequestFor<
+      JoinRoutePath<Prefix, Path>,
+      RouteOptionsFor<Query, Body, Responses>
+    >,
+    RouteResponsesFor<
+      RouteOptionsFor<Query, Body, Responses>,
+      RouteHandlerResultFor<Responses>
+    >
+  >;
+
+  all(
+    path: string,
+
+    optionsOrHandler: unknown,
+
+    handlerOrLifecycle?: unknown,
+
+    lifecycle?: unknown,
+  ): unknown {
+    return this.registerRoute(
+      ALL_ROUTE_METHOD,
+      path,
+      optionsOrHandler,
+      handlerOrLifecycle,
+      lifecycle,
+    );
+  }
+
+  /*
    * Generic method route without options.
    */
-  route<const Method extends HttpMethod, const Path extends string, Result>(
-    method: Method,
+  route<const Method extends string, const Path extends string, Result>(
+    method: Method & ValidHttpMethodLiteral<Method>,
 
     path: Path & ValidRoutePath<Path>,
 
@@ -1083,13 +1210,13 @@ export class RouteBuilder<Prefix extends string = ""> {
    * an explicit response contract.
    */
   route<
-    const Method extends HttpMethod,
+    const Method extends string,
     const Path extends string,
     const Query extends StandardSchemaV1 | undefined = undefined,
     const Body extends StandardSchemaV1 | undefined = undefined,
     Result = unknown,
   >(
-    method: Method,
+    method: Method & ValidHttpMethodLiteral<Method>,
 
     path: Path & ValidRoutePath<Path>,
 
@@ -1124,13 +1251,13 @@ export class RouteBuilder<Prefix extends string = ""> {
    * response contract.
    */
   route<
-    const Method extends HttpMethod,
+    const Method extends string,
     const Path extends string,
     const Responses extends ResponseContractMap,
     const Query extends StandardSchemaV1 | undefined = undefined,
     const Body extends StandardSchemaV1 | undefined = undefined,
   >(
-    method: Method,
+    method: Method & ValidHttpMethodLiteral<Method>,
 
     path: Path & ValidRoutePath<Path>,
 
@@ -1166,7 +1293,7 @@ export class RouteBuilder<Prefix extends string = ""> {
   >;
 
   route(
-    method: HttpMethod,
+    method: string,
 
     path: string,
 
@@ -1176,6 +1303,8 @@ export class RouteBuilder<Prefix extends string = ""> {
 
     lifecycle?: unknown,
   ): unknown {
+    assertHttpMethodToken(method);
+
     return this.registerRoute(
       method,
       path,
@@ -1186,7 +1315,7 @@ export class RouteBuilder<Prefix extends string = ""> {
   }
 
   private registerRoute(
-    method: HttpMethod,
+    method: string,
 
     path: string,
 
@@ -1236,7 +1365,7 @@ export class RouteBuilder<Prefix extends string = ""> {
   }
 
   private registerPlainRuntimeRoute(
-    method: HttpMethod,
+    method: string,
 
     path: string,
 
@@ -1272,7 +1401,7 @@ export class RouteBuilder<Prefix extends string = ""> {
   }
 
   private registerRuntimeRoute(
-    method: HttpMethod,
+    method: string,
 
     path: string,
 

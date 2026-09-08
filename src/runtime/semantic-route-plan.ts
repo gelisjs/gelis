@@ -1,6 +1,6 @@
-import type { HttpMethod } from "../route";
-
 import { RUNTIME_ROUTE_PLAIN } from "./types";
+
+import { assertRouteMethod } from "../http-method";
 
 import type { RuntimeRouteHandler, RuntimeRouteRecord } from "./types";
 
@@ -29,7 +29,7 @@ export interface SemanticRoutePlan {
 }
 
 export interface SemanticRoutePlanEntry {
-  readonly method: HttpMethod;
+  readonly method: string;
 
   readonly path: string;
 
@@ -92,6 +92,8 @@ export function bindSemanticRoutePlan(
     if (entry === undefined || handler === undefined) {
       throw new Error(`Missing Gelis semantic route binding: ${index}`);
     }
+
+    assertHttpMethodToken(entry.method);
 
     if (entry.flags !== RUNTIME_ROUTE_PLAIN) {
       throw new Error(`Unsupported Gelis semantic route flags: ${entry.flags}`);

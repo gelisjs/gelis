@@ -1,5 +1,7 @@
 import { RUNTIME_ROUTE_PLAIN } from "../runtime/types";
 
+import { assertRouteMethod } from "../http-method";
+
 import type {
   SemanticRoutePlan,
   SemanticRoutePlanEntry,
@@ -24,6 +26,8 @@ export async function compileSemanticRoutePlan(
     if (route === undefined) {
       throw new Error("Missing Gelis semantic route");
     }
+
+    assertHttpMethodToken(route.method);
 
     entries[index] = {
       method: route.method,

@@ -1,4 +1,4 @@
-import type { HttpMethod, ResponseContractMap } from "../route";
+import type { ResponseContractMap } from "../route";
 
 import { RUNTIME_ROUTE_CONTRACT_METADATA } from "./contract-metadata";
 
@@ -231,7 +231,7 @@ export type RuntimeModuleRequestScopePlan =
   | RuntimeScopedModuleRequestScopePlan;
 
 export interface RuntimeRouteRecord {
-  readonly method: HttpMethod;
+  readonly method: string;
 
   readonly path: string;
 
