@@ -1,20 +1,3 @@
-Documentation Hardening
-
-[ ] remove chat/session/process language
-[ ] convert accepted architecture into ADRs
-[ ] separate roadmap from architectural facts
-[ ] remove obsolete candidates
-[ ] remove prototype terminology where graduated
-[ ] README focused on developer value
-[ ] reproducible benchmark documentation
-[ ] architecture overview
-[ ] CONTRIBUTING.md
-[ ] SECURITY.md
-[ ] compatibility/runtime matrix
-[ ] package documentation
-[ ] API examples manually reviewed
-[ ] claims backed by reproducible evidence
-
 # Gelis Engineering Documentation
 
 This directory records accepted architectural decisions, reproducible benchmark baselines, and the current engineering roadmap.
