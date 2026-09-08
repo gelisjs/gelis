@@ -1,6 +1,6 @@
 import { Gelis } from "../../../../src";
 
-import { serve } from "../../../../prototype/bun";
+import { serve } from "gelis/bun";
 
 const PORT = Number(process.env.PORT ?? 3100);
 

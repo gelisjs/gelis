@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 
 import { Gelis, definePlugin } from "../../src";
 
-import { serve, serveReady } from "../../prototype/bun";
+import { serve, serveReady } from "gelis/bun";
 
 describe("Gelis Bun lifecycle adapter", () => {
   test("keeps plain serve synchronous and directly usable", async () => {

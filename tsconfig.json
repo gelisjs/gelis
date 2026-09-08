@@ -21,5 +21,6 @@
 
     "types": []
   },
-  "include": ["src/**/*.ts", "test/types/assert.ts"]
+  "include": ["src/**/*.ts", "test/types/assert.ts"],
+  "exclude": ["src/adapter/bun/**/*.ts"]
 }

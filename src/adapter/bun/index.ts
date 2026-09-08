@@ -1,6 +1,6 @@
-import { isApplicationRequestBlocked } from "../../src/startup";
+import { isApplicationRequestBlocked } from "../../startup";
 
-import type { Gelis } from "../../src";
+import type { Gelis } from "../../app";
 
 export type GelisBunOptions = Bun.Serve.HostnamePortServeOptions<undefined>;
 

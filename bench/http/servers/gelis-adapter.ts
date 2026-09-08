@@ -1,4 +1,4 @@
-import { serve } from "../../../prototype/bun";
+import { serve } from "gelis/bun";
 
 import { createBenchmarkApp } from "./gelis-app";
 

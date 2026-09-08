@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 
 import { Gelis } from "../../src";
 
-import { serve } from "../../prototype/bun";
+import { serve } from "gelis/bun";
 
 describe("Gelis Bun adapter", () => {
   test("serves Gelis routes through Bun.serve", async () => {
