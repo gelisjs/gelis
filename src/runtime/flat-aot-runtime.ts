@@ -1,6 +1,6 @@
 import { GELIS_INTERNAL_RUNTIME, type Gelis } from "../app";
 
-import { assertRouteMethod } from "../http-method";
+import { ALL_ROUTE_METHOD, assertRouteMethod } from "../http-method";
 
 import { FLAT_AOT_ARTIFACT_VERSION } from "./flat-aot-artifact";
 
@@ -11,6 +11,8 @@ import type {
 } from "./flat-aot-artifact";
 
 import { Router } from "./router";
+
+import { activateAllFallback } from "./router-all";
 
 import type { DynamicNode, MethodRoutes, TrailingParamRoute } from "./router";
 
@@ -129,7 +131,7 @@ export function bindFlatRoutes(
       throw new Error(`Invalid Gelis flat AOT method id: ${methodId}`);
     }
 
-    assertHttpMethodToken(methodName);
+    assertRouteMethod(methodName);
 
     const method = methodName;
 
@@ -227,7 +229,7 @@ export function hydrateFlatRouter(
       throw new Error(`Invalid Gelis flat AOT method id: ${methodId}`);
     }
 
-    assertHttpMethodToken(methodName);
+    assertRouteMethod(methodName);
 
     if (runtimeMethods.has(methodName)) {
       throw new Error(`Duplicate Gelis flat AOT method: ${methodName}`);
@@ -240,7 +242,13 @@ export function hydrateFlatRouter(
     );
   }
 
-  return Router.fromMethods(runtimeMethods);
+  const router = Router.fromMethods(runtimeMethods);
+
+  if (runtimeMethods.has(ALL_ROUTE_METHOD)) {
+    activateAllFallback(router);
+  }
+
+  return router;
 }
 
 function hydrateFlatMethod(

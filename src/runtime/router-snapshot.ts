@@ -1,4 +1,8 @@
+import { ALL_ROUTE_METHOD } from "../http-method";
+
 import { Router } from "./router";
+
+import { activateAllFallback } from "./router-all";
 
 import type {
   DynamicNode,
@@ -81,7 +85,13 @@ export function hydrateRouterSnapshot(
     );
   }
 
-  return Router.fromMethods(methods);
+  const router = Router.fromMethods(methods);
+
+  if (methods.has(ALL_ROUTE_METHOD)) {
+    activateAllFallback(router);
+  }
+
+  return router;
 }
 
 function hydrateMethodRoutes(

@@ -1,5 +1,3 @@
-import { ALL_ROUTE_METHOD } from "../http-method";
-
 import type { RuntimeRouteRecord } from "./types";
 
 export interface DynamicRoute {
@@ -43,21 +41,10 @@ const EMPTY_PARAMS = Object.freeze({}) as Record<string, string>;
 export class Router {
   #methods = new Map<string, MethodRoutes>();
 
-  /*
-   * Internal construction path for precomputed
-   * router representations.
-   *
-   * Normal Router construction remains identical
-   * to the non-AOT runtime path.
-   */
   static fromMethods(methods: Map<string, MethodRoutes>): Router {
     const router = new Router();
 
     router.#methods = methods;
-
-    if (methods.has(ALL_ROUTE_METHOD)) {
-      router.#activateAllFallback();
-    }
 
     return router;
   }
@@ -66,10 +53,6 @@ export class Router {
     const table = this.getOrCreateMethod(route.method);
 
     registerRouteIntoTable(table, route);
-
-    if (route.method === ALL_ROUTE_METHOD) {
-      this.#activateAllFallback();
-    }
   }
 
   /*
@@ -116,10 +99,6 @@ export class Router {
      * before this point.
      */
     this.#methods = nextMethods;
-
-    if (nextMethods.has(ALL_ROUTE_METHOD)) {
-      this.#activateAllFallback();
-    }
   }
 
   match(method: string, pathname: string): RuntimeRouteMatch | undefined {
@@ -224,40 +203,6 @@ export class Router {
 
       params,
     };
-  }
-
-  #activateAllFallback(): void {
-    if (Object.prototype.hasOwnProperty.call(this, "match")) {
-      return;
-    }
-
-    /*
-     * Capture the original prototype matcher once.
-     *
-     * Plain Router instances never enter this branch,
-     * so their existing match() hot path stays unchanged.
-     */
-    const exactMatch = this.match.bind(this);
-
-    Object.defineProperty(this, "match", {
-      configurable: true,
-
-      writable: true,
-
-      value: (
-        method: string,
-
-        pathname: string,
-      ): RuntimeRouteMatch | undefined => {
-        const exact = exactMatch(method, pathname);
-
-        if (exact !== undefined) {
-          return exact;
-        }
-
-        return exactMatch(ALL_ROUTE_METHOD, pathname);
-      },
-    });
   }
 
   private getOrCreateMethod(method: string): MethodRoutes {

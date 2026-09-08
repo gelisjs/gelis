@@ -94,8 +94,6 @@ const result = {
 
 const outputPath = resolve(RESULTS_DIR, `all-zero-unused-${label}.json`);
 
-writeFileSync(outputPath, `${JSON.stringify(result, null, 2)}\n`);
-
 console.log("");
 console.log("P9-C ALL zero-unused plain-route benchmark");
 console.log(`Label:       ${label}`);
@@ -113,6 +111,8 @@ console.log(`CV:          ${round(cv * 100, 2)}%`);
 if (cv > MAX_CV) {
   throw new Error(`Benchmark invalid: CV ${round(cv * 100, 2)}% exceeds 5%`);
 }
+
+writeFileSync(outputPath, `${JSON.stringify(result, null, 2)}\n`);
 
 if (label === "candidate") {
   const baselinePath = resolve(RESULTS_DIR, "all-zero-unused-baseline.json");

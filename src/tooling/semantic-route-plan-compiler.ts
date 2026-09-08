@@ -27,7 +27,7 @@ export async function compileSemanticRoutePlan(
       throw new Error("Missing Gelis semantic route");
     }
 
-    assertHttpMethodToken(route.method);
+    assertRouteMethod(route.method);
 
     entries[index] = {
       method: route.method,

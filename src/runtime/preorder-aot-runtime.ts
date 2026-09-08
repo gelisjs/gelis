@@ -1,6 +1,6 @@
 import { GELIS_INTERNAL_RUNTIME, type Gelis } from "../app";
 
-import { assertRouteMethod } from "../http-method";
+import { ALL_ROUTE_METHOD, assertRouteMethod } from "../http-method";
 
 import { PREORDER_AOT_ARTIFACT_VERSION } from "./preorder-aot-artifact";
 
@@ -11,6 +11,8 @@ import type {
 } from "./preorder-aot-artifact";
 
 import { Router } from "./router";
+
+import { activateAllFallback } from "./router-all";
 
 import type { DynamicNode, MethodRoutes, TrailingParamRoute } from "./router";
 
@@ -113,7 +115,7 @@ export function bindPreorderRoutes(
       throw new Error(`Invalid Gelis preorder AOT method id: ${methodId}`);
     }
 
-    assertHttpMethodToken(methodName);
+    assertRouteMethod(methodName);
 
     routes[index] = {
       method: methodName,
@@ -181,7 +183,7 @@ export function hydratePreorderRouter(
       throw new Error(`Invalid Gelis preorder AOT method id: ${methodId}`);
     }
 
-    assertHttpMethodToken(methodName);
+    assertRouteMethod(methodName);
 
     if (runtimeMethods.has(methodName)) {
       throw new Error(`Duplicate Gelis preorder AOT method: ${methodName}`);
@@ -203,7 +205,13 @@ export function hydratePreorderRouter(
     );
   }
 
-  return Router.fromMethods(runtimeMethods);
+  const router = Router.fromMethods(runtimeMethods);
+
+  if (runtimeMethods.has(ALL_ROUTE_METHOD)) {
+    activateAllFallback(router);
+  }
+
+  return router;
 }
 
 interface PreorderCursor {

@@ -1,5 +1,4 @@
 import type {
-  HttpMethod,
   InferImplicitResponses,
   ResponseContractMap,
   RouteHandler,

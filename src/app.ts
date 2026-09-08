@@ -24,6 +24,8 @@ import type { ApplicationStartupTask } from "./startup";
 
 import { pathnameFromUrl } from "./runtime/url";
 
+import { ALL_ROUTE_METHOD } from "./http-method";
+
 import { RouteBuilder } from "./route-builder";
 
 import { GELIS_CONTRACT_SOURCE } from "./contract-source";
@@ -39,6 +41,8 @@ import {
 } from "./runtime/contract-metadata";
 
 import { Router, type RuntimeRouteMatch } from "./runtime/router";
+
+import { activateAllFallback } from "./runtime/router-all";
 
 import { normalizeResponse, runtimeReply } from "./runtime/response";
 
@@ -916,6 +920,8 @@ function commitModuleRuntimeRoutesAtomic(
   if (localBeforeHooks === undefined || localAfterHooks === undefined) {
     registerBatchAtomic.call(state.router, routes);
 
+    activateAllFallbackForRoutes(state, routes);
+
     const routeIdentityKeys = state.routeIdentityKeys;
 
     if (routeIdentityKeys !== undefined) {
@@ -960,6 +966,8 @@ function commitModuleRuntimeRoutesAtomic(
 
   registerBatchAtomic.call(state.router, routes);
 
+  activateAllFallbackForRoutes(state, routes);
+
   const routeIdentityKeys = state.routeIdentityKeys;
 
   if (routeIdentityKeys !== undefined) {
@@ -973,6 +981,26 @@ function commitModuleRuntimeRoutesAtomic(
   localAfterHooks.push(...pendingAfterHooks);
 
   state.routes.push(...routes);
+}
+
+function activateAllFallbackForRoutes(
+  state: AppRuntimeState,
+
+  routes: readonly RuntimeRouteRecord[],
+): void {
+  const router = state.router;
+
+  if (!(router instanceof Router)) {
+    return;
+  }
+
+  for (let index = 0; index < routes.length; index++) {
+    if (routes[index]?.method === ALL_ROUTE_METHOD) {
+      activateAllFallback(router);
+
+      return;
+    }
+  }
 }
 
 function validatePluginCompositionRoutes(
@@ -1052,6 +1080,10 @@ function registerAppRuntimeRoute(
    * unchanged.
    */
   state.router.register(route);
+
+  if (route.method === ALL_ROUTE_METHOD && state.router instanceof Router) {
+    activateAllFallback(state.router);
+  }
 
   const routeIdentityKeys = state.routeIdentityKeys;
 

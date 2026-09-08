@@ -93,7 +93,7 @@ export function bindSemanticRoutePlan(
       throw new Error(`Missing Gelis semantic route binding: ${index}`);
     }
 
-    assertHttpMethodToken(entry.method);
+    assertRouteMethod(entry.method);
 
     if (entry.flags !== RUNTIME_ROUTE_PLAIN) {
       throw new Error(`Unsupported Gelis semantic route flags: ${entry.flags}`);
