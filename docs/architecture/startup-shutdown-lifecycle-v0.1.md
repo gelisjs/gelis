@@ -191,6 +191,116 @@ The existing Bun adapter zero/near-zero-overhead expectation remains unchanged f
 
 Do not loosen these gates after candidate results are observed.
 
+## P8-D7 zero-unused and performance validation
+
+P8-D7 validated the production package/runtime architecture after Bun adapter graduation to `gelis/bun` and after startup/shutdown integration.
+
+All performance thresholds below were fixed before their corresponding candidate results were evaluated.
+
+### Production Bun adapter overhead
+
+The production `gelis/bun` synchronous `serve()` path was compared against direct `Bun.serve({ fetch: app.fetch.bind(app) })` using 5,000 mixed routes, 50 concurrent connections, 9 samples, and four representative HTTP workloads.
+
+The acceptance threshold required every workload to remain within `-3%` throughput of the direct control, with coefficient of variation no greater than `5%`.
+
+Observed median throughput deltas:
+
+```text
+static-raw    -0.26%
+dynamic-raw   -0.12%
+static-json   -0.72%
+dynamic-json  +0.41%
+```
+
+Maximum observed coefficient of variation was `3.67%`.
+
+Result: **PASS**.
+
+The production `gelis/bun` synchronous transport path remains effectively zero-overhead relative to direct `Bun.serve` for this benchmark.
+
+### Restored direct request hot path after startup
+
+A plain application was compared with an application that registered asynchronous startup work, completed `await app.ready()`, and then returned to the prototype `fetch` path.
+
+The benchmark also asserted that neither application retained an instance-owned `fetch` wrapper and that both request paths remained synchronous.
+
+Observed medians:
+
+```text
+plain               155.62 ns/op
+startup-restored    159.83 ns/op
+delta               +4.20 ns/op
+delta               +2.70%
+plain CV              2.14%
+startup-restored CV   2.88%
+```
+
+The frozen P8-D zero-unused direct-request acceptance band is `±3%`.
+
+Result: **PASS**.
+
+Successful startup therefore does not leave a measurable request-path regression outside the previously accepted benchmark-noise band.
+
+### Restored HTTP hot path after startup
+
+The startup-restored application was also measured end-to-end over Bun HTTP against a plain application using the same production Bun adapter surface.
+
+A first run contained a workload with coefficient of variation above the predeclared `5%` validity limit and was classified as invalid rather than accepted or rejected. One unchanged rerun was performed.
+
+The valid rerun produced:
+
+```text
+static-raw     -1.56%
+dynamic-raw    +0.48%
+static-json    -1.11%
+dynamic-json   -1.04%
+```
+
+Maximum coefficient of variation in the valid run was `4.27%`.
+
+The acceptance threshold required every workload to remain at or above `-3%`.
+
+Result: **PASS**.
+
+### Type scalability regression gate
+
+The frozen P8-C retained-route module-composition type scalability benchmark was rerun after P8-D lifecycle integration.
+
+At 5,000 composition units:
+
+```text
+instantiations vs direct control    1.211x
+memory vs direct control            1.321x
+check time vs direct control        1.357x
+normalized instantiation growth     1.144x
+```
+
+Frozen limits:
+
+```text
+instantiations <= 1.50x
+memory         <= 1.40x
+check time     <= 1.60x
+normalized 100->5k instantiation growth <= 1.25x
+```
+
+All four gates passed.
+
+Result: **PASS**.
+
+### P8-D7 conclusion
+
+The accepted P8-D lifecycle architecture satisfies its zero-unused and scalability requirements on the validated environment:
+
+```text
+Runtime:      Bun 1.4.0
+TypeScript:   7.0.2
+CPU:          Intel Core i5-10500H
+Logical CPUs: 12
+```
+
+P8-D7 is accepted. No lifecycle performance threshold was relaxed after benchmark results were observed.
+
 ## Planned implementation sequence
 
 P8-D2: internal startup coordinator and `app.ready()`  

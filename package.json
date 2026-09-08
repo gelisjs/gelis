@@ -96,7 +96,9 @@
     "bench:http:elysia2:aot:validation:build": "bun run --cwd bench/http/elysia-v2-aot build:validation",
     "typecheck:package:portable": "bun ./node_modules/typescript/bin/tsc -p test/package/portable/tsconfig.json --noEmit",
     "typecheck:package:bun": "bun ./node_modules/typescript/bin/tsc -p test/package/bun/tsconfig.json --noEmit",
-    "test:package": "bun test test/package/package-exports.test.ts"
+    "test:package": "bun test test/package/package-exports.test.ts",
+    "bench:runtime:startup-restored": "bun bench/runtime/startup-restored-hot-path.mts",
+    "bench:http:startup-restored": "bun bench/http/run-startup-restored.mts"
   },
   "devDependencies": {
     "@hono/standard-validator": "^0.4.0",
