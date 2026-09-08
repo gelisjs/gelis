@@ -62,6 +62,7 @@ type FrozenPluginRouteStringKeys =
   | "delete"
   | "options"
   | "head"
+  | "query"
   | "route";
 
 type PluginRouteShape = Expect<

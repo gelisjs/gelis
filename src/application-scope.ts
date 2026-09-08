@@ -323,6 +323,8 @@ export interface ApplicationScopeBuilder<
 
   readonly head: ApplicationScopeRouteMethod<"HEAD", Scope, Prefix>;
 
+  readonly query: ApplicationScopeRouteMethod<"QUERY", Scope, Prefix>;
+
   readonly route: ApplicationScopeGenericRouteMethod<Scope, Prefix>;
 }
 

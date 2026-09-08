@@ -11,7 +11,8 @@ export type HttpMethod =
   | "PATCH"
   | "DELETE"
   | "OPTIONS"
-  | "HEAD";
+  | "HEAD"
+  | "QUERY";
 
 export interface RouteRequestContract<
   Params = Record<never, never>,

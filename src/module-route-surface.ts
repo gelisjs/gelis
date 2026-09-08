@@ -282,6 +282,8 @@ interface SharedModulePlainRouteSurface {
 
   readonly head: ModulePlainRouteMethod<"HEAD">;
 
+  readonly query: ModulePlainRouteMethod<"QUERY">;
+
   readonly route: ModulePlainGenericRouteMethod;
 }
 
@@ -548,6 +550,8 @@ interface SharedModuleScopedRouteSurface {
   readonly options: ModuleScopedRouteMethod<"OPTIONS">;
 
   readonly head: ModuleScopedRouteMethod<"HEAD">;
+
+  readonly query: ModuleScopedRouteMethod<"QUERY">;
 
   readonly route: ModuleScopedGenericRouteMethod;
 }

@@ -527,6 +527,8 @@ interface SharedModuleRequestScopeRouteSurface {
 
   readonly head: SharedModuleRequestScopeRouteMethod<"HEAD">;
 
+  readonly query: SharedModuleRequestScopeRouteMethod<"QUERY">;
+
   readonly route: SharedModuleRequestScopeGenericRouteMethod;
 }
 

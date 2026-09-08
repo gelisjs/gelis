@@ -43,6 +43,7 @@
     "bench:runtime:lifecycle": "bun bench/runtime/lifecycle.mts",
     "bench:http:autocannon": "bun bench/http/run.mts",
     "bench:http": "bun bench/http/run-oha.mts",
+    "probe:http:query": "bun bench/http/query-transport-probe.mts",
     "bench:http:elysia2:aot:build": "bun run --cwd bench/http/elysia-v2-aot build",
     "typecheck:bun-adapter": "bun ./node_modules/typescript/bin/tsc -p tsconfig.bun.json --noEmit",
     "bench:http:adapter": "bun bench/http/run-gelis-adapter.mts",

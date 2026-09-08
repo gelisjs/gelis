@@ -50,6 +50,7 @@ type PluginRouteMethodName =
   | "delete"
   | "options"
   | "head"
+  | "query"
   | "route";
 
 export type PluginRouteBuilder = Pick<RouteBuilder<"">, PluginRouteMethodName>;

@@ -935,6 +935,126 @@ export class RouteBuilder<Prefix extends string = ""> {
   }
 
   /*
+   * QUERY without options.
+   */
+  query<const Path extends string, Result>(
+    path: Path & ValidRoutePath<Path>,
+
+    handler: RouteHandler<JoinRoutePath<Prefix, Path>, never, never, Result>,
+
+    lifecycle?: RouteLifecycleFor<
+      JoinRoutePath<Prefix, Path>,
+      undefined,
+      undefined,
+      undefined,
+      Result
+    >,
+  ): RouteRef<
+    "QUERY",
+    JoinRoutePath<Prefix, Path>,
+    RouteRequestContract<InferPathParams<JoinRoutePath<Prefix, Path>>>,
+    InferImplicitResponses<Result>
+  >;
+
+  /*
+   * QUERY with options but without an explicit
+   * response contract.
+   */
+  query<
+    const Path extends string,
+    const Query extends StandardSchemaV1 | undefined = undefined,
+    const Body extends StandardSchemaV1 | undefined = undefined,
+    Result = unknown,
+  >(
+    path: Path & ValidRoutePath<Path>,
+
+    options: RouteOptionsFor<Query, Body, undefined>,
+
+    handler: (
+      context: RouteHandlerContextFor<
+        JoinRoutePath<Prefix, Path>,
+        RouteOptionsFor<Query, Body, undefined>
+      >,
+    ) => Result,
+
+    lifecycle?: RouteLifecycleFor<
+      JoinRoutePath<Prefix, Path>,
+      Query,
+      Body,
+      undefined,
+      Result
+    >,
+  ): RouteRef<
+    "QUERY",
+    JoinRoutePath<Prefix, Path>,
+    RouteRequestFor<
+      JoinRoutePath<Prefix, Path>,
+      RouteOptionsFor<Query, Body, undefined>
+    >,
+    RouteResponsesFor<RouteOptionsFor<Query, Body, undefined>, Result>
+  >;
+
+  /*
+   * QUERY with an explicit response contract.
+   */
+  query<
+    const Path extends string,
+    const Responses extends ResponseContractMap,
+    const Query extends StandardSchemaV1 | undefined = undefined,
+    const Body extends StandardSchemaV1 | undefined = undefined,
+  >(
+    path: Path & ValidRoutePath<Path>,
+
+    options: RouteOptionsFor<Query, Body, Responses> & {
+      readonly responses: Responses;
+    },
+
+    handler: (
+      context: RouteHandlerContextFor<
+        JoinRoutePath<Prefix, Path>,
+        RouteOptionsFor<Query, Body, Responses>
+      >,
+    ) => RouteHandlerResultFor<Responses>,
+
+    lifecycle?: RouteLifecycleFor<
+      JoinRoutePath<Prefix, Path>,
+      Query,
+      Body,
+      Responses,
+      RouteHandlerResultFor<Responses>
+    >,
+  ): RouteRef<
+    "QUERY",
+    JoinRoutePath<Prefix, Path>,
+    RouteRequestFor<
+      JoinRoutePath<Prefix, Path>,
+      RouteOptionsFor<Query, Body, Responses>
+    >,
+    RouteResponsesFor<
+      RouteOptionsFor<Query, Body, Responses>,
+      RouteHandlerResultFor<Responses>
+    >
+  >;
+
+  query(
+    path: string,
+
+    optionsOrHandler: unknown,
+
+    handlerOrLifecycle?: unknown,
+
+    lifecycle?: unknown,
+  ): unknown {
+    return this.registerRoute(
+      "QUERY",
+      path,
+      optionsOrHandler,
+      handlerOrLifecycle,
+      lifecycle,
+    );
+  }
+
+  /*
    * Generic method route without options.
    */
   route<const Method extends HttpMethod, const Path extends string, Result>(

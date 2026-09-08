@@ -321,6 +321,8 @@ export interface RequestScopeBuilder<Scope extends object> {
 
   readonly head: RequestScopeRouteMethod<"HEAD", Scope>;
 
+  readonly query: RequestScopeRouteMethod<"QUERY", Scope>;
+
   readonly route: RequestScopeGenericRouteMethod<Scope>;
 }
 

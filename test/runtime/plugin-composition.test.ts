@@ -20,6 +20,12 @@ describe("plugin composition surface", () => {
 
           () => "healthy",
         );
+
+        setup.routes.query(
+          "/plugin-query",
+
+          () => "queried",
+        );
       },
     );
 
@@ -30,6 +36,20 @@ describe("plugin composition surface", () => {
     const response = await app.fetch(
       new Request("http://gelis.test/plugin-health"),
     );
+
+    const queryResponse = await app.fetch(
+      new Request(
+        "http://gelis.test/plugin-query",
+
+        {
+          method: "QUERY",
+        },
+      ),
+    );
+
+    expect(queryResponse.status).toBe(200);
+
+    expect(await queryResponse.text()).toBe("queried");
 
     expect(response.status).toBe(200);
 

@@ -76,6 +76,7 @@ describe("Gelis AOT source analyzer", () => {
             app.delete("/delete", () => 1);
             app.options("/options", () => 1);
             app.head("/head", () => 1);
+            app.query("/query", () => 1);
           `);
 
     expect(analysis.routes.map((route) => route.method)).toEqual([
@@ -86,6 +87,7 @@ describe("Gelis AOT source analyzer", () => {
       "DELETE",
       "OPTIONS",
       "HEAD",
+      "QUERY",
     ]);
   });
 

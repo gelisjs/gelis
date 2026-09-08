@@ -321,6 +321,9 @@ function routeMethod(method: string): HttpMethod | undefined {
     case "head":
       return "HEAD";
 
+    case "query":
+      return "QUERY";
+
     default:
       return undefined;
   }

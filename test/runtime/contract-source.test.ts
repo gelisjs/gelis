@@ -737,4 +737,40 @@ describe("Gelis contract source", () => {
       tags: ["Users"],
     });
   });
+
+  test("projects QUERY method and request-body contract", () => {
+    const Body = createSchema<{
+      term: string;
+    }>();
+
+    const app = new Gelis();
+
+    app.query(
+      "/search",
+
+      {
+        body: Body,
+
+        openapi: {
+          summary: "Search with QUERY",
+        },
+      },
+
+      () => "ok",
+    );
+
+    const snapshot = inspectContract(app);
+
+    expect(snapshot.routes).toHaveLength(1);
+
+    expect(snapshot.routes[0]?.method).toBe("QUERY");
+
+    expect(snapshot.routes[0]?.path).toBe("/search");
+
+    expect(snapshot.routes[0]?.body).toBe(Body);
+
+    expect(snapshot.routes[0]?.openapi).toEqual({
+      summary: "Search with QUERY",
+    });
+  });
 });

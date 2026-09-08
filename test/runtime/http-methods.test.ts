@@ -2,6 +2,8 @@ import { describe, expect, test } from "bun:test";
 
 import { Gelis, inspectContract } from "../../src";
 
+import type { StandardSchemaV1 } from "../../src";
+
 describe("Gelis HTTP method surface", () => {
   test("routes every supported HTTP method through convenience methods", async () => {
     const app = new Gelis();
@@ -33,6 +35,8 @@ describe("Gelis HTTP method surface", () => {
 
     app.head("/methods", handler("HEAD"));
 
+    app.query("/methods", handler("QUERY"));
+
     const methods = [
       "GET",
       "POST",
@@ -41,6 +45,7 @@ describe("Gelis HTTP method surface", () => {
       "DELETE",
       "OPTIONS",
       "HEAD",
+      "QUERY",
     ] as const;
 
     for (const method of methods) {
@@ -117,6 +122,147 @@ describe("Gelis HTTP method surface", () => {
 
     expect(snapshot.routes[1]?.openapi).toEqual({
       summary: "Generic patch",
+    });
+  });
+
+  test("preserves QUERY request content through Gelis", async () => {
+    const app = new Gelis();
+
+    app.query(
+      "/query-body",
+
+      async ({ request }) =>
+        Response.json({
+          method: request.method,
+
+          body: await request.text(),
+        }),
+    );
+
+    const payload = JSON.stringify({
+      q: "gelis",
+    });
+
+    const response = await app.fetch(
+      new Request(
+        "http://localhost/query-body",
+
+        {
+          method: "QUERY",
+
+          headers: {
+            "content-type": "application/json",
+          },
+
+          body: payload,
+        },
+      ),
+    );
+
+    expect(response.status).toBe(200);
+
+    expect(await response.json()).toEqual({
+      method: "QUERY",
+
+      body: payload,
+    });
+  });
+
+  test("validates and transforms QUERY JSON body through the input plan", async () => {
+    const Body: StandardSchemaV1<
+      {
+        term: string;
+      },
+      {
+        term: string;
+        length: number;
+      }
+    > = {
+      "~standard": {
+        version: 1,
+
+        vendor: "gelis-test",
+
+        types: {
+          input: undefined as unknown as {
+            term: string;
+          },
+
+          output: undefined as unknown as {
+            term: string;
+            length: number;
+          },
+        },
+
+        validate(value) {
+          if (
+            typeof value !== "object" ||
+            value === null ||
+            typeof (value as { term?: unknown }).term !== "string"
+          ) {
+            return {
+              issues: [
+                {
+                  message: "Expected term",
+                },
+              ],
+            };
+          }
+
+          const term = (value as { term: string }).term;
+
+          return {
+            value: {
+              term,
+
+              length: term.length,
+            },
+          };
+        },
+      },
+    };
+
+    const app = new Gelis();
+
+    app.query(
+      "/validated-query",
+
+      {
+        body: Body,
+      },
+
+      ({ body }) =>
+        Response.json({
+          term: body.term,
+
+          length: body.length,
+        }),
+    );
+
+    const response = await app.fetch(
+      new Request(
+        "http://localhost/validated-query",
+
+        {
+          method: "QUERY",
+
+          headers: {
+            "content-type": "application/json",
+          },
+
+          body: JSON.stringify({
+            term: "gelis",
+          }),
+        },
+      ),
+    );
+
+    expect(response.status).toBe(200);
+
+    expect(await response.json()).toEqual({
+      term: "gelis",
+
+      length: 5,
     });
   });
 });

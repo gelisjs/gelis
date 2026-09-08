@@ -47,6 +47,8 @@ describe("application scope route surface", () => {
 
     routes.options("/options", (_context, scope) => scope.value);
 
+    routes.query("/query", (_context, scope) => scope.value);
+
     routes.head(
       "/head",
       () =>
@@ -62,6 +64,7 @@ describe("application scope route surface", () => {
       ["PATCH", "/patch"],
       ["DELETE", "/delete"],
       ["OPTIONS", "/options"],
+      ["QUERY", "/query"],
     ] as const;
 
     for (const [method, path] of cases) {

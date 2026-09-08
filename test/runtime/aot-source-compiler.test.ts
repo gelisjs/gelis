@@ -192,6 +192,27 @@ describe("Gelis AOT source compiler", () => {
 
     expect(result.code).toBe(source);
   });
+
+  test("compiles QUERY routes into the semantic plan", async () => {
+    const result = await compileAotSource(`
+    const app = new Gelis();
+
+    app.query(
+      "/search",
+      () => "ok",
+    );
+  `);
+
+    expect(result.routeCount).toBe(1);
+
+    expect(result.plan?.routes).toHaveLength(1);
+
+    expect(result.plan?.routes[0]?.method).toBe("QUERY");
+
+    expect(result.plan?.routes[0]?.path).toBe("/search");
+
+    expect(result.code).not.toContain("app.query(");
+  });
 });
 
 function execute(
