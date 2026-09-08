@@ -26,6 +26,12 @@ const WORKER = resolve(
   "test/runtime/fixtures/flat-aot-build-pipeline-worker.ts",
 );
 
+interface WorkerRequest {
+  readonly path: string;
+
+  readonly method: string;
+}
+
 interface WorkerRequestResult {
   readonly path: string;
 
@@ -118,6 +124,87 @@ describe("Gelis flat AOT end-to-end build pipeline", () => {
           status: 200,
 
           body: "core:7",
+        },
+      ]);
+    } finally {
+      await removeDirectory(directory);
+    }
+  });
+
+  test("builds ALL and custom methods and executes them in a fresh process", async () => {
+    const directory = await createTemporaryDirectory();
+
+    try {
+      const imports = productionImports();
+
+      const output = await writeFlatAotBuildOutput(
+        `
+                import { Gelis } from ${JSON.stringify(imports.gelis)};
+
+                const app = new Gelis();
+
+                app.all(
+                  "/resource/:id",
+                  ({ params }) => "all:" + params.id,
+                );
+
+                app.route(
+                  "PURGE",
+                  "/resource/:id",
+                  ({ params }) => "purge:" + params.id,
+                );
+
+                export default app;
+              `,
+
+        {
+          modulePath: resolve(directory, "application.mts"),
+
+          runtimeAdapterImport: imports.runtimeAdapter,
+
+          host: createFileSystemHost(),
+        },
+      );
+
+      expect(output.routeCount).toBe(2);
+
+      expect(output.artifactPath).toBeDefined();
+
+      const run = await runGeneratedRequests(
+        output.modulePath,
+
+        [
+          {
+            path: "/resource/42",
+
+            method: "PURGE",
+          },
+
+          {
+            path: "/resource/42",
+
+            method: "POST",
+          },
+        ],
+      );
+
+      expect(run.exitCode).toBe(0);
+
+      expect(parseWorkerResults(run.stdout)).toEqual([
+        {
+          path: "/resource/42",
+
+          status: 200,
+
+          body: "purge:42",
+        },
+
+        {
+          path: "/resource/42",
+
+          status: 200,
+
+          body: "all:42",
         },
       ]);
     } finally {
@@ -450,6 +537,44 @@ async function runGeneratedModule(
         MODULE_PATH: modulePath,
 
         REQUEST_PATHS: JSON.stringify(requestPaths),
+      },
+
+      stdout: "pipe",
+
+      stderr: "pipe",
+    },
+  );
+
+  const stdout = await new Response(child.stdout).text();
+
+  const stderr = await new Response(child.stderr).text();
+
+  const exitCode = await child.exited;
+
+  return {
+    exitCode,
+
+    stdout,
+
+    stderr,
+  };
+}
+
+async function runGeneratedRequests(
+  modulePath: string,
+
+  requests: readonly WorkerRequest[],
+): Promise<WorkerRun> {
+  const child = Bun.spawn(
+    [process.execPath, WORKER],
+
+    {
+      env: {
+        ...process.env,
+
+        MODULE_PATH: modulePath,
+
+        REQUESTS_JSON: JSON.stringify(requests),
       },
 
       stdout: "pipe",

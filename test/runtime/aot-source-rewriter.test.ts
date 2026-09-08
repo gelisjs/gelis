@@ -103,6 +103,68 @@ describe("Gelis AOT source rewriter", () => {
     ]);
   });
 
+  test("preserves mixed ALL and custom-route handler acquisition order", () => {
+    const events: string[] = [];
+
+    const result = rewriteAotSource(`
+            const app = new Gelis();
+
+            const make = (name) => {
+              events.push("make:" + name);
+
+              return () => name;
+            };
+
+            events.push("before");
+
+            app.get(
+              "/get",
+              make("get"),
+            );
+
+            events.push("after-get");
+
+            app.route(
+              "PURGE",
+              "/cache",
+              make("purge"),
+            );
+
+            events.push("after-purge");
+
+            app.all(
+              "/fallback",
+              make("all"),
+            );
+
+            events.push("after-all");
+          `);
+
+    const handlers = execute(result, events);
+
+    expect(events).toEqual([
+      "before",
+      "make:get",
+      "after-get",
+      "make:purge",
+      "after-purge",
+      "make:all",
+      "after-all",
+    ]);
+
+    expect(handlers).toHaveLength(3);
+
+    expect(handlers[0]?.()).toBe("get");
+
+    expect(handlers[1]?.()).toBe("purge");
+
+    expect(handlers[2]?.()).toBe("all");
+
+    expect(result.code).not.toContain("app.route(");
+
+    expect(result.code).not.toContain("app.all(");
+  });
+
   test("evaluates each handler expression exactly once", () => {
     const events: string[] = [];
 
@@ -142,6 +204,41 @@ describe("Gelis AOT source rewriter", () => {
             app.get(
               "/route",
               make(),
+            );
+          `);
+
+    const executeThrowing = new Function(
+      "Gelis",
+      "make",
+      `
+              ${result.code}
+
+              return ${result.handlerArrayIdentifier};
+            `,
+    );
+
+    expect(() =>
+      executeThrowing(FakeGelis, () => {
+        throw marker;
+      }),
+    ).toThrow(marker);
+  });
+
+  test("preserves custom-route handler acquisition exceptions", () => {
+    const marker = new Error("custom handler acquisition");
+
+    const result = rewriteAotSource(`
+            const app = new Gelis();
+
+            app.route(
+              "PURGE",
+              "/cache",
+              make(),
+            );
+
+            app.all(
+              "/fallback",
+              () => "fallback",
             );
           `);
 

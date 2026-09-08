@@ -88,6 +88,60 @@ describe("Gelis semantic route plan", () => {
     expect(changedOrder.shapeFingerprint).not.toBe(original.shapeFingerprint);
   });
 
+  test("preserves ALL and custom methods through semantic compilation", async () => {
+    const plan = await compileSemanticRoutePlan([
+      {
+        method: "*",
+
+        path: "/fallback",
+      },
+
+      {
+        method: "PURGE",
+
+        path: "/cache",
+      },
+
+      {
+        method: "MiXeD-Gelis",
+
+        path: "/mixed",
+      },
+    ]);
+
+    expect(
+      plan.routes.map((route) => ({
+        method: route.method,
+
+        path: route.path,
+      })),
+    ).toEqual([
+      {
+        method: "*",
+
+        path: "/fallback",
+      },
+
+      {
+        method: "PURGE",
+
+        path: "/cache",
+      },
+
+      {
+        method: "MiXeD-Gelis",
+
+        path: "/mixed",
+      },
+    ]);
+
+    expect(plan.router.methods.map(([method]) => method)).toEqual([
+      "*",
+      "PURGE",
+      "MiXeD-Gelis",
+    ]);
+  });
+
   test("binds runtime handler identity into prepared route records", async () => {
     const plan = await compileSemanticRoutePlan(SHAPES);
 

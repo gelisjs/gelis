@@ -4,6 +4,12 @@ interface FetchApplication {
   fetch(request: Request): Response | Promise<Response>;
 }
 
+interface WorkerRequest {
+  readonly path: string;
+
+  readonly method?: string;
+}
+
 interface RequestResult {
   readonly path: string;
 
@@ -16,11 +22,21 @@ const modulePath = process.env.MODULE_PATH;
 
 const pathsJson = process.env.REQUEST_PATHS;
 
-if (modulePath === undefined || pathsJson === undefined) {
+const requestsJson = process.env.REQUESTS_JSON;
+
+if (
+  modulePath === undefined ||
+  (pathsJson === undefined && requestsJson === undefined)
+) {
   throw new Error("Missing E5E worker environment");
 }
 
-const paths = JSON.parse(pathsJson) as string[];
+const requests: WorkerRequest[] =
+  requestsJson !== undefined
+    ? (JSON.parse(requestsJson) as WorkerRequest[])
+    : (JSON.parse(pathsJson!) as string[]).map((path) => ({
+        path,
+      }));
 
 const loaded = (await import(pathToFileURL(modulePath).href)) as {
   readonly default?: FetchApplication;
@@ -36,11 +52,15 @@ if (app === undefined || typeof app.fetch !== "function") {
 
 const results: RequestResult[] = [];
 
-for (const path of paths) {
-  const response = await app.fetch(new Request(`http://gelis.test${path}`));
+for (const request of requests) {
+  const response = await app.fetch(
+    new Request(`http://gelis.test${request.path}`, {
+      method: request.method ?? "GET",
+    }),
+  );
 
   results.push({
-    path,
+    path: request.path,
 
     status: response.status,
 

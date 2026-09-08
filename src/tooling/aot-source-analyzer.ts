@@ -1,9 +1,9 @@
 import * as ts from "@typescript/typescript6";
 
-import type { HttpMethod } from "../route";
+import { ALL_ROUTE_METHOD, assertHttpMethodToken } from "../http-method";
 
 export interface AotSourceRoute {
-  readonly method: HttpMethod;
+  readonly method: string;
 
   readonly path: string;
 
@@ -97,28 +97,88 @@ export function analyzeAotSource(
           );
         }
 
-        if (node.arguments.length !== 2) {
-          throw unsupported(
+        let method: string;
+
+        let pathArgument: ts.Expression | undefined;
+
+        let handlerArgument: ts.Expression | undefined;
+
+        if (routeCall.kind === "generic") {
+          if (node.arguments.length !== 3) {
+            throw unsupported(
+              sourceFile,
+
+              node,
+
+              "AOT v0.1 supports only static method + path + handler routes for app.route()",
+            );
+          }
+
+          const methodArgument = node.arguments[0];
+
+          pathArgument = node.arguments[1];
+
+          handlerArgument = node.arguments[2];
+
+          if (
+            methodArgument === undefined ||
+            pathArgument === undefined ||
+            handlerArgument === undefined
+          ) {
+            throw unsupported(
+              sourceFile,
+
+              node,
+
+              "route arguments are incomplete",
+            );
+          }
+
+          if (!ts.isStringLiteralLike(methodArgument)) {
+            throw unsupported(
+              sourceFile,
+
+              methodArgument,
+
+              "route method must be a static string literal",
+            );
+          }
+
+          method = methodArgument.text;
+
+          assertAotHttpMethod(
             sourceFile,
 
-            node,
+            methodArgument,
 
-            "AOT v0.1 supports only plain path + handler routes",
+            method,
           );
-        }
+        } else {
+          if (node.arguments.length !== 2) {
+            throw unsupported(
+              sourceFile,
 
-        const pathArgument = node.arguments[0];
+              node,
 
-        const handlerArgument = node.arguments[1];
+              "AOT v0.1 supports only plain path + handler routes",
+            );
+          }
 
-        if (pathArgument === undefined || handlerArgument === undefined) {
-          throw unsupported(
-            sourceFile,
+          pathArgument = node.arguments[0];
 
-            node,
+          handlerArgument = node.arguments[1];
 
-            "route arguments are incomplete",
-          );
+          if (pathArgument === undefined || handlerArgument === undefined) {
+            throw unsupported(
+              sourceFile,
+
+              node,
+
+              "route arguments are incomplete",
+            );
+          }
+
+          method = routeCall.method;
         }
 
         if (!ts.isStringLiteralLike(pathArgument)) {
@@ -142,7 +202,7 @@ export function analyzeAotSource(
         }
 
         routes.push({
-          method: routeCall.method,
+          method,
 
           path: pathArgument.text,
 
@@ -163,11 +223,21 @@ export function analyzeAotSource(
   }
 }
 
-interface RouteCallInfo {
-  readonly method: HttpMethod;
+interface ConvenienceRouteCallInfo {
+  readonly kind: "convenience";
+
+  readonly method: string;
 
   readonly computed: boolean;
 }
+
+interface GenericRouteCallInfo {
+  readonly kind: "generic";
+
+  readonly computed: boolean;
+}
+
+type RouteCallInfo = ConvenienceRouteCallInfo | GenericRouteCallInfo;
 
 function inspectRouteCall(
   call: ts.CallExpression,
@@ -184,17 +254,11 @@ function inspectRouteCall(
       return undefined;
     }
 
-    const method = routeMethod(expression.name.text);
+    return routeCallInfo(
+      expression.name.text,
 
-    if (method === undefined) {
-      return undefined;
-    }
-
-    return {
-      method,
-
-      computed: false,
-    };
+      false,
+    );
   }
 
   if (ts.isElementAccessExpression(expression)) {
@@ -211,20 +275,42 @@ function inspectRouteCall(
       return undefined;
     }
 
-    const method = routeMethod(argument.text);
+    return routeCallInfo(
+      argument.text,
 
-    if (method === undefined) {
-      return undefined;
-    }
-
-    return {
-      method,
-
-      computed: true,
-    };
+      true,
+    );
   }
 
   return undefined;
+}
+
+function routeCallInfo(
+  methodName: string,
+
+  computed: boolean,
+): RouteCallInfo | undefined {
+  if (methodName === "route") {
+    return {
+      kind: "generic",
+
+      computed,
+    };
+  }
+
+  const method = routeMethod(methodName);
+
+  if (method === undefined) {
+    return undefined;
+  }
+
+  return {
+    kind: "convenience",
+
+    method,
+
+    computed,
+  };
 }
 
 function assertCanonicalAppDeclaration(
@@ -298,7 +384,7 @@ function assertCanonicalAppDeclaration(
   }
 }
 
-function routeMethod(method: string): HttpMethod | undefined {
+function routeMethod(method: string): string | undefined {
   switch (method) {
     case "get":
       return "GET";
@@ -324,8 +410,35 @@ function routeMethod(method: string): HttpMethod | undefined {
     case "query":
       return "QUERY";
 
+    case "all":
+      return ALL_ROUTE_METHOD;
+
     default:
       return undefined;
+  }
+}
+
+function assertAotHttpMethod(
+  sourceFile: ts.SourceFile,
+
+  node: ts.Node,
+
+  method: string,
+): void {
+  try {
+    assertHttpMethodToken(method);
+  } catch (error) {
+    if (error instanceof Error) {
+      throw unsupported(
+        sourceFile,
+
+        node,
+
+        error.message,
+      );
+    }
+
+    throw error;
   }
 }
 

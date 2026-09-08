@@ -16,6 +16,8 @@ import { compilePreorderAotArtifact } from "../../src/tooling/preorder-aot-artif
 
 import { compileSemanticRoutePlan } from "../../src/tooling/semantic-route-plan-compiler";
 
+import { compileAotSource } from "../../src/tooling/aot-source-compiler";
+
 const routeShapes = [
   {
     method: "*",
@@ -88,6 +90,73 @@ describe("ALL and custom methods across production AOT runtimes", () => {
     );
 
     expect(await exact.text()).toBe("purge:42");
+    expect(await fallback.text()).toBe("all:42");
+  });
+
+  test("feeds ALL and custom source grammar into preorder AOT without method loss", async () => {
+    const compilation = await compileAotSource(`
+      const app = new Gelis();
+
+      app.all(
+        "/resource/:id",
+        ({ params }) => "all:" + params.id,
+      );
+
+      app.route(
+        "PURGE",
+        "/resource/:id",
+        ({ params }) => "purge:" + params.id,
+      );
+    `);
+
+    const plan = compilation.plan;
+
+    expect(plan).toBeDefined();
+
+    if (plan === undefined) {
+      throw new Error("Missing P9-C5 preorder semantic plan");
+    }
+
+    expect(plan.routes.map((route) => [route.method, route.path])).toEqual([
+      ["*", "/resource/:id"],
+
+      ["PURGE", "/resource/:id"],
+    ]);
+
+    const artifact = compilePreorderAotArtifact(plan);
+
+    const app = new Gelis();
+
+    installPreorderAotRuntime(app, artifact, {
+      version: PREORDER_AOT_ARTIFACT_VERSION,
+
+      shapeFingerprint: artifact[2],
+
+      handlers,
+    });
+
+    const exact = await app.fetch(
+      new Request(
+        "http://gelis.test/resource/42",
+
+        {
+          method: "PURGE",
+        },
+      ),
+    );
+
+    const fallback = await app.fetch(
+      new Request(
+        "http://gelis.test/resource/42",
+
+        {
+          method: "POST",
+        },
+      ),
+    );
+
+    expect(await exact.text()).toBe("purge:42");
+
     expect(await fallback.text()).toBe("all:42");
   });
 });

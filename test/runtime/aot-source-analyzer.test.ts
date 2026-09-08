@@ -65,7 +65,7 @@ describe("Gelis AOT source analyzer", () => {
     ]);
   });
 
-  test("supports every convenience HTTP method", () => {
+  test("supports every convenience HTTP method including ALL", () => {
     const analysis = analyzeAotSource(`
             const app = new Gelis();
 
@@ -77,6 +77,7 @@ describe("Gelis AOT source analyzer", () => {
             app.options("/options", () => 1);
             app.head("/head", () => 1);
             app.query("/query", () => 1);
+            app.all("/all", () => 1);
           `);
 
     expect(analysis.routes.map((route) => route.method)).toEqual([
@@ -88,7 +89,159 @@ describe("Gelis AOT source analyzer", () => {
       "OPTIONS",
       "HEAD",
       "QUERY",
+      "*",
     ]);
+  });
+
+  test("extracts static generic custom methods and preserves identity", () => {
+    const analysis = analyzeAotSource(`
+            const app = new Gelis();
+
+            app.route(
+              "PURGE",
+              "/cache",
+              () => "purged",
+            );
+
+            app.route(
+              "PROPFIND",
+              "/resource/:id",
+              ({ params }) => params.id,
+            );
+
+            app.route(
+              "MiXeD-Gelis",
+              "/mixed",
+              () => "mixed",
+            );
+
+            app.route(
+              "ALL",
+              "/ordinary-all-token",
+              () => "ordinary",
+            );
+          `);
+
+    expect(
+      analysis.routes.map((route) => ({
+        method: route.method,
+
+        path: route.path,
+      })),
+    ).toEqual([
+      {
+        method: "PURGE",
+
+        path: "/cache",
+      },
+
+      {
+        method: "PROPFIND",
+
+        path: "/resource/:id",
+      },
+
+      {
+        method: "MiXeD-Gelis",
+
+        path: "/mixed",
+      },
+
+      {
+        method: "ALL",
+
+        path: "/ordinary-all-token",
+      },
+    ]);
+
+    expect(analysis.routes[0]?.handlerText).toContain('"purged"');
+
+    expect(analysis.routes[1]?.handlerText).toContain("params.id");
+  });
+
+  test("rejects dynamic generic route methods", () => {
+    expect(() =>
+      analyzeAotSource(`
+              const app = new Gelis();
+
+              const method = "PURGE";
+
+              app.route(
+                method,
+                "/cache",
+                () => "ok",
+              );
+            `),
+    ).toThrow("route method must be a static string literal");
+  });
+
+  test("applies canonical runtime method validation to generic AOT routes", () => {
+    expect(() =>
+      analyzeAotSource(`
+              const app = new Gelis();
+
+              app.route(
+                "*",
+                "/reserved",
+                () => "ok",
+              );
+            `),
+    ).toThrow('HTTP method "*" is reserved for Gelis all-route matching');
+
+    expect(() =>
+      analyzeAotSource(`
+              const app = new Gelis();
+
+              app.route(
+                "TRACE",
+                "/forbidden",
+                () => "ok",
+              );
+            `),
+    ).toThrow("Forbidden Fetch HTTP method: TRACE");
+
+    expect(() =>
+      analyzeAotSource(`
+              const app = new Gelis();
+
+              app.route(
+                "get",
+                "/non-canonical",
+                () => "ok",
+              );
+            `),
+    ).toThrow("Non-canonical Fetch-normalized HTTP method: get");
+
+    expect(() =>
+      analyzeAotSource(`
+              const app = new Gelis();
+
+              app.route(
+                "BAD METHOD",
+                "/invalid-token",
+                () => "ok",
+              );
+            `),
+    ).toThrow('Invalid HTTP method token: "BAD METHOD"');
+  });
+
+  test("rejects unsupported generic route argument shapes", () => {
+    expect(() =>
+      analyzeAotSource(`
+              const app = new Gelis();
+
+              app.route(
+                "PURGE",
+                "/cache",
+                {
+                  response: schema,
+                },
+                () => "ok",
+              );
+            `),
+    ).toThrow(
+      "AOT v0.1 supports only static method + path + handler routes for app.route()",
+    );
   });
 
   test("rejects dynamic route paths", () => {
@@ -99,6 +252,20 @@ describe("Gelis AOT source analyzer", () => {
               const path = "/dynamic";
 
               app.get(path, () => "ok");
+            `),
+    ).toThrow("route path must be a static string literal");
+
+    expect(() =>
+      analyzeAotSource(`
+              const app = new Gelis();
+
+              const path = "/dynamic";
+
+              app.route(
+                "PURGE",
+                path,
+                () => "ok",
+              );
             `),
     ).toThrow("route path must be a static string literal");
   });
@@ -127,6 +294,19 @@ describe("Gelis AOT source analyzer", () => {
               const route =
                 app.get(
                   "/users",
+                  () => "ok",
+                );
+            `),
+    ).toThrow("route registration must be a top-level expression statement");
+
+    expect(() =>
+      analyzeAotSource(`
+              const app = new Gelis();
+
+              const route =
+                app.route(
+                  "PURGE",
+                  "/cache",
                   () => "ok",
                 );
             `),
@@ -172,6 +352,29 @@ describe("Gelis AOT source analyzer", () => {
 
               app["get"](
                 "/computed",
+                () => "ok",
+              );
+            `),
+    ).toThrow("computed route method access is not supported");
+
+    expect(() =>
+      analyzeAotSource(`
+              const app = new Gelis();
+
+              app["all"](
+                "/computed-all",
+                () => "ok",
+              );
+            `),
+    ).toThrow("computed route method access is not supported");
+
+    expect(() =>
+      analyzeAotSource(`
+              const app = new Gelis();
+
+              app["route"](
+                "PURGE",
+                "/computed-route",
                 () => "ok",
               );
             `),

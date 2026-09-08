@@ -213,6 +213,88 @@ describe("Gelis AOT source compiler", () => {
 
     expect(result.code).not.toContain("app.query(");
   });
+
+  test("compiles ALL routes into the semantic plan", async () => {
+    const result = await compileAotSource(`
+      const app = new Gelis();
+
+      app.all(
+        "/fallback/:id",
+        ({ params }) => params.id,
+      );
+    `);
+
+    expect(result.routeCount).toBe(1);
+
+    expect(result.plan?.routes).toHaveLength(1);
+
+    expect(result.plan?.routes[0]?.method).toBe("*");
+
+    expect(result.plan?.routes[0]?.path).toBe("/fallback/:id");
+
+    expect(result.plan?.router.methods.map(([method]) => method)).toEqual([
+      "*",
+    ]);
+
+    expect(result.code).not.toContain("app.all(");
+
+    expect(result.code).toContain(
+      "__gelisAotHandlers[0] = ({ params }) => params.id;",
+    );
+  });
+
+  test("compiles static custom methods without changing method identity", async () => {
+    const result = await compileAotSource(`
+      const app = new Gelis();
+
+      app.route(
+        "PURGE",
+        "/cache",
+        () => "purged",
+      );
+
+      app.route(
+        "MiXeD-Gelis",
+        "/mixed/:id",
+        ({ params }) => params.id,
+      );
+    `);
+
+    expect(result.routeCount).toBe(2);
+
+    expect(
+      result.plan?.routes.map((route) => ({
+        method: route.method,
+
+        path: route.path,
+      })),
+    ).toEqual([
+      {
+        method: "PURGE",
+
+        path: "/cache",
+      },
+
+      {
+        method: "MiXeD-Gelis",
+
+        path: "/mixed/:id",
+      },
+    ]);
+
+    expect(result.plan?.router.methods.map(([method]) => method)).toEqual([
+      "PURGE",
+      "MiXeD-Gelis",
+    ]);
+
+    expect(result.code).not.toContain("app.route(");
+
+    expect(result.code).toContain('__gelisAotHandlers[0] = () => "purged";');
+
+    expect(result.code).toContain(
+      "__gelisAotHandlers[1] = ({ params }) => params.id;",
+    );
+  });
 });
 
 function execute(
