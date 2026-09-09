@@ -24,8 +24,8 @@ P10  OpenAPI & Contract Integration        ACTIVE
 ├── D  @gelis/openapi integration          ACCEPTED
 ├── E  provider compatibility              ACCEPTED
 ├── F  generation scalability              ACCEPTED
-├── G  zero-runtime-overhead               ACTIVE / GATES FROZEN
-└── H  public API + documentation freeze   PLANNED
+├── G  zero-runtime-overhead               ACCEPTED
+└── H  public API + documentation freeze   ACTIVE
 ```
 
 ## P10 package ownership
@@ -62,6 +62,14 @@ legacy B21 generation regression matrix
 post-P9 rich 100 / 1,000 / 5,000 route scaling
 OpenAPI 3.1.2 / 3.2.0 version-overhead gate
 generated-document structural-growth gate
+
+P10-G
+metadata-only request-time isolation
+package import-only request-time isolation
+generate-once request-time isolation
+plain + rich documented applications
+5,000 routes
+41 mirrored ABBA/BAAB samples
 ```
 
 P10-F accepted measured source:
@@ -72,27 +80,17 @@ P10-F accepted measured source:
 
 The first P10-F candidate failed the frozen plain-route generation gate. The gate was not relaxed. The accepted candidate restored a standard-method fast path and made QUERY/custom-method representation pay-for-use.
 
-## Active P10-G objective
-
-P10-G verifies the core roadmap invariant:
-
-> OpenAPI capability must not create permanent request-time OpenAPI work.
-
-Frozen verification covers:
+P10-G accepted measured source:
 
 ```text
-OpenAPI metadata present but package not imported
-@gelis/openapi imported but generation unused
-generateOpenAPI() called once before request execution
-plain documented routes
-rich documented routes
+6e84bd324fb83de228e17c99736deea92e23d070
 ```
 
-The canonical request-time gate is bounded against paired controls using persistent Bun workers and mirrored ABBA/BAAB measurement.
+P10-G request-time results all passed the frozen `<= 1.03x` per-case gate. Package import/generate isolation produced a canonical geomean of `1.0055x`, passing the frozen `<= 1.02x` gate. Ratios below `1.0x` are treated as no-regression evidence only.
 
-Generation speed is not part of P10-G; that evidence belongs to P10-F.
+## Active P10-H objective
 
-## P10-H completion boundary
+P10-H is the public API and documentation freeze boundary for OpenAPI & Contract Integration v0.1.
 
 P10 does not complete merely because generation works.
 
@@ -113,6 +111,8 @@ core master roadmap status
 ```
 
 Internal phase labels may remain in historical architecture documents, but user-facing package documentation should describe features rather than requiring users to understand P10 labels.
+
+P10-H must not introduce new runtime semantics unless a correctness issue requires reopening an earlier accepted phase. Documentation-only and packaging-surface work should preserve accepted D/E/F/G evidence.
 
 ## After P10
 
