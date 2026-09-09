@@ -2,6 +2,14 @@ import * as ts from "@typescript/typescript6";
 
 import { ALL_ROUTE_METHOD, assertHttpMethodToken } from "../http-method";
 
+const MANAGED_BODY_OPTION_KEYS = new Set([
+  "query",
+  "body",
+  "bodyParser",
+  "bodyContentTypes",
+  "openapi",
+]);
+
 export interface AotSourceRoute {
   readonly method: string;
 
@@ -16,6 +24,10 @@ export interface AotSourceRoute {
   readonly handlerStart: number;
 
   readonly handlerEnd: number;
+
+  readonly optionsStart: number | undefined;
+
+  readonly optionsEnd: number | undefined;
 }
 
 export interface AotSourceAnalysis {
@@ -101,10 +113,12 @@ export function analyzeAotSource(
 
         let pathArgument: ts.Expression | undefined;
 
+        let optionsArgument: ts.Expression | undefined;
+
         let handlerArgument: ts.Expression | undefined;
 
         if (routeCall.kind === "generic") {
-          if (node.arguments.length !== 3) {
+          if (node.arguments.length !== 3 && node.arguments.length !== 4) {
             throw unsupported(
               sourceFile,
 
@@ -118,7 +132,12 @@ export function analyzeAotSource(
 
           pathArgument = node.arguments[1];
 
-          handlerArgument = node.arguments[2];
+          if (node.arguments.length === 3) {
+            handlerArgument = node.arguments[2];
+          } else {
+            optionsArgument = node.arguments[2];
+            handlerArgument = node.arguments[3];
+          }
 
           if (
             methodArgument === undefined ||
@@ -154,7 +173,7 @@ export function analyzeAotSource(
             method,
           );
         } else {
-          if (node.arguments.length !== 2) {
+          if (node.arguments.length !== 2 && node.arguments.length !== 3) {
             throw unsupported(
               sourceFile,
 
@@ -166,7 +185,12 @@ export function analyzeAotSource(
 
           pathArgument = node.arguments[0];
 
-          handlerArgument = node.arguments[1];
+          if (node.arguments.length === 2) {
+            handlerArgument = node.arguments[1];
+          } else {
+            optionsArgument = node.arguments[1];
+            handlerArgument = node.arguments[2];
+          }
 
           if (pathArgument === undefined || handlerArgument === undefined) {
             throw unsupported(
@@ -188,6 +212,16 @@ export function analyzeAotSource(
             pathArgument,
 
             "route path must be a static string literal",
+          );
+        }
+
+        if (optionsArgument !== undefined) {
+          assertManagedBodyOptions(
+            sourceFile,
+
+            optionsArgument,
+
+            routeCall.kind,
           );
         }
 
@@ -215,6 +249,10 @@ export function analyzeAotSource(
           handlerStart: handlerArgument.getStart(sourceFile),
 
           handlerEnd: handlerArgument.getEnd(),
+
+          optionsStart: optionsArgument?.getStart(sourceFile),
+
+          optionsEnd: optionsArgument?.getEnd(),
         });
       }
     }
@@ -311,6 +349,100 @@ function routeCallInfo(
 
     computed,
   };
+}
+
+function assertManagedBodyOptions(
+  sourceFile: ts.SourceFile,
+
+  options: ts.Expression,
+
+  routeKind: RouteCallInfo["kind"],
+): void {
+  const legacyPrefix =
+    routeKind === "generic"
+      ? "AOT v0.1 supports only static method + path + handler routes for app.route()"
+      : "AOT v0.1 supports only plain path + handler routes";
+
+  if (!ts.isObjectLiteralExpression(options)) {
+    throw unsupported(
+      sourceFile,
+
+      options,
+
+      `${legacyPrefix}; managed request-body AOT options must be a directly analyzable object literal`,
+    );
+  }
+
+  let hasBody = false;
+
+  for (const property of options.properties) {
+    if (ts.isSpreadAssignment(property)) {
+      throw unsupported(
+        sourceFile,
+
+        property,
+
+        "managed request-body AOT options do not support spread properties",
+      );
+    }
+
+    if (
+      !ts.isPropertyAssignment(property) &&
+      !ts.isShorthandPropertyAssignment(property)
+    ) {
+      throw unsupported(
+        sourceFile,
+
+        property,
+
+        "managed request-body AOT options require ordinary static properties",
+      );
+    }
+
+    const name = staticPropertyName(property.name);
+
+    if (name === undefined) {
+      throw unsupported(
+        sourceFile,
+
+        property.name,
+
+        "managed request-body AOT options do not support computed property names",
+      );
+    }
+
+    if (!MANAGED_BODY_OPTION_KEYS.has(name)) {
+      throw unsupported(
+        sourceFile,
+
+        property.name,
+
+        `${legacyPrefix}; managed request-body AOT option ${JSON.stringify(name)} is not supported`,
+      );
+    }
+
+    if (name === "body") {
+      hasBody = true;
+    }
+  }
+
+  if (!hasBody) {
+    throw unsupported(
+      sourceFile,
+
+      options,
+
+      `${legacyPrefix}; managed request-body AOT options require a body property`,
+    );
+  }
+}
+
+function staticPropertyName(name: ts.PropertyName): string | undefined {
+  if (ts.isIdentifier(name) || ts.isStringLiteralLike(name)) {
+    return name.text;
+  }
+
+  return undefined;
 }
 
 function assertCanonicalAppDeclaration(

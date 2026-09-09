@@ -116,10 +116,29 @@ export function emitFlatAotModule(
     artifactIdentifier,
   );
 
+  const captureManagedInputIdentifier =
+    compilation.captureManagedInputIdentifier;
+
+  if (
+    (captureManagedInputIdentifier === undefined) !==
+    (compilation.managedInputBindingsIdentifier === undefined)
+  ) {
+    throw new Error("Gelis managed AOT source binding mismatch");
+  }
+
+  const runtimeImport =
+    captureManagedInputIdentifier === undefined
+      ? `import { createFlatAotRuntimeAdapter as ${runtimeAdapterIdentifier} } from ${JSON.stringify(
+          options.runtimeAdapterImport,
+        )};`
+      :
+          `import { createFlatAotRuntimeAdapter as ${runtimeAdapterIdentifier}, ` +
+          `captureFlatAotManagedInput as ${captureManagedInputIdentifier} } from ${JSON.stringify(
+            options.runtimeAdapterImport,
+          )};`;
+
   const prelude = [
-    `import { createFlatAotRuntimeAdapter as ${runtimeAdapterIdentifier} } from ${JSON.stringify(
-      options.runtimeAdapterImport,
-    )};`,
+    runtimeImport,
 
     `import ${artifactIdentifier} from ${JSON.stringify(
       options.artifactImport,

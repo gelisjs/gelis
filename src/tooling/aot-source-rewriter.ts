@@ -7,10 +7,20 @@ import {
 
 const DEFAULT_HANDLER_IDENTIFIER = "__gelisAotHandlers";
 
+export const AOT_MANAGED_INPUT_BINDINGS_IDENTIFIER =
+  "__gelisAotInputBindings";
+
+export const AOT_CAPTURE_MANAGED_INPUT_IDENTIFIER =
+  "__gelisAotCaptureManagedInput";
+
 export interface AotSourceRewrite {
   readonly code: string;
 
   readonly handlerArrayIdentifier: string;
+
+  readonly managedInputBindingsIdentifier: string | undefined;
+
+  readonly captureManagedInputIdentifier: string | undefined;
 
   readonly routeCount: number;
 }
@@ -48,11 +58,33 @@ export function rewriteAotSource(
 
       handlerArrayIdentifier,
 
+      managedInputBindingsIdentifier: undefined,
+
+      captureManagedInputIdentifier: undefined,
+
       routeCount: 0,
     };
   }
 
   assertIdentifierAvailable(sourceText, fileName, handlerArrayIdentifier);
+
+  const hasManagedInput = analysis.routes.some(
+    (route) => route.optionsStart !== undefined,
+  );
+
+  if (hasManagedInput) {
+    assertIdentifierAvailable(
+      sourceText,
+      fileName,
+      AOT_MANAGED_INPUT_BINDINGS_IDENTIFIER,
+    );
+
+    assertIdentifierAvailable(
+      sourceText,
+      fileName,
+      AOT_CAPTURE_MANAGED_INPUT_IDENTIFIER,
+    );
+  }
 
   const appDeclarationEnd = findAppDeclarationEnd(
     sourceText,
@@ -82,12 +114,21 @@ export function rewriteAotSource(
     });
   }
 
+  let bindingDeclaration =
+    `\n\nconst ${handlerArrayIdentifier} = new Array(${analysis.routes.length});`;
+
+  if (hasManagedInput) {
+    bindingDeclaration +=
+      `\nconst ${AOT_MANAGED_INPUT_BINDINGS_IDENTIFIER} = ` +
+      `new Array(${analysis.routes.length});`;
+  }
+
   edits.push({
     start: appDeclarationEnd,
 
     end: appDeclarationEnd,
 
-    text: `\n\nconst ${handlerArrayIdentifier} = new Array(${analysis.routes.length});`,
+    text: bindingDeclaration,
   });
 
   for (let index = 0; index < analysis.routes.length; index++) {
@@ -102,12 +143,28 @@ export function rewriteAotSource(
       route.handlerEnd,
     );
 
+    let replacement: string;
+
+    if (route.optionsStart === undefined || route.optionsEnd === undefined) {
+      replacement = `${handlerArrayIdentifier}[${index}] = ${handlerSource};`;
+    } else {
+      const optionsSource = sourceText.slice(
+        route.optionsStart,
+        route.optionsEnd,
+      );
+
+      replacement =
+        `${AOT_MANAGED_INPUT_BINDINGS_IDENTIFIER}[${index}] = ` +
+        `${AOT_CAPTURE_MANAGED_INPUT_IDENTIFIER}(` +
+        `${optionsSource}, ${handlerSource});`;
+    }
+
     edits.push({
       start: route.statementStart,
 
       end: route.statementEnd,
 
-      text: `${handlerArrayIdentifier}[${index}] = ${handlerSource};`,
+      text: replacement,
     });
   }
 
@@ -131,6 +188,14 @@ export function rewriteAotSource(
     code,
 
     handlerArrayIdentifier,
+
+    managedInputBindingsIdentifier: hasManagedInput
+      ? AOT_MANAGED_INPUT_BINDINGS_IDENTIFIER
+      : undefined,
+
+    captureManagedInputIdentifier: hasManagedInput
+      ? AOT_CAPTURE_MANAGED_INPUT_IDENTIFIER
+      : undefined,
 
     routeCount: analysis.routes.length,
   };

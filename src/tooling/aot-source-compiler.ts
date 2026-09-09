@@ -2,7 +2,10 @@ import * as ts from "@typescript/typescript6";
 
 import type { SemanticRoutePlan } from "../runtime/semantic-route-plan";
 
-import { rewriteAotSource } from "./aot-source-rewriter";
+import {
+  AOT_MANAGED_INPUT_BINDINGS_IDENTIFIER,
+  rewriteAotSource,
+} from "./aot-source-rewriter";
 
 import { analyzeAotSourceSafety } from "./aot-source-safety";
 
@@ -30,6 +33,10 @@ export interface AotSourceCompilation {
   readonly routeCount: number;
 
   readonly handlerArrayIdentifier: string;
+
+  readonly managedInputBindingsIdentifier: string | undefined;
+
+  readonly captureManagedInputIdentifier: string | undefined;
 
   readonly installerIdentifier: string;
 
@@ -69,6 +76,10 @@ export async function compileAotSource(
 
       handlerArrayIdentifier,
 
+      managedInputBindingsIdentifier: undefined,
+
+      captureManagedInputIdentifier: undefined,
+
       installerIdentifier,
 
       installBeforeOffset: undefined,
@@ -99,6 +110,14 @@ export async function compileAotSource(
 
   const plan = await compileSemanticRoutePlan(routeShapes);
 
+  const hasManagedInput = safety.analysis.routes.some(
+    (route) => route.optionsStart !== undefined,
+  );
+
+  const installArguments = hasManagedInput
+    ? `${appIdentifier}, ${handlerArrayIdentifier}, ${AOT_MANAGED_INPUT_BINDINGS_IDENTIFIER}`
+    : `${appIdentifier}, ${handlerArrayIdentifier}`;
+
   const rewrite = rewriteAotSource(
     sourceText,
 
@@ -112,9 +131,7 @@ export async function compileAotSource(
       {
         offset: installBeforeOffset,
 
-        text:
-          `\n\n${installerIdentifier}(` +
-          `${appIdentifier}, ${handlerArrayIdentifier});\n`,
+        text: `\n\n${installerIdentifier}(${installArguments});\n`,
       },
     ],
   );
@@ -125,6 +142,10 @@ export async function compileAotSource(
     routeCount: rewrite.routeCount,
 
     handlerArrayIdentifier,
+
+    managedInputBindingsIdentifier: rewrite.managedInputBindingsIdentifier,
+
+    captureManagedInputIdentifier: rewrite.captureManagedInputIdentifier,
 
     installerIdentifier,
 

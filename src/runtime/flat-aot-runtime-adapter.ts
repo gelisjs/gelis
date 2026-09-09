@@ -4,14 +4,25 @@ import { FLAT_AOT_ARTIFACT_VERSION } from "./flat-aot-artifact";
 
 import type { FlatAotArtifact } from "./flat-aot-artifact";
 
+import {
+  captureFlatAotManagedInput,
+  installFlatAotManagedRuntime,
+} from "./flat-aot-managed-input";
+
+import type { FlatAotManagedInputBindings } from "./flat-aot-managed-input";
+
 import { installFlatAotRuntime } from "./flat-aot-runtime";
 
 import type { RuntimeRouteHandler } from "./types";
+
+export { captureFlatAotManagedInput };
 
 export type FlatAotRuntimeInstaller = (
   app: Gelis,
 
   handlers: readonly RuntimeRouteHandler[],
+
+  inputBindings?: FlatAotManagedInputBindings,
 ) => void;
 
 /*
@@ -28,8 +39,26 @@ export function createFlatAotRuntimeAdapter(
 
   expectedShapeFingerprint: string,
 ): FlatAotRuntimeInstaller {
-  return (app, handlers): void => {
-    installFlatAotRuntime(
+  return (app, handlers, inputBindings): void => {
+    if (inputBindings === undefined) {
+      installFlatAotRuntime(
+        app,
+
+        artifact,
+
+        {
+          version: FLAT_AOT_ARTIFACT_VERSION,
+
+          shapeFingerprint: expectedShapeFingerprint,
+
+          handlers,
+        },
+      );
+
+      return;
+    }
+
+    installFlatAotManagedRuntime(
       app,
 
       artifact,
@@ -40,6 +69,8 @@ export function createFlatAotRuntimeAdapter(
         shapeFingerprint: expectedShapeFingerprint,
 
         handlers,
+
+        inputBindings,
       },
     );
   };
