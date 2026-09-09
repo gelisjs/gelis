@@ -430,27 +430,6 @@ describe("Gelis arrayBuffer request body reader", () => {
       },
     });
   });
-
-  test("still rejects form parsers deferred to later P9-E3 work", () => {
-    const Body = createSchema((value) => ({
-      value,
-    }));
-
-    for (const bodyParser of ["multipart"] as const) {
-      const app = new Gelis();
-
-      expect(() => {
-        app.post(
-          `/${bodyParser}`,
-          {
-            body: Body,
-            bodyParser,
-          },
-          ({ body }) => body,
-        );
-      }).toThrow(TypeError);
-    }
-  });
 });
 
 function createSchema<Input = unknown, Output = Input>(
