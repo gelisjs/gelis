@@ -44,6 +44,8 @@ import { Router, type RuntimeRouteMatch } from "./runtime/router";
 
 import { activateAllFallback } from "./runtime/router-all";
 
+import { createAutomaticOptionsResponse } from "./runtime/http-method-semantics";
+
 import {
   normalizeResponse,
   runtimeReply,
@@ -159,6 +161,8 @@ export interface GelisInternalRouter {
 
     pathname: string,
   ): RuntimeRouteMatch | undefined;
+
+  matchingMethods(pathname: string): string[];
 }
 
 interface AppRuntimeState {
@@ -605,6 +609,16 @@ export class Gelis extends RouteBuilder<""> {
 
         pathname,
       );
+    }
+
+    if (matched === undefined && request.method === "OPTIONS") {
+      const automaticOptions = createAutomaticOptionsResponse(
+        this.#state.router.matchingMethods(pathname),
+      );
+
+      if (automaticOptions !== undefined) {
+        return automaticOptions;
+      }
     }
 
     if (!matched) {

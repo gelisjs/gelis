@@ -205,6 +205,18 @@ export class Router {
     };
   }
 
+  matchingMethods(pathname: string): string[] {
+    const methods: string[] = [];
+
+    for (const [method, table] of this.#methods) {
+      if (methodTableMatchesPath(table, pathname)) {
+        methods.push(method);
+      }
+    }
+
+    return methods;
+  }
+
   private getOrCreateMethod(method: string): MethodRoutes {
     const existing = this.#methods.get(method);
 
@@ -218,6 +230,130 @@ export class Router {
 
     return created;
   }
+}
+
+function methodTableMatchesPath(
+  table: MethodRoutes,
+
+  pathname: string,
+): boolean {
+  if (table.staticRoutes.has(pathname)) {
+    return true;
+  }
+
+  if (!table.usesDynamicTrie) {
+    const trailingParamRoutes = table.trailingParamRoutes;
+
+    if (pathname !== "/" && trailingParamRoutes !== undefined) {
+      const slash = pathname.lastIndexOf("/");
+
+      if (slash >= 0) {
+        const prefix = pathname.slice(
+          0,
+
+          slash + 1,
+        );
+
+        if (trailingParamRoutes.has(prefix)) {
+          return true;
+        }
+      }
+    }
+
+    return false;
+  }
+
+  return dynamicTableMatchesPath(
+    table.dynamicRoot,
+
+    pathname,
+  );
+}
+
+function dynamicTableMatchesPath(
+  root: DynamicNode,
+
+  pathname: string,
+): boolean {
+  if (pathname === "/") {
+    return root.route !== undefined;
+  }
+
+  return dynamicNodeMatchesPath(
+    root,
+
+    pathname,
+
+    1,
+  );
+}
+
+function dynamicNodeMatchesPath(
+  node: DynamicNode,
+
+  pathname: string,
+
+  start: number,
+): boolean {
+  let end = pathname.indexOf(
+    "/",
+
+    start,
+  );
+
+  const isLast = end === -1;
+
+  if (isLast) {
+    end = pathname.length;
+  }
+
+  const next = end + 1;
+
+  const staticChildren = node.staticChildren;
+
+  if (staticChildren !== undefined) {
+    const segment = pathname.slice(
+      start,
+
+      end,
+    );
+
+    const staticChild = staticChildren.get(segment);
+
+    if (
+      staticChild !== undefined &&
+      (isLast
+        ? staticChild.route !== undefined
+        : dynamicNodeMatchesPath(
+            staticChild,
+
+            pathname,
+
+            next,
+          ))
+    ) {
+      return true;
+    }
+  }
+
+  const paramChild = node.paramChild;
+
+  if (
+    paramChild !== undefined &&
+    (isLast
+      ? paramChild.route !== undefined
+      : dynamicNodeMatchesPath(
+          paramChild,
+
+          pathname,
+
+          next,
+        ))
+  ) {
+    return true;
+  }
+
+  return false;
 }
 
 function createMethodRoutes(): MethodRoutes {

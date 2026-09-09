@@ -42,6 +42,10 @@ class CollectOnlyRouter implements GelisInternalRouter {
   ): RuntimeRouteMatch | undefined {
     throw new Error("Gelis AOT application was used before router hydration");
   }
+
+  matchingMethods(_pathname: string): string[] {
+    throw new Error("Gelis AOT application was used before router hydration");
+  }
 }
 
 /*
