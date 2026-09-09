@@ -6,10 +6,16 @@ const ROUTES = 5_000;
 const TARGET_INDEX = ROUTES - 1;
 const WARMUP_ITERATIONS = 10_000;
 const MEASURED_ITERATIONS = 20_000;
+const BOUNDARY = "gelis-bench";
+const CONTENT_TYPE = `multipart/form-data; boundary=${BOUNDARY}`;
 
 type Variant = "manual" | "managed";
 type MultipartValue = string | File | Array<string | File>;
 type MultipartBody = Record<string, MultipartValue>;
+type ReadMultipartBody = (
+  request: Request,
+  parserContentType: string,
+) => Promise<MultipartBody>;
 
 interface RequestContext {
   readonly request: Request;
@@ -39,7 +45,17 @@ const module = (await import(
   readonly Gelis: GelisConstructor;
 };
 
-const app = createApplication(module.Gelis, variant);
+const multipartModule = (await import(
+  pathToFileURL(resolve(root, "src/runtime/multipart.ts")).href
+)) as {
+  readonly readMultipartBody: ReadMultipartBody;
+};
+
+const app = createApplication(
+  module.Gelis,
+  multipartModule.readMultipartBody,
+  variant,
+);
 const request = createRequest();
 
 let sink = 0;
@@ -83,6 +99,7 @@ void sink;
 
 function createApplication(
   Constructor: GelisConstructor,
+  readMultipartBody: ReadMultipartBody,
   selectedVariant: Variant,
 ): AppLike {
   const application = new Constructor();
@@ -100,7 +117,8 @@ function createApplication(
           !Array.isArray(body.tag) ||
           body.tag.length !== 2 ||
           body.tag[0] !== "a" ||
-          body.tag[1] !== "b"
+          body.tag[1] !== "b" ||
+          body[""] !== "blank"
         ) {
           return {
             issues: [
@@ -141,21 +159,27 @@ function createApplication(
         return unsupportedMediaTypeResponse();
       }
 
-      return request
-        .formData()
-        .then(normalizeMultipartFormData)
-        .then(
-          (decoded) => {
-            const validation = Body["~standard"].validate(decoded);
+      const contentType = request.headers.get("content-type");
 
-            if ("issues" in validation) {
-              return validationErrorResponse();
-            }
+      if (contentType === null) {
+        return unsupportedMediaTypeResponse();
+      }
 
-            return response;
-          },
-          () => malformedBodyResponse(),
-        );
+      return readMultipartBody(
+        request,
+        multipartParserContentType(contentType),
+      ).then(
+        (decoded) => {
+          const validation = Body["~standard"].validate(decoded);
+
+          if ("issues" in validation) {
+            return validationErrorResponse();
+          }
+
+          return response;
+        },
+        () => malformedBodyResponse(),
+      );
     });
   }
 
@@ -165,44 +189,44 @@ function createApplication(
 function createRequest(): Request {
   const headers = {
     get(name: string): string | null {
-      return name.toLowerCase() === "content-type"
-        ? "multipart/form-data; boundary=gelis-bench"
-        : null;
+      return name.toLowerCase() === "content-type" ? CONTENT_TYPE : null;
     },
   };
 
-  const formData = new FormData();
-  formData.append("name", "Gelis");
-  formData.append("tag", "a");
-  formData.append("tag", "b");
+  const encoded = new TextEncoder().encode(
+    [
+      `--${BOUNDARY}`,
+      'Content-Disposition: form-data; name="name"',
+      "",
+      "Gelis",
+      `--${BOUNDARY}`,
+      'Content-Disposition: form-data; name="tag"',
+      "",
+      "a",
+      `--${BOUNDARY}`,
+      'Content-Disposition: form-data; name="tag"',
+      "",
+      "b",
+      `--${BOUNDARY}`,
+      'Content-Disposition: form-data; name=""',
+      "",
+      "blank",
+      `--${BOUNDARY}--`,
+      "",
+    ].join("\r\n"),
+  );
+  const payload = new ArrayBuffer(encoded.byteLength);
+  new Uint8Array(payload).set(encoded);
 
   return {
     method: "POST",
     url: `http://gelis.test/r/${TARGET_INDEX}`,
     headers,
 
-    formData() {
-      return Promise.resolve(formData);
+    arrayBuffer() {
+      return Promise.resolve(payload);
     },
   } as unknown as Request;
-}
-
-function normalizeMultipartFormData(formData: FormData): MultipartBody {
-  const result = Object.create(null) as MultipartBody;
-
-  formData.forEach((entryValue, key) => {
-    const existing = result[key];
-
-    if (existing === undefined) {
-      result[key] = entryValue;
-    } else if (Array.isArray(existing)) {
-      existing.push(entryValue);
-    } else {
-      result[key] = [existing, entryValue];
-    }
-  });
-
-  return result;
 }
 
 function isMultipartFormData(request: Request): boolean {
@@ -249,6 +273,14 @@ function isMultipartFormData(request: Request): boolean {
       .trim()
       .toLowerCase() === "multipart/form-data"
   );
+}
+
+function multipartParserContentType(contentType: string): string {
+  const separator = contentType.indexOf(";");
+
+  return separator === -1
+    ? "multipart/form-data"
+    : `multipart/form-data${contentType.slice(separator)}`;
 }
 
 function unsupportedMediaTypeResponse(): Response {
