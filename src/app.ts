@@ -546,6 +546,13 @@ export class Gelis extends RouteBuilder<""> {
 
         body: input?.body,
 
+        bodyParser: input?.bodyParser,
+
+        bodyContentTypes:
+          input?.bodyContentTypes === undefined
+            ? undefined
+            : [...input.bodyContentTypes],
+
         responses: route.responses,
 
         openapi:

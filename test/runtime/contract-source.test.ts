@@ -98,6 +98,10 @@ describe("Gelis contract source", () => {
 
       body: undefined,
 
+      bodyParser: undefined,
+
+      bodyContentTypes: undefined,
+
       responses: undefined,
 
       openapi: undefined,
@@ -113,6 +117,10 @@ describe("Gelis contract source", () => {
 
     expect(documented.body).toBe(Body);
 
+    expect(documented.bodyParser).toBe("json");
+
+    expect(documented.bodyContentTypes).toBeUndefined();
+
     expect(documented.responses).toBe(responses);
 
     expect(documented.openapi).toEqual(metadata);
@@ -124,6 +132,8 @@ describe("Gelis contract source", () => {
       "path",
       "query",
       "body",
+      "bodyParser",
+      "bodyContentTypes",
       "responses",
       "openapi",
     ]);
@@ -768,6 +778,10 @@ describe("Gelis contract source", () => {
     expect(snapshot.routes[0]?.path).toBe("/search");
 
     expect(snapshot.routes[0]?.body).toBe(Body);
+
+    expect(snapshot.routes[0]?.bodyParser).toBe("json");
+
+    expect(snapshot.routes[0]?.bodyContentTypes).toBeUndefined();
 
     expect(snapshot.routes[0]?.openapi).toEqual({
       summary: "Search with QUERY",

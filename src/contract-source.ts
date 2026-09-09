@@ -2,7 +2,7 @@ import type { Gelis } from "./app";
 
 import type { OpenAPIRouteMetadata } from "./openapi";
 
-import type { ResponseContractMap } from "./route";
+import type { RequestBodyParser, ResponseContractMap } from "./route";
 
 import type { StandardSchemaV1 } from "./schema";
 
@@ -23,6 +23,10 @@ export interface ContractRouteSnapshot {
   readonly query: StandardSchemaV1 | undefined;
 
   readonly body: StandardSchemaV1 | undefined;
+
+  readonly bodyParser: RequestBodyParser | undefined;
+
+  readonly bodyContentTypes: readonly string[] | undefined;
 
   readonly responses: ResponseContractMap | undefined;
 

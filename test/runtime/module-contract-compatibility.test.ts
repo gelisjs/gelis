@@ -210,6 +210,10 @@ describe("module contract compatibility", () => {
 
     expect(route.body).toBe(Body);
 
+    expect(route.bodyParser).toBe("json");
+
+    expect(route.bodyContentTypes).toBeUndefined();
+
     expect(route.responses).toBe(responses);
 
     expect(route.openapi).toEqual(metadata);
@@ -221,6 +225,8 @@ describe("module contract compatibility", () => {
       "path",
       "query",
       "body",
+      "bodyParser",
+      "bodyContentTypes",
       "responses",
       "openapi",
     ]);
