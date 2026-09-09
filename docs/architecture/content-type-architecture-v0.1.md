@@ -240,7 +240,7 @@ The accepted design therefore adds no measured TypeScript instantiation growth t
 4. `bodyContentTypes` is media-type metadata and does not become a route generic.
 5. Managed request bodies require a Standard Schema.
 6. Parser metadata without a managed body schema is invalid.
-7. Non-JSON parser execution and custom media-type matching are implemented in P9-E3; P9-E2 uses fail-fast transitional guards rather than silently treating them as JSON.
+7. Non-JSON parser execution remains deferred to P9-E3. Custom JSON media-type matching is compiled in P9-E2-B.
 8. Routes without a managed body retain the zero-unused design: they do not inspect Content-Type or allocate parser state.
 
 ## P9-E2-B — Registration-Time Compiled Request Body Plan
