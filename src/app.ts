@@ -2705,35 +2705,41 @@ function runBodyRoute(
     throw new Error("Missing Gelis runtime body reader");
   }
 
+  const readBodyError = input.readBodyError;
+
+  if (readBodyError === undefined) {
+    throw new Error("Missing Gelis runtime body read error handler");
+  }
+
   const rawBody = readBody(request);
 
   if (rawBody instanceof Response) {
     return rawBody;
   }
 
-  return rawBody.then((resolvedBody) => {
-    if (resolvedBody instanceof Response) {
-      return resolvedBody;
-    }
+  return rawBody.then(
+    (resolvedBody) => {
+      const validation = schema["~standard"].validate(resolvedBody);
 
-    const validation = schema["~standard"].validate(resolvedBody);
+      if (isPromiseLike(validation)) {
+        return Promise.resolve(validation).then((result) => {
+          if (result.issues !== undefined) {
+            return validationErrorResponse("body", result.issues);
+          }
 
-    if (isPromiseLike(validation)) {
-      return Promise.resolve(validation).then((result) => {
-        if (result.issues !== undefined) {
-          return validationErrorResponse("body", result.issues);
-        }
+          return invoke(route, request, params, query, result.value);
+        });
+      }
 
-        return invoke(route, request, params, query, result.value);
-      });
-    }
+      if (validation.issues !== undefined) {
+        return validationErrorResponse("body", validation.issues);
+      }
 
-    if (validation.issues !== undefined) {
-      return validationErrorResponse("body", validation.issues);
-    }
+      return invoke(route, request, params, query, validation.value);
+    },
 
-    return invoke(route, request, params, query, validation.value);
-  });
+    readBodyError,
+  );
 }
 
 function runQueryBodyRoute(

@@ -1,4 +1,4 @@
-import type { RouteOptions } from "../route";
+import type { RequestBodyParser, RouteOptions } from "../route";
 
 import type { StandardSchemaV1 } from "../schema";
 
@@ -15,6 +15,8 @@ export type RuntimeBodyReader = (
   request: Request,
 ) => Response | Promise<unknown>;
 
+export type RuntimeBodyReadError = (error: unknown) => Response;
+
 export interface RuntimeInputPlan {
   readonly kind: number;
 
@@ -23,9 +25,31 @@ export interface RuntimeInputPlan {
   readonly body: StandardSchemaV1 | undefined;
 
   readonly readBody?: RuntimeBodyReader;
+
+  readonly readBodyError?: RuntimeBodyReadError;
+
+  /*
+   * Declarative body metadata retained for contract/tooling
+   * projection. Request execution uses readBody directly.
+   */
+  readonly bodyParser?: RequestBodyParser;
+
+  /*
+   * Undefined means the parser's built-in default media types.
+   *
+   * Explicit values are normalized/deduplicated registration-time
+   * media-type essences.
+   */
+  readonly bodyContentTypes?: readonly string[];
 }
 
 type RuntimeContentTypeMatcher = (request: Request) => boolean;
+
+interface CompiledContentTypes {
+  readonly contentTypes: readonly string[];
+
+  readonly matches: RuntimeContentTypeMatcher;
+}
 
 const MEDIA_TYPE_TOKEN = /^[!#$%&'*+\-.^_`|~0-9A-Za-z]+$/;
 
@@ -64,9 +88,9 @@ function invalidDeclaredMediaType(value: string): TypeError {
   return new TypeError(`Invalid Gelis request body media type: ${value}`);
 }
 
-function compileContentTypeMatcher(
+function compileContentTypes(
   contentTypes: readonly string[],
-): RuntimeContentTypeMatcher {
+): CompiledContentTypes {
   if (contentTypes.length === 0) {
     throw new TypeError(
       "Gelis bodyContentTypes must contain at least one media type",
@@ -89,17 +113,25 @@ function compileContentTypeMatcher(
   if (essences.length === 1) {
     const first = essences[0]!;
 
-    return (request) => requestContentTypeEssence(request) === first;
+    return {
+      contentTypes: essences,
+
+      matches: (request) => requestContentTypeEssence(request) === first,
+    };
   }
 
   if (essences.length === 2) {
     const first = essences[0]!;
     const second = essences[1]!;
 
-    return (request) => {
-      const actual = requestContentTypeEssence(request);
+    return {
+      contentTypes: essences,
 
-      return actual === first || actual === second;
+      matches: (request) => {
+        const actual = requestContentTypeEssence(request);
+
+        return actual === first || actual === second;
+      },
     };
   }
 
@@ -108,19 +140,27 @@ function compileContentTypeMatcher(
     const second = essences[1]!;
     const third = essences[2]!;
 
-    return (request) => {
-      const actual = requestContentTypeEssence(request);
+    return {
+      contentTypes: essences,
 
-      return actual === first || actual === second || actual === third;
+      matches: (request) => {
+        const actual = requestContentTypeEssence(request);
+
+        return actual === first || actual === second || actual === third;
+      },
     };
   }
 
   const accepted = new Set(essences);
 
-  return (request) => {
-    const actual = requestContentTypeEssence(request);
+  return {
+    contentTypes: essences,
 
-    return actual !== undefined && accepted.has(actual);
+    matches: (request) => {
+      const actual = requestContentTypeEssence(request);
+
+      return actual !== undefined && accepted.has(actual);
+    },
   };
 }
 
@@ -185,10 +225,15 @@ export function createRuntimeInputPlan(
     );
   }
 
-  const readBody =
+  const compiledContentTypes =
     bodyContentTypes === undefined
+      ? undefined
+      : compileContentTypes(bodyContentTypes);
+
+  const readBody =
+    compiledContentTypes === undefined
       ? readDefaultJsonBody
-      : compileJsonBodyReader(bodyContentTypes);
+      : compileJsonBodyReader(compiledContentTypes.matches);
 
   if (query === undefined) {
     return {
@@ -196,6 +241,14 @@ export function createRuntimeInputPlan(
       query: undefined,
       body,
       readBody,
+      readBodyError: handleMalformedJsonBody,
+      bodyParser: parser,
+
+      ...(compiledContentTypes === undefined
+        ? {}
+        : {
+            bodyContentTypes: compiledContentTypes.contentTypes,
+          }),
     };
   }
 
@@ -204,6 +257,14 @@ export function createRuntimeInputPlan(
     query,
     body,
     readBody,
+    readBodyError: handleMalformedJsonBody,
+    bodyParser: parser,
+
+    ...(compiledContentTypes === undefined
+      ? {}
+      : {
+          bodyContentTypes: compiledContentTypes.contentTypes,
+        }),
   };
 }
 
@@ -212,20 +273,29 @@ function readDefaultJsonBody(request: Request): Response | Promise<unknown> {
     return unsupportedMediaTypeResponse();
   }
 
-  return request.json().catch(() => malformedJsonResponse());
+  /*
+   * Do not normalize rejection here.
+   *
+   * runBodyRoute attaches the compiled error handler
+   * as the rejection branch of the same Promise
+   * continuation that performs validation.
+   */
+  return request.json();
+}
+
+function handleMalformedJsonBody(_error: unknown): Response {
+  return malformedJsonResponse();
 }
 
 function compileJsonBodyReader(
-  contentTypes: readonly string[],
+  matchesContentType: RuntimeContentTypeMatcher,
 ): RuntimeBodyReader {
-  const matchesContentType = compileContentTypeMatcher(contentTypes);
-
   return (request) => {
     if (!matchesContentType(request)) {
       return unsupportedMediaTypeResponse();
     }
 
-    return request.json().catch(() => malformedJsonResponse());
+    return request.json();
   };
 }
 
@@ -375,12 +445,18 @@ export function isJsonContentType(request: Request): boolean {
     return false;
   }
 
-  if (hasCombinedContentType(contentType)) {
-    return false;
-  }
-
+  /*
+   * The canonical JSON media type cannot contain
+   * a combined field value. Preserve the critical
+   * exact-match fast path before the slower singleton
+   * ambiguity scan.
+   */
   if (contentType.length === 16 && contentType === "application/json") {
     return true;
+  }
+
+  if (hasCombinedContentType(contentType)) {
+    return false;
   }
 
   const separator = contentType.indexOf(";");

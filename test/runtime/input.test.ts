@@ -631,26 +631,6 @@ describe("Gelis input runtime", () => {
     }).toThrow(TypeError);
   });
 
-  test("rejects custom body content types before P9-E3 runtime support", () => {
-    const Body = createSchema((value) => ({
-      value,
-    }));
-
-    const app = new Gelis();
-
-    expect(() => {
-      app.post(
-        "/vendor-json",
-        {
-          body: Body,
-          bodyParser: "json",
-          bodyContentTypes: ["application/vnd.gelis+json"],
-        },
-        ({ body }) => body,
-      );
-    }).toThrow(TypeError);
-  });
-
   test("accepts compiled custom JSON media types", async () => {
     const Body = createSchema<{
       name: string;
