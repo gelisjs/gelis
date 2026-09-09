@@ -41,10 +41,16 @@ console.log("Routes:         5,000 POST routes");
 console.log("Warmup:         10,000 async app.fetch calls/worker");
 console.log("Measurement:    20,000 async app.fetch calls/measurement");
 console.log(
-  "Body source:    stable Request-like object; formData() returns Promise.resolve(FormData)",
+  "Body source:    stable Request-like object; arrayBuffer() returns Promise.resolve(wire payload)",
 );
 console.log(
-  "Normalize:      null-prototype scalar/array normalization preserving FormData values",
+  "Decode:         shared multipart v2 byte compatibility pass + native FormData parsing",
+);
+console.log(
+  "Payload:        repeated fields plus one empty-name field to exercise v2 compatibility semantics",
+);
+console.log(
+  "Validation:     same Standard Schema object; manual invokes it explicitly, managed via Gelis input plan",
 );
 console.log("GC:             Bun.gc(true) inside measured worker");
 console.log(
