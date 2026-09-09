@@ -13,6 +13,10 @@ export const AOT_MANAGED_INPUT_BINDINGS_IDENTIFIER =
 export const AOT_CAPTURE_MANAGED_INPUT_IDENTIFIER =
   "__gelisAotCaptureManagedInput";
 
+const AOT_MANAGED_INPUT_BINDINGS_LOCAL_IDENTIFIER = "__gI";
+
+const AOT_CAPTURE_MANAGED_INPUT_LOCAL_IDENTIFIER = "__gC";
+
 export interface AotSourceRewrite {
   readonly code: string;
 
@@ -84,6 +88,18 @@ export function rewriteAotSource(
       fileName,
       AOT_CAPTURE_MANAGED_INPUT_IDENTIFIER,
     );
+
+    assertIdentifierAvailable(
+      sourceText,
+      fileName,
+      AOT_MANAGED_INPUT_BINDINGS_LOCAL_IDENTIFIER,
+    );
+
+    assertIdentifierAvailable(
+      sourceText,
+      fileName,
+      AOT_CAPTURE_MANAGED_INPUT_LOCAL_IDENTIFIER,
+    );
   }
 
   const appDeclarationEnd = findAppDeclarationEnd(
@@ -120,7 +136,11 @@ export function rewriteAotSource(
   if (hasManagedInput) {
     bindingDeclaration +=
       `\nconst ${AOT_MANAGED_INPUT_BINDINGS_IDENTIFIER} = ` +
-      `new Array(${analysis.routes.length});`;
+      `new Array(${analysis.routes.length});` +
+      `\nconst ${AOT_MANAGED_INPUT_BINDINGS_LOCAL_IDENTIFIER} = ` +
+      `${AOT_MANAGED_INPUT_BINDINGS_IDENTIFIER};` +
+      `\nconst ${AOT_CAPTURE_MANAGED_INPUT_LOCAL_IDENTIFIER} = ` +
+      `${AOT_CAPTURE_MANAGED_INPUT_IDENTIFIER};`;
   }
 
   edits.push({
@@ -154,8 +174,8 @@ export function rewriteAotSource(
       );
 
       replacement =
-        `${AOT_MANAGED_INPUT_BINDINGS_IDENTIFIER}[${index}] = ` +
-        `${AOT_CAPTURE_MANAGED_INPUT_IDENTIFIER}(` +
+        `${AOT_MANAGED_INPUT_BINDINGS_LOCAL_IDENTIFIER}[${index}] = ` +
+        `${AOT_CAPTURE_MANAGED_INPUT_LOCAL_IDENTIFIER}(` +
         `${optionsSource}, ${handlerSource});`;
     }
 

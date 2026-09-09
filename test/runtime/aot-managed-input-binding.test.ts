@@ -4,7 +4,10 @@ import { Gelis, inspectContract } from "../../src";
 
 import type { StandardSchemaV1 } from "../../src";
 
-import { captureFlatAotManagedInput, createFlatAotRuntimeAdapter } from "../../src/runtime/flat-aot-runtime-adapter";
+import {
+  captureFlatAotManagedInput,
+  createFlatAotRuntimeAdapter,
+} from "../../src/runtime/flat-aot-runtime-adapter";
 
 import type { RuntimeRouteHandler } from "../../src/runtime/types";
 
@@ -41,7 +44,7 @@ function createTextSchema(): StandardSchemaV1<unknown, string> {
 }
 
 describe("managed request-body flat AOT binding", () => {
-  test("rewrites managed routes into a declaration-time input sidecar", async () => {
+  test("rewrites managed routes into a compact declaration-time input sidecar", async () => {
     const result = await compileAotSource(`
       const Body = schema;
       const app = new Gelis();
@@ -73,6 +76,16 @@ describe("managed request-body flat AOT binding", () => {
     );
 
     expect(result.code).toContain(
+      "const __gI = __gelisAotInputBindings;",
+    );
+
+    expect(result.code).toContain(
+      "const __gC = __gelisAotCaptureManagedInput;",
+    );
+
+    expect(result.code).toContain("__gI[0] = __gC(");
+
+    expect(result.code).not.toContain(
       "__gelisAotInputBindings[0] = __gelisAotCaptureManagedInput(",
     );
 
@@ -93,9 +106,31 @@ describe("managed request-body flat AOT binding", () => {
     expect(result.captureManagedInputIdentifier).toBeUndefined();
     expect(result.code).not.toContain("__gelisAotInputBindings");
     expect(result.code).not.toContain("__gelisAotCaptureManagedInput");
+    expect(result.code).not.toContain("__gI");
+    expect(result.code).not.toContain("__gC");
     expect(result.code).toContain(
       "__gelisAotInstall(app, __gelisAotHandlers);",
     );
+  });
+
+  test("rejects compact managed AOT identifier collisions", async () => {
+    await expect(
+      compileAotSource(`
+        const __gI = 1;
+        const Body = schema;
+        const app = new Gelis();
+        app.post("/body", { body: Body }, ({ body }) => body);
+      `),
+    ).rejects.toThrow("internal AOT identifier __gI already exists");
+
+    await expect(
+      compileAotSource(`
+        const __gC = 1;
+        const Body = schema;
+        const app = new Gelis();
+        app.post("/body", { body: Body }, ({ body }) => body);
+      `),
+    ).rejects.toThrow("internal AOT identifier __gC already exists");
   });
 
   test("keeps the topology artifact identical for plain and managed bindings", async () => {
