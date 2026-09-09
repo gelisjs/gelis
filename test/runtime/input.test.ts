@@ -71,7 +71,7 @@ describe("Gelis input runtime", () => {
       new Request("http://gelis.test/search?page=2&tag=a&tag=b&q=hello+world"),
     );
 
-    expect(result).toBeInstanceOf(Promise);
+    expect(result).toBeInstanceOf(Response);
 
     const response = await result;
 
