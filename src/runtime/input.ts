@@ -219,21 +219,33 @@ export function createRuntimeInputPlan(
 
   const parser = bodyParser ?? "json";
 
-  if (parser !== "json") {
-    throw new TypeError(
-      "Gelis non-JSON request body parsers require P9-E3 runtime support",
-    );
-  }
-
   const compiledContentTypes =
     bodyContentTypes === undefined
       ? undefined
       : compileContentTypes(bodyContentTypes);
 
-  const readBody =
-    compiledContentTypes === undefined
-      ? readDefaultJsonBody
-      : compileJsonBodyReader(compiledContentTypes.matches);
+  let readBody: RuntimeBodyReader;
+  let readBodyError: RuntimeBodyReadError;
+
+  if (parser === "json") {
+    readBody =
+      compiledContentTypes === undefined
+        ? readDefaultJsonBody
+        : compileJsonBodyReader(compiledContentTypes.matches);
+
+    readBodyError = handleMalformedJsonBody;
+  } else if (parser === "text") {
+    readBody =
+      compiledContentTypes === undefined
+        ? readDefaultTextBody
+        : compileTextBodyReader(compiledContentTypes.matches);
+
+    readBodyError = handleMalformedTextBody;
+  } else {
+    throw new TypeError(
+      "Gelis urlencoded, multipart, and arrayBuffer request body parsers require later P9-E3 runtime support",
+    );
+  }
 
   if (query === undefined) {
     return {
@@ -241,7 +253,7 @@ export function createRuntimeInputPlan(
       query: undefined,
       body,
       readBody,
-      readBodyError: handleMalformedJsonBody,
+      readBodyError,
       bodyParser: parser,
 
       ...(compiledContentTypes === undefined
@@ -257,7 +269,7 @@ export function createRuntimeInputPlan(
     query,
     body,
     readBody,
-    readBodyError: handleMalformedJsonBody,
+    readBodyError,
     bodyParser: parser,
 
     ...(compiledContentTypes === undefined
@@ -296,6 +308,30 @@ function compileJsonBodyReader(
     }
 
     return request.json();
+  };
+}
+
+function readDefaultTextBody(request: Request): Response | Promise<unknown> {
+  if (!isTextContentType(request)) {
+    return unsupportedMediaTypeResponse();
+  }
+
+  return request.text();
+}
+
+function handleMalformedTextBody(_error: unknown): Response {
+  return malformedBodyResponse();
+}
+
+function compileTextBodyReader(
+  matchesContentType: RuntimeContentTypeMatcher,
+): RuntimeBodyReader {
+  return (request) => {
+    if (!matchesContentType(request)) {
+      return unsupportedMediaTypeResponse();
+    }
+
+    return request.text();
   };
 }
 
@@ -473,6 +509,32 @@ export function isJsonContentType(request: Request): boolean {
   );
 }
 
+function isTextContentType(request: Request): boolean {
+  const contentType = request.headers.get("content-type");
+
+  if (contentType === null) {
+    return false;
+  }
+
+  if (contentType.length === 10 && contentType === "text/plain") {
+    return true;
+  }
+
+  if (hasCombinedContentType(contentType)) {
+    return false;
+  }
+
+  const separator = contentType.indexOf(";");
+
+  const mediaType = (
+    separator === -1 ? contentType : contentType.slice(0, separator)
+  )
+    .trim()
+    .toLowerCase();
+
+  return mediaType === "text/plain";
+}
+
 export function validationErrorResponse(
   target: RuntimeInputTarget,
 
@@ -502,6 +564,22 @@ export function malformedJsonResponse(): Response {
         code: "MALFORMED_JSON",
 
         message: "Malformed JSON request body",
+      },
+    },
+
+    {
+      status: 400,
+    },
+  );
+}
+
+function malformedBodyResponse(): Response {
+  return Response.json(
+    {
+      error: {
+        code: "MALFORMED_BODY",
+
+        message: "Malformed request body",
       },
     },
 
