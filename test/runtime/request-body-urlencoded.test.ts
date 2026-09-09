@@ -469,25 +469,6 @@ describe("Gelis urlencoded request body reader", () => {
       },
     });
   });
-
-  test("still rejects multipart until its P9-E3 phase", () => {
-    const Body = createSchema((value) => ({
-      value,
-    }));
-
-    const app = new Gelis();
-
-    expect(() => {
-      app.post(
-        "/multipart",
-        {
-          body: Body,
-          bodyParser: "multipart",
-        },
-        ({ body }) => body,
-      );
-    }).toThrow(TypeError);
-  });
 });
 
 function createSchema<Input = unknown, Output = Input>(
