@@ -44,7 +44,10 @@ import { Router, type RuntimeRouteMatch } from "./runtime/router";
 
 import { activateAllFallback } from "./runtime/router-all";
 
-import { createAutomaticOptionsResponse } from "./runtime/http-method-semantics";
+import {
+  createAutomaticOptionsResponse,
+  createMethodNotAllowedResponse,
+} from "./runtime/http-method-semantics";
 
 import {
   normalizeResponse,
@@ -611,17 +614,24 @@ export class Gelis extends RouteBuilder<""> {
       );
     }
 
-    if (matched === undefined && request.method === "OPTIONS") {
-      const automaticOptions = createAutomaticOptionsResponse(
-        this.#state.router.matchingMethods(pathname),
-      );
-
-      if (automaticOptions !== undefined) {
-        return automaticOptions;
-      }
-    }
-
     if (!matched) {
+      const matchingMethods = this.#state.router.matchingMethods(pathname);
+
+      if (request.method === "OPTIONS") {
+        const automaticOptions =
+          createAutomaticOptionsResponse(matchingMethods);
+
+        if (automaticOptions !== undefined) {
+          return automaticOptions;
+        }
+      }
+
+      const methodNotAllowed = createMethodNotAllowedResponse(matchingMethods);
+
+      if (methodNotAllowed !== undefined) {
+        return methodNotAllowed;
+      }
+
       return new Response(
         "Not Found",
 

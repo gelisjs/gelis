@@ -370,3 +370,85 @@ describe("automatic OPTIONS across production AOT runtimes", () => {
     expect(await response.text()).toBe("");
   });
 });
+
+describe("405 Method Not Allowed across production AOT runtimes", () => {
+  test("flat AOT inherits 405 and Allow semantics", async () => {
+    const plan = await compileSemanticRoutePlan(optionsRouteShapes);
+
+    const artifact = compileFlatAotArtifact(plan);
+
+    const app = new Gelis();
+
+    installFlatAotRuntime(
+      app,
+
+      artifact,
+
+      {
+        version: FLAT_AOT_ARTIFACT_VERSION,
+
+        shapeFingerprint: artifact[2],
+
+        handlers: optionsHandlers,
+      },
+    );
+
+    const response = await app.fetch(
+      new Request(
+        "http://gelis.test/options/42",
+
+        {
+          method: "PATCH",
+        },
+      ),
+    );
+
+    expect(response.status).toBe(405);
+
+    expect(response.headers.get("allow")).toBe(
+      "GET, HEAD, POST, PURGE, OPTIONS",
+    );
+
+    expect(await response.text()).toBe("Method Not Allowed");
+  });
+
+  test("preorder AOT inherits 405 and Allow semantics", async () => {
+    const plan = await compileSemanticRoutePlan(optionsRouteShapes);
+
+    const artifact = compilePreorderAotArtifact(plan);
+
+    const app = new Gelis();
+
+    installPreorderAotRuntime(
+      app,
+
+      artifact,
+
+      {
+        version: PREORDER_AOT_ARTIFACT_VERSION,
+
+        shapeFingerprint: artifact[2],
+
+        handlers: optionsHandlers,
+      },
+    );
+
+    const response = await app.fetch(
+      new Request(
+        "http://gelis.test/options/42",
+
+        {
+          method: "PATCH",
+        },
+      ),
+    );
+
+    expect(response.status).toBe(405);
+
+    expect(response.headers.get("allow")).toBe(
+      "GET, HEAD, POST, PURGE, OPTIONS",
+    );
+
+    expect(await response.text()).toBe("Method Not Allowed");
+  });
+});

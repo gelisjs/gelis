@@ -69,3 +69,25 @@ export function createAutomaticOptionsResponse(
     },
   );
 }
+
+export function createMethodNotAllowedResponse(
+  methods: readonly string[],
+): Response | undefined {
+  const allow = buildAllowHeader(methods);
+
+  if (allow === undefined) {
+    return undefined;
+  }
+
+  return new Response(
+    "Method Not Allowed",
+
+    {
+      status: 405,
+
+      headers: {
+        allow,
+      },
+    },
+  );
+}
