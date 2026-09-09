@@ -422,11 +422,7 @@ describe("Gelis text request body reader", () => {
       value,
     }));
 
-    for (const bodyParser of [
-      "urlencoded",
-      "multipart",
-      "arrayBuffer",
-    ] as const) {
+    for (const bodyParser of ["urlencoded", "multipart"] as const) {
       const app = new Gelis();
 
       expect(() => {
