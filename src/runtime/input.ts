@@ -255,10 +255,17 @@ export function createRuntimeInputPlan(
         : compileUrlEncodedBodyReader(compiledContentTypes.matches);
 
     readBodyError = handleMalformedUrlEncodedBody;
+  } else if (parser === "multipart") {
+    readBody =
+      compiledContentTypes === undefined
+        ? readDefaultMultipartBody
+        : compileMultipartBodyReader(compiledContentTypes.matches);
+
+    readBodyError = handleMalformedMultipartBody;
   } else {
-    throw new TypeError(
-      "Gelis multipart request body parser requires later P9-E3 runtime support",
-    );
+    const unsupportedParser: never = parser;
+
+    throw new TypeError(`Unsupported Gelis request body parser: ${unsupportedParser}`);
   }
 
   if (query === undefined) {
@@ -408,6 +415,73 @@ function parseUrlEncodedBody(
   const entries = new URLSearchParams(value);
 
   entries.forEach((entryValue, key) => {
+    const existing = result[key];
+
+    if (existing === undefined) {
+      result[key] = entryValue;
+    } else if (Array.isArray(existing)) {
+      existing.push(entryValue);
+    } else {
+      result[key] = [existing, entryValue];
+    }
+  });
+
+  return result;
+}
+
+function readDefaultMultipartBody(
+  request: Request,
+): Response | Promise<unknown> {
+  if (!isMultipartContentType(request)) {
+    return unsupportedMediaTypeResponse();
+  }
+
+  return request.formData().then(normalizeMultipartFormData);
+}
+
+function handleMalformedMultipartBody(_error: unknown): Response {
+  return malformedBodyResponse();
+}
+
+function compileMultipartBodyReader(
+  matchesContentType: RuntimeContentTypeMatcher,
+): RuntimeBodyReader {
+  return (request) => {
+    if (!matchesContentType(request)) {
+      return unsupportedMediaTypeResponse();
+    }
+
+    const contentType = request.headers.get("content-type");
+
+    if (contentType === null) {
+      return unsupportedMediaTypeResponse();
+    }
+
+    const separator = contentType.indexOf(";");
+    const parserContentType =
+      separator === -1
+        ? "multipart/form-data"
+        : `multipart/form-data${contentType.slice(separator)}`;
+
+    return new Response(request.body, {
+      headers: {
+        "content-type": parserContentType,
+      },
+    })
+      .formData()
+      .then(normalizeMultipartFormData);
+  };
+}
+
+function normalizeMultipartFormData(
+  formData: FormData,
+): Record<string, string | File | Array<string | File>> {
+  const result = Object.create(null) as Record<
+    string,
+    string | File | Array<string | File>
+  >;
+
+  formData.forEach((entryValue, key) => {
     const existing = result[key];
 
     if (existing === undefined) {
@@ -678,6 +752,32 @@ function isUrlEncodedContentType(request: Request): boolean {
     .toLowerCase();
 
   return mediaType === "application/x-www-form-urlencoded";
+}
+
+function isMultipartContentType(request: Request): boolean {
+  const contentType = request.headers.get("content-type");
+
+  if (contentType === null) {
+    return false;
+  }
+
+  if (contentType.length === 19 && contentType === "multipart/form-data") {
+    return true;
+  }
+
+  if (hasCombinedContentType(contentType)) {
+    return false;
+  }
+
+  const separator = contentType.indexOf(";");
+
+  const mediaType = (
+    separator === -1 ? contentType : contentType.slice(0, separator)
+  )
+    .trim()
+    .toLowerCase();
+
+  return mediaType === "multipart/form-data";
 }
 
 export function validationErrorResponse(
