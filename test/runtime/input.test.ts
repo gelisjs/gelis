@@ -650,6 +650,222 @@ describe("Gelis input runtime", () => {
       );
     }).toThrow(TypeError);
   });
+
+  test("accepts compiled custom JSON media types", async () => {
+    const Body = createSchema<{
+      name: string;
+    }>((value) => ({
+      value: value as {
+        name: string;
+      },
+    }));
+
+    const app = new Gelis();
+
+    app.post(
+      "/vendor-json",
+      {
+        body: Body,
+
+        bodyParser: "json",
+
+        bodyContentTypes: ["application/vnd.gelis+json"],
+      },
+      ({ body }) => body,
+    );
+
+    const response = await app.fetch(
+      new Request("http://gelis.test/vendor-json", {
+        method: "POST",
+
+        headers: {
+          "content-type": "Application/Vnd.Gelis+Json; charset=utf-8",
+        },
+
+        body: JSON.stringify({
+          name: "Gelis",
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(200);
+
+    expect(await response.json()).toEqual({
+      name: "Gelis",
+    });
+  });
+
+  test("custom body content types replace JSON defaults", async () => {
+    const Body = createSchema((value) => ({
+      value,
+    }));
+
+    const app = new Gelis();
+
+    app.post(
+      "/vendor-only",
+      {
+        body: Body,
+
+        bodyParser: "json",
+
+        bodyContentTypes: ["application/vnd.gelis+json"],
+      },
+      ({ body }) => body,
+    );
+
+    const response = await app.fetch(
+      new Request("http://gelis.test/vendor-only", {
+        method: "POST",
+
+        headers: {
+          "content-type": "application/json",
+        },
+
+        body: "{}",
+      }),
+    );
+
+    expect(response.status).toBe(415);
+  });
+
+  test("returns 400 for malformed custom JSON representation", async () => {
+    const Body = createSchema((value) => ({
+      value,
+    }));
+
+    const app = new Gelis();
+
+    app.post(
+      "/vendor-malformed",
+      {
+        body: Body,
+
+        bodyParser: "json",
+
+        bodyContentTypes: ["application/vnd.gelis+json"],
+      },
+      ({ body }) => body,
+    );
+
+    const response = await app.fetch(
+      new Request("http://gelis.test/vendor-malformed", {
+        method: "POST",
+
+        headers: {
+          "content-type": "application/vnd.gelis+json",
+        },
+
+        body: "{broken",
+      }),
+    );
+
+    expect(response.status).toBe(400);
+  });
+
+  test("rejects empty request body content type lists", () => {
+    const Body = createSchema((value) => ({
+      value,
+    }));
+
+    const app = new Gelis();
+
+    expect(() => {
+      app.post(
+        "/empty-content-types",
+        {
+          body: Body,
+
+          bodyParser: "json",
+
+          bodyContentTypes: [],
+        },
+        ({ body }) => body,
+      );
+    }).toThrow(TypeError);
+  });
+
+  test("rejects wildcard request body media types", () => {
+    const Body = createSchema((value) => ({
+      value,
+    }));
+
+    const app = new Gelis();
+
+    expect(() => {
+      app.post(
+        "/wildcard-content-type",
+        {
+          body: Body,
+
+          bodyParser: "json",
+
+          bodyContentTypes: ["application/*"],
+        },
+        ({ body }) => body,
+      );
+    }).toThrow(TypeError);
+  });
+
+  test("rejects combined request Content-Type values", async () => {
+    const Body = createSchema((value) => ({
+      value,
+    }));
+
+    const app = new Gelis();
+
+    app.post(
+      "/combined-content-type",
+      {
+        body: Body,
+      },
+      ({ body }) => body,
+    );
+
+    const response = await app.fetch(
+      new Request("http://gelis.test/combined-content-type", {
+        method: "POST",
+
+        headers: {
+          "content-type": "application/json; charset=utf-8, text/plain",
+        },
+
+        body: "{}",
+      }),
+    );
+
+    expect(response.status).toBe(415);
+  });
+
+  test("does not treat quoted parameter commas as combined Content-Type", async () => {
+    const Body = createSchema((value) => ({
+      value,
+    }));
+
+    const app = new Gelis();
+
+    app.post(
+      "/quoted-comma",
+      {
+        body: Body,
+      },
+      ({ body }) => body,
+    );
+
+    const response = await app.fetch(
+      new Request("http://gelis.test/quoted-comma", {
+        method: "POST",
+
+        headers: {
+          "content-type": 'application/json; profile="a,b"',
+        },
+
+        body: "{}",
+      }),
+    );
+
+    expect(response.status).toBe(200);
+  });
 });
 
 function createSchema<Input = unknown, Output = Input>(

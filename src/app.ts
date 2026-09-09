@@ -70,10 +70,7 @@ import {
   RUNTIME_INPUT_QUERY,
   RUNTIME_INPUT_QUERY_BODY,
   invalidQueryEncodingResponse,
-  isJsonContentType,
-  malformedJsonResponse,
   parseQueryFromUrl,
-  unsupportedMediaTypeResponse,
   validationErrorResponse,
 } from "./runtime/input";
 
@@ -2702,33 +2699,41 @@ function runBodyRoute(
     throw new Error("Missing body schema");
   }
 
-  if (!isJsonContentType(request)) {
-    return unsupportedMediaTypeResponse();
+  const readBody = input.readBody;
+
+  if (readBody === undefined) {
+    throw new Error("Missing Gelis runtime body reader");
   }
 
-  return request.json().then(
-    (rawBody) => {
-      const validation = schema["~standard"].validate(rawBody);
+  const rawBody = readBody(request);
 
-      if (isPromiseLike(validation)) {
-        return Promise.resolve(validation).then((result) => {
-          if (result.issues !== undefined) {
-            return validationErrorResponse("body", result.issues);
-          }
+  if (rawBody instanceof Response) {
+    return rawBody;
+  }
 
-          return invoke(route, request, params, query, result.value);
-        });
-      }
+  return rawBody.then((resolvedBody) => {
+    if (resolvedBody instanceof Response) {
+      return resolvedBody;
+    }
 
-      if (validation.issues !== undefined) {
-        return validationErrorResponse("body", validation.issues);
-      }
+    const validation = schema["~standard"].validate(resolvedBody);
 
-      return invoke(route, request, params, query, validation.value);
-    },
+    if (isPromiseLike(validation)) {
+      return Promise.resolve(validation).then((result) => {
+        if (result.issues !== undefined) {
+          return validationErrorResponse("body", result.issues);
+        }
 
-    () => malformedJsonResponse(),
-  );
+        return invoke(route, request, params, query, result.value);
+      });
+    }
+
+    if (validation.issues !== undefined) {
+      return validationErrorResponse("body", validation.issues);
+    }
+
+    return invoke(route, request, params, query, validation.value);
+  });
 }
 
 function runQueryBodyRoute(

@@ -11,12 +11,143 @@ export const RUNTIME_INPUT_QUERY_BODY =
 
 export type RuntimeInputTarget = "query" | "body";
 
+export type RuntimeBodyReader = (
+  request: Request,
+) => Response | Promise<unknown>;
+
 export interface RuntimeInputPlan {
   readonly kind: number;
 
   readonly query: StandardSchemaV1 | undefined;
 
   readonly body: StandardSchemaV1 | undefined;
+
+  readonly readBody?: RuntimeBodyReader;
+}
+
+type RuntimeContentTypeMatcher = (request: Request) => boolean;
+
+const MEDIA_TYPE_TOKEN = /^[!#$%&'*+\-.^_`|~0-9A-Za-z]+$/;
+
+function normalizeDeclaredMediaType(value: string): string {
+  const separator = value.indexOf(";");
+
+  const essence = (separator === -1 ? value : value.slice(0, separator)).trim();
+
+  const slash = essence.indexOf("/");
+
+  if (
+    slash <= 0 ||
+    slash !== essence.lastIndexOf("/") ||
+    slash === essence.length - 1
+  ) {
+    throw invalidDeclaredMediaType(value);
+  }
+
+  const type = essence.slice(0, slash);
+
+  const subtype = essence.slice(slash + 1);
+
+  if (
+    type === "*" ||
+    subtype === "*" ||
+    !MEDIA_TYPE_TOKEN.test(type) ||
+    !MEDIA_TYPE_TOKEN.test(subtype)
+  ) {
+    throw invalidDeclaredMediaType(value);
+  }
+
+  return `${type.toLowerCase()}/${subtype.toLowerCase()}`;
+}
+
+function invalidDeclaredMediaType(value: string): TypeError {
+  return new TypeError(`Invalid Gelis request body media type: ${value}`);
+}
+
+function compileContentTypeMatcher(
+  contentTypes: readonly string[],
+): RuntimeContentTypeMatcher {
+  if (contentTypes.length === 0) {
+    throw new TypeError(
+      "Gelis bodyContentTypes must contain at least one media type",
+    );
+  }
+
+  const essences: string[] = [];
+
+  const seen = new Set<string>();
+
+  for (const contentType of contentTypes) {
+    const essence = normalizeDeclaredMediaType(contentType);
+
+    if (!seen.has(essence)) {
+      seen.add(essence);
+      essences.push(essence);
+    }
+  }
+
+  if (essences.length === 1) {
+    const first = essences[0]!;
+
+    return (request) => requestContentTypeEssence(request) === first;
+  }
+
+  if (essences.length === 2) {
+    const first = essences[0]!;
+    const second = essences[1]!;
+
+    return (request) => {
+      const actual = requestContentTypeEssence(request);
+
+      return actual === first || actual === second;
+    };
+  }
+
+  if (essences.length === 3) {
+    const first = essences[0]!;
+    const second = essences[1]!;
+    const third = essences[2]!;
+
+    return (request) => {
+      const actual = requestContentTypeEssence(request);
+
+      return actual === first || actual === second || actual === third;
+    };
+  }
+
+  const accepted = new Set(essences);
+
+  return (request) => {
+    const actual = requestContentTypeEssence(request);
+
+    return actual !== undefined && accepted.has(actual);
+  };
+}
+
+function requestContentTypeEssence(request: Request): string | undefined {
+  const contentType = request.headers.get("content-type");
+
+  if (contentType === null) {
+    return undefined;
+  }
+
+  if (hasCombinedContentType(contentType)) {
+    return undefined;
+  }
+
+  const separator = contentType.indexOf(";");
+
+  const essence = (
+    separator === -1 ? contentType : contentType.slice(0, separator)
+  )
+    .trim()
+    .toLowerCase();
+
+  if (essence.length === 0) {
+    return undefined;
+  }
+
+  return essence;
 }
 
 export function createRuntimeInputPlan(
@@ -34,38 +165,67 @@ export function createRuntimeInputPlan(
     if (bodyParser !== undefined || bodyContentTypes !== undefined) {
       throw new TypeError("Gelis body parser metadata requires a body schema");
     }
-  } else {
-    if (bodyParser !== undefined && bodyParser !== "json") {
-      throw new TypeError(
-        "Gelis non-JSON request body parsers require P9-E3 runtime support",
-      );
+
+    if (query === undefined) {
+      return undefined;
     }
 
-    if (bodyContentTypes !== undefined) {
-      throw new TypeError(
-        "Gelis custom request body content types require P9-E3 runtime support",
-      );
-    }
+    return {
+      kind: RUNTIME_INPUT_QUERY,
+      query,
+      body: undefined,
+    };
   }
 
-  if (query === undefined && body === undefined) {
-    return undefined;
+  const parser = bodyParser ?? "json";
+
+  if (parser !== "json") {
+    throw new TypeError(
+      "Gelis non-JSON request body parsers require P9-E3 runtime support",
+    );
   }
 
-  let kind = 0;
+  const readBody =
+    bodyContentTypes === undefined
+      ? readDefaultJsonBody
+      : compileJsonBodyReader(bodyContentTypes);
 
-  if (query !== undefined) {
-    kind |= RUNTIME_INPUT_QUERY;
-  }
-
-  if (body !== undefined) {
-    kind |= RUNTIME_INPUT_BODY;
+  if (query === undefined) {
+    return {
+      kind: RUNTIME_INPUT_BODY,
+      query: undefined,
+      body,
+      readBody,
+    };
   }
 
   return {
-    kind,
+    kind: RUNTIME_INPUT_QUERY_BODY,
     query,
     body,
+    readBody,
+  };
+}
+
+function readDefaultJsonBody(request: Request): Response | Promise<unknown> {
+  if (!isJsonContentType(request)) {
+    return unsupportedMediaTypeResponse();
+  }
+
+  return request.json().catch(() => malformedJsonResponse());
+}
+
+function compileJsonBodyReader(
+  contentTypes: readonly string[],
+): RuntimeBodyReader {
+  const matchesContentType = compileContentTypeMatcher(contentTypes);
+
+  return (request) => {
+    if (!matchesContentType(request)) {
+      return unsupportedMediaTypeResponse();
+    }
+
+    return request.json().catch(() => malformedJsonResponse());
   };
 }
 
@@ -178,10 +338,44 @@ export function parseQueryFromUrl(
   return result;
 }
 
+function hasCombinedContentType(value: string): boolean {
+  let quoted = false;
+  let escaped = false;
+
+  for (let index = 0; index < value.length; index++) {
+    const code = value.charCodeAt(index);
+
+    if (escaped) {
+      escaped = false;
+      continue;
+    }
+
+    if (quoted && code === 92) {
+      escaped = true;
+      continue;
+    }
+
+    if (code === 34) {
+      quoted = !quoted;
+      continue;
+    }
+
+    if (!quoted && code === 44) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 export function isJsonContentType(request: Request): boolean {
   const contentType = request.headers.get("content-type");
 
   if (contentType === null) {
+    return false;
+  }
+
+  if (hasCombinedContentType(contentType)) {
     return false;
   }
 
@@ -247,7 +441,7 @@ export function unsupportedMediaTypeResponse(): Response {
       error: {
         code: "UNSUPPORTED_MEDIA_TYPE",
 
-        message: "Expected application/json request body",
+        message: "Unsupported request body media type",
       },
     },
 
