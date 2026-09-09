@@ -8,29 +8,40 @@ type MultipartValue = string | File | Array<string | File>;
 type MultipartBody = Record<string, MultipartValue>;
 
 describe("Gelis multipart request body reader", () => {
-  test("parses fields and files into a null-prototype object", async () => {
+  test("preserves fields, empty names and native File metadata", async () => {
     const boundary = "gelis-boundary";
+    const wireBody = multipartBody(boundary, [
+      field("name", "Gelis"),
+      field("tag", "a"),
+      field("tag", "b"),
+      field("user[name]", "Rigent"),
+      field("a.b", "value"),
+      field("", "blank"),
+      field("empty", ""),
+      field("count", "42"),
+      file("upload", "hello.txt", "text/plain", "hello multipart"),
+    ]);
+
+    const nativeFormData = await new Response(wireBody, {
+      headers: {
+        "content-type": `multipart/form-data; boundary=${boundary}`,
+      },
+    }).formData();
+    const nativeUpload = nativeFormData.get("upload");
+
+    if (!(nativeUpload instanceof File)) {
+      throw new Error("Native multipart baseline did not produce a File");
+    }
 
     const Body = createSchema<MultipartBody, unknown>(async (value) => {
       const body = value as MultipartBody;
-
-      if (Object.getPrototypeOf(body) !== null) {
-        return {
-          issues: [
-            {
-              message: "multipart body must have a null prototype",
-            },
-          ],
-        };
-      }
-
       const upload = body.upload;
 
-      if (!(upload instanceof File)) {
+      if (Object.getPrototypeOf(body) !== null || !(upload instanceof File)) {
         return {
           issues: [
             {
-              message: "upload must be a File",
+              message: "invalid normalized multipart body",
             },
           ],
         };
@@ -43,6 +54,8 @@ describe("Gelis multipart request body reader", () => {
           literalBracket: body["user[name]"],
           literalDot: body["a.b"],
           emptyName: body[""],
+          emptyValue: body.empty,
+          count: body.count,
           upload: {
             name: upload.name,
             type: upload.type,
@@ -65,21 +78,7 @@ describe("Gelis multipart request body reader", () => {
     );
 
     const response = await app.fetch(
-      new Request("http://gelis.test/form", {
-        method: "POST",
-        headers: {
-          "content-type": `multipart/form-data; boundary=${boundary}`,
-        },
-        body: multipartBody(boundary, [
-          field("name", "Gelis"),
-          field("tag", "a"),
-          field("tag", "b"),
-          field("user[name]", "Rigent"),
-          field("a.b", "value"),
-          field("", "blank"),
-          file("upload", "hello.txt", "text/plain", "hello multipart"),
-        ]),
-      }),
+      multipartRequest("http://gelis.test/form", boundary, wireBody),
     );
 
     expect(response.status).toBe(200);
@@ -89,12 +88,55 @@ describe("Gelis multipart request body reader", () => {
       literalBracket: "Rigent",
       literalDot: "value",
       emptyName: "blank",
+      emptyValue: "",
+      count: "42",
       upload: {
-        name: "hello.txt",
-        type: "text/plain",
-        size: 15,
+        name: nativeUpload.name,
+        type: nativeUpload.type,
+        size: nativeUpload.size,
         text: "hello multipart",
       },
+    });
+  });
+
+  test("keeps the internal empty-name sentinel collision-safe", async () => {
+    const boundary = "gelis-sentinel";
+    const sentinelLikeName = "__gelis_multipart_empty_name__";
+
+    const Body = createSchema<MultipartBody>((value) => ({
+      value: value as MultipartBody,
+    }));
+
+    const app = new Gelis();
+
+    app.post(
+      "/sentinel",
+      {
+        body: Body,
+        bodyParser: "multipart",
+      },
+      ({ body }) => ({
+        real: body[sentinelLikeName],
+        empty: body[""],
+      }),
+    );
+
+    const response = await app.fetch(
+      multipartRequest(
+        "http://gelis.test/sentinel",
+        boundary,
+        multipartBody(boundary, [
+          field(sentinelLikeName, "real"),
+          field("", "first"),
+          field("", "second"),
+        ]),
+      ),
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      real: "real",
+      empty: ["first", "second"],
     });
   });
 
@@ -139,42 +181,37 @@ describe("Gelis multipart request body reader", () => {
     );
 
     const response = await app.fetch(
-      new Request("http://gelis.test/mixed", {
-        method: "POST",
-        headers: {
-          "content-type": `multipart/form-data; boundary=${boundary}`,
-        },
-        body: multipartBody(boundary, [
+      multipartRequest(
+        "http://gelis.test/mixed",
+        boundary,
+        multipartBody(boundary, [
           field("item", "first"),
-          file("item", "item.txt", "text/plain", "second"),
-          field("item", "third"),
+          file("item", "middle.txt", "text/plain", "middle"),
+          field("item", "last"),
         ]),
-      }),
+      ),
     );
 
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual([
       "first",
       {
-        name: "item.txt",
-        text: "second",
+        name: "middle.txt",
+        text: "middle",
       },
-      "third",
+      "last",
     ]);
   });
 
-  test("accepts multipart media type case-insensitively", async () => {
-    const formData = new FormData();
-    formData.append("name", "Gelis");
-
+  test("accepts case-insensitive media essence and quoted boundary parameters", async () => {
+    const boundary = "gelis,quoted";
     const Body = createSchema<MultipartBody>((value) => ({
       value: value as MultipartBody,
     }));
-
     const app = new Gelis();
 
     app.post(
-      "/form",
+      "/quoted",
       {
         body: Body,
         bodyParser: "multipart",
@@ -182,27 +219,28 @@ describe("Gelis multipart request body reader", () => {
       ({ body }) => body,
     );
 
-    const request = requestLike(
-      "http://gelis.test/form",
-      'Multipart/Form-Data; note="a,b"; boundary=gelis',
-      formData,
+    const response = await app.fetch(
+      new Request("http://gelis.test/quoted", {
+        method: "POST",
+        headers: {
+          "content-type": `Multipart/Form-Data; boundary="${boundary}"`,
+        },
+        body: multipartBody(boundary, [field("name", "Gelis")]),
+      }),
     );
-
-    const response = await app.fetch(request);
 
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ name: "Gelis" });
   });
 
-  test("returns 400 when multipart boundary is missing", async () => {
+  test("returns 400 when an accepted multipart media type has no boundary", async () => {
     const Body = createSchema<MultipartBody>((value) => ({
       value: value as MultipartBody,
     }));
-
     const app = new Gelis();
 
     app.post(
-      "/form",
+      "/missing-boundary",
       {
         body: Body,
         bodyParser: "multipart",
@@ -211,7 +249,7 @@ describe("Gelis multipart request body reader", () => {
     );
 
     const response = await app.fetch(
-      new Request("http://gelis.test/form", {
+      new Request("http://gelis.test/missing-boundary", {
         method: "POST",
         headers: {
           "content-type": "multipart/form-data",
@@ -223,15 +261,14 @@ describe("Gelis multipart request body reader", () => {
     expect(response.status).toBe(400);
   });
 
-  test("returns 400 when multipart boundary is unusable", async () => {
+  test("returns 400 when the declared multipart boundary is unusable", async () => {
     const Body = createSchema<MultipartBody>((value) => ({
       value: value as MultipartBody,
     }));
-
     const app = new Gelis();
 
     app.post(
-      "/form",
+      "/wrong-boundary",
       {
         body: Body,
         bodyParser: "multipart",
@@ -240,10 +277,10 @@ describe("Gelis multipart request body reader", () => {
     );
 
     const response = await app.fetch(
-      new Request("http://gelis.test/form", {
+      new Request("http://gelis.test/wrong-boundary", {
         method: "POST",
         headers: {
-          "content-type": "multipart/form-data; boundary=wrong",
+          "content-type": "multipart/form-data; boundary=declared",
         },
         body: multipartBody("actual", [field("name", "Gelis")]),
       }),
@@ -252,11 +289,10 @@ describe("Gelis multipart request body reader", () => {
     expect(response.status).toBe(400);
   });
 
-  test("multipart default does not accept other media types", async () => {
+  test("multipart default rejects other media types", async () => {
     const Body = createSchema<MultipartBody>((value) => ({
       value: value as MultipartBody,
     }));
-
     const app = new Gelis();
 
     app.post(
@@ -274,24 +310,22 @@ describe("Gelis multipart request body reader", () => {
         headers: {
           "content-type": "application/octet-stream",
         },
-        body: "binary",
+        body: "x",
       }),
     );
 
     expect(response.status).toBe(415);
   });
 
-  test("custom media aliases replace the default and preserve multipart grammar", async () => {
-    const boundary = "gelis-custom";
-
+  test("custom media aliases replace the default while retaining multipart grammar", async () => {
+    const boundary = "gelis-vendor";
     const Body = createSchema<MultipartBody>((value) => ({
       value: value as MultipartBody,
     }));
-
     const app = new Gelis();
 
     app.post(
-      "/custom",
+      "/vendor",
       {
         body: Body,
         bodyParser: "multipart",
@@ -301,39 +335,39 @@ describe("Gelis multipart request body reader", () => {
     );
 
     const customResponse = await app.fetch(
-      new Request("http://gelis.test/custom", {
+      new Request("http://gelis.test/vendor", {
         method: "POST",
         headers: {
-          "content-type": `application/vnd.gelis-multipart; boundary=${boundary}`,
+          "content-type": `Application/Vnd.Gelis-Multipart; boundary=${boundary}`,
         },
-        body: multipartBody(boundary, [field("name", "Gelis")]),
+        body: multipartBody(boundary, [
+          field("name", "Gelis"),
+          field("", "blank"),
+        ]),
       }),
     );
 
     expect(customResponse.status).toBe(200);
-    expect(await customResponse.json()).toEqual({ name: "Gelis" });
+    expect(await customResponse.json()).toEqual({
+      name: "Gelis",
+      "": "blank",
+    });
 
     const defaultResponse = await app.fetch(
-      new Request("http://gelis.test/custom", {
-        method: "POST",
-        headers: {
-          "content-type": `multipart/form-data; boundary=${boundary}`,
-        },
-        body: multipartBody(boundary, [field("name", "Gelis")]),
-      }),
+      multipartRequest(
+        "http://gelis.test/vendor",
+        boundary,
+        multipartBody(boundary, [field("name", "Gelis")]),
+      ),
     );
 
     expect(defaultResponse.status).toBe(415);
   });
 
   test("returns 415 when Content-Type is missing or ambiguous", async () => {
-    const formData = new FormData();
-    formData.append("name", "Gelis");
-
     const Body = createSchema<MultipartBody>((value) => ({
       value: value as MultipartBody,
     }));
-
     const app = new Gelis();
 
     app.post(
@@ -346,26 +380,23 @@ describe("Gelis multipart request body reader", () => {
     );
 
     const missing = await app.fetch(
-      requestLike("http://gelis.test/form", null, formData),
+      requestLike("http://gelis.test/form", null, new ArrayBuffer(0)),
     );
-
-    expect(missing.status).toBe(415);
 
     const ambiguous = await app.fetch(
       requestLike(
         "http://gelis.test/form",
-        "multipart/form-data; boundary=a, multipart/form-data; boundary=b",
-        formData,
+        "multipart/form-data; boundary=x, text/plain",
+        new ArrayBuffer(0),
       ),
     );
 
+    expect(missing.status).toBe(415);
     expect(ambiguous.status).toBe(415);
   });
 
   test("returns 422 when multipart schema validation fails", async () => {
-    const formData = new FormData();
-    formData.append("name", "Gelis");
-
+    const boundary = "gelis-validation";
     const Body = createSchema<MultipartBody>(() => ({
       issues: [
         {
@@ -374,7 +405,6 @@ describe("Gelis multipart request body reader", () => {
         },
       ],
     }));
-
     const app = new Gelis();
 
     app.post(
@@ -387,10 +417,10 @@ describe("Gelis multipart request body reader", () => {
     );
 
     const response = await app.fetch(
-      requestLike(
+      multipartRequest(
         "http://gelis.test/form",
-        "multipart/form-data; boundary=gelis",
-        formData,
+        boundary,
+        multipartBody(boundary, [field("name", "Gelis")]),
       ),
     );
 
@@ -410,9 +440,7 @@ describe("Gelis multipart request body reader", () => {
   });
 
   test("validates query before passing normalized multipart data", async () => {
-    const formData = new FormData();
-    formData.append("name", "Gelis");
-
+    const boundary = "gelis-query";
     const Query = createSchema<
       Record<string, string | string[]>,
       { id: number }
@@ -425,11 +453,9 @@ describe("Gelis multipart request body reader", () => {
         },
       };
     });
-
     const Body = createSchema<MultipartBody>((value) => ({
       value: value as MultipartBody,
     }));
-
     const app = new Gelis();
 
     app.post(
@@ -446,10 +472,10 @@ describe("Gelis multipart request body reader", () => {
     );
 
     const response = await app.fetch(
-      requestLike(
+      multipartRequest(
         "http://gelis.test/combined?id=42",
-        "multipart/form-data; boundary=gelis",
-        formData,
+        boundary,
+        multipartBody(boundary, [field("name", "Gelis")]),
       ),
     );
 
@@ -460,11 +486,10 @@ describe("Gelis multipart request body reader", () => {
     });
   });
 
-  test("maps Request.formData rejection to 400", async () => {
+  test("maps request body consumption rejection to 400", async () => {
     const Body = createSchema<MultipartBody>((value) => ({
       value: value as MultipartBody,
     }));
-
     const app = new Gelis();
 
     app.post(
@@ -486,7 +511,7 @@ describe("Gelis multipart request body reader", () => {
             : null;
         },
       },
-      formData() {
+      arrayBuffer() {
         return Promise.reject(new TypeError("body unavailable"));
       },
     } as unknown as Request;
@@ -503,10 +528,24 @@ describe("Gelis multipart request body reader", () => {
   });
 });
 
+function multipartRequest(
+  url: string,
+  boundary: string,
+  body: string,
+): Request {
+  return new Request(url, {
+    method: "POST",
+    headers: {
+      "content-type": `multipart/form-data; boundary=${boundary}`,
+    },
+    body,
+  });
+}
+
 function requestLike(
   url: string,
   contentType: string | null,
-  formData: FormData,
+  body: ArrayBuffer,
 ): Request {
   return {
     method: "POST",
@@ -516,8 +555,8 @@ function requestLike(
         return name.toLowerCase() === "content-type" ? contentType : null;
       },
     },
-    formData() {
-      return Promise.resolve(formData);
+    arrayBuffer() {
+      return Promise.resolve(body);
     },
   } as unknown as Request;
 }
