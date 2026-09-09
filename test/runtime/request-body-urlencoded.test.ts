@@ -8,21 +8,36 @@ type FormBody = Record<string, string | string[]>;
 
 describe("Gelis urlencoded request body reader", () => {
   test("parses Web form semantics and normalizes repeated fields", async () => {
-    const Body = createSchema<FormBody>((value) => {
+    const Body = createSchema<
+      FormBody,
+      {
+        name: string | string[] | undefined;
+        tag: string | string[] | undefined;
+        plus: string | string[] | undefined;
+        bad: string | string[] | undefined;
+        empty: string | string[] | undefined;
+        bracket: string | string[] | undefined;
+        dot: string | string[] | undefined;
+        blankName: string | string[] | undefined;
+        protoValue: string | string[] | undefined;
+        nullPrototype: boolean;
+      }
+    >((value) => {
       const body = value as FormBody;
 
-      if (Object.getPrototypeOf(body) !== null) {
-        return {
-          issues: [
-            {
-              message: "form body must have a null prototype",
-            },
-          ],
-        };
-      }
-
       return {
-        value: body,
+        value: {
+          name: body.name,
+          tag: body.tag,
+          plus: body.plus,
+          bad: body.bad,
+          empty: body.empty,
+          bracket: body["user[name]"],
+          dot: body["a.b"],
+          blankName: body[""],
+          protoValue: body["__proto__"],
+          nullPrototype: Object.getPrototypeOf(body) === null,
+        },
       };
     });
 
@@ -65,10 +80,11 @@ describe("Gelis urlencoded request body reader", () => {
       plus: "x+y",
       bad: "%ZZ",
       empty: "",
-      "user[name]": "Rigent",
-      "a.b": "value",
-      "": "blank",
-      __proto__: "safe",
+      bracket: "Rigent",
+      dot: "value",
+      blankName: "blank",
+      protoValue: "safe",
+      nullPrototype: true,
     });
   });
 
