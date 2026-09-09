@@ -119,30 +119,6 @@ Gelis must therefore base server-side managed-body dispatch on the actual incomi
 11. HTML / SSR is an explicit P9-E response requirement.
 12. Full `Accept` negotiation and multiple response representations per status remain outside P9-E v0.1 unless later evidence requires them.
 
-## P9-E2 direction
-
-The next phase freezes the public managed-body descriptor and its type inference.
-
-Candidate built-in parser set:
-
-```text
-json
-text
-urlencoded
-formData
-arrayBuffer
-```
-
-The descriptor must:
-
-- preserve Standard Schema input/output inference
-- keep the current JSON shorthand source-compatible
-- make parser selection registration-time information
-- carry accepted media-type metadata for contract/client/OpenAPI projection
-- compile into a direct runtime body parser rather than interpreting descriptor strings on every request
-
-P9-E2 is not frozen until its public type surface and TypeScript scalability are validated.
-
 ## P9-E2 Request Body Contract Freeze
 
 ### Public type surface
@@ -163,3 +139,120 @@ type RequestBodyParser =
   | "multipart"
   | "arrayBuffer";
 ```
+
+`body: schema` remains the backwards-compatible JSON shorthand.
+
+Explicit parser and media-type declarations are sibling metadata rather than a nested generic descriptor:
+
+```ts
+app.post(
+  "/message",
+  {
+    body: MessageSchema,
+    bodyParser: "text",
+    bodyContentTypes: ["text/plain"],
+  },
+  ({ body }) => body,
+);
+```
+
+The schema continues to define both sides of the Standard Schema contract:
+
+- schema input = request/client body
+- schema output = handler body
+
+Parser metadata does not participate in the inferred request-body type.
+
+### Rejected nested descriptor model
+
+P9-E2 evaluated the following candidate:
+
+```ts
+{
+  body: {
+    schema: BodySchema,
+    parser: "json",
+  },
+}
+```
+
+The model was rejected because carrying the full descriptor as the route-level `Body` generic produced unacceptable TypeScript scaling cost.
+
+At 5,000 routes, relative to candidate shorthand:
+
+- instantiations: 1.480x
+- memory: 1.443x
+- check time: 1.086x
+- normalized 100→5000 instantiation growth: 1.365x
+
+This failed the predeclared instantiation, memory, and normalized-growth gates.
+
+### Accepted flat metadata model
+
+The accepted model is:
+
+```ts
+{
+  body: BodySchema,
+  bodyParser: "json",
+}
+```
+
+Frozen acceptance gates were declared before measurement:
+
+```text
+candidate shorthand / P9-D shorthand
+instantiations <= 1.10x
+memory         <= 1.20x
+check time     <= 1.25x
+normalized 100→5000 instantiation growth <= 1.10x
+
+candidate explicit / candidate shorthand
+instantiations <= 1.15x
+memory         <= 1.20x
+check time     <= 1.30x
+normalized 100→5000 instantiation growth <= 1.10x
+```
+
+The flat model passed all frozen gates at 5,000 routes.
+
+Candidate shorthand relative to the P9-D control:
+
+- instantiations: 1.000x
+- memory: 1.001x
+- check time: 1.053x
+- normalized instantiation growth: 1.000x
+
+Explicit parser metadata relative to candidate shorthand:
+
+- instantiations: 1.000x
+- memory: 1.050x
+- check time: 1.004x
+- normalized instantiation growth: 1.000x
+
+The accepted design therefore adds no measured TypeScript instantiation growth through 5,000 routes.
+
+### Frozen P9-E2-A invariants
+
+1. `body: schema` remains valid and continues to mean managed JSON input.
+2. `body` remains the only request-body schema generic carried by route inference.
+3. `bodyParser` is parser-selection metadata and does not alter schema input/output inference.
+4. `bodyContentTypes` is media-type metadata and does not become a route generic.
+5. Managed request bodies require a Standard Schema.
+6. Parser metadata without a managed body schema is invalid.
+7. Non-JSON parser execution and custom media-type matching are implemented in P9-E3; P9-E2 uses fail-fast transitional guards rather than silently treating them as JSON.
+8. Routes without a managed body retain the zero-unused design: they do not inspect Content-Type or allocate parser state.
+
+## Next step — P9-E2-B
+
+P9-E2-B compiles the frozen request-body contract into registration-time runtime parser metadata.
+
+The runtime plan must:
+
+- preserve `body: schema` as the JSON shorthand
+- compile parser selection once at registration
+- compile accepted media-type matching once where practical
+- avoid interpreting parser names on the successful request hot path
+- preserve 415 / 400 / 422 error separation
+- preserve zero-unused behavior for routes without managed bodies
+- provide the runtime foundation for P9-E3 parser implementations
