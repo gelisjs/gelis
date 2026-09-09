@@ -51,6 +51,38 @@ export function normalizeResponse(value: unknown): Response {
   return normalizeResponseWithStatus(200, value);
 }
 
+export function normalizeResponseForRequest(
+  request: Request,
+
+  value: unknown,
+): Response {
+  const response = normalizeResponse(value);
+
+  if (request.method !== "HEAD") {
+    return response;
+  }
+
+  return suppressHeadResponse(response);
+}
+
+export function suppressHeadResponse(response: Response): Response {
+  if (response.body === null) {
+    return response;
+  }
+
+  return new Response(
+    null,
+
+    {
+      status: response.status,
+
+      statusText: response.statusText,
+
+      headers: response.headers,
+    },
+  );
+}
+
 export function normalizeResponseWithStatus(
   status: number,
 

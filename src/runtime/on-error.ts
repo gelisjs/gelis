@@ -2,7 +2,7 @@ import type { OnError, OnErrorContext } from "../error";
 
 import type { RuntimeFetch } from "./fetch";
 
-import { normalizeResponse } from "./response";
+import { normalizeResponseForRequest, suppressHeadResponse } from "./response";
 
 type RuntimeErrorHandler = (
   request: Request,
@@ -156,18 +156,14 @@ function runSingleErrorHook(
     error,
   });
 
-  /*
-   * Response is the common synchronous handled-error path.
-   * normalizeResponse() would perform the same check first.
-   */
   if (result instanceof Response) {
-    return result;
+    return request.method === "HEAD" ? suppressHeadResponse(result) : result;
   }
 
   if (isPromiseLike(result)) {
     return Promise.resolve(result).then((handled) => {
       if (handled !== undefined) {
-        return normalizeResponse(handled);
+        return normalizeResponseForRequest(request, handled);
       }
 
       throw error;
@@ -175,7 +171,7 @@ function runSingleErrorHook(
   }
 
   if (result !== undefined) {
-    return normalizeResponse(result);
+    return normalizeResponseForRequest(request, result);
   }
 
   throw error;
@@ -206,7 +202,7 @@ function runErrorHooks(
     if (isPromiseLike(result)) {
       return Promise.resolve(result).then((handled) => {
         if (handled !== undefined) {
-          return normalizeResponse(handled);
+          return normalizeResponseForRequest(context.request, handled);
         }
 
         return runErrorHooks(hooks, context, originalError, index + 1);
@@ -214,7 +210,7 @@ function runErrorHooks(
     }
 
     if (result !== undefined) {
-      return normalizeResponse(result);
+      return normalizeResponseForRequest(context.request, result);
     }
   }
 

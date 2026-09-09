@@ -34,6 +34,35 @@ const handlers = [
   ({ params }: { params: Record<string, string> }) => `purge:${params.id}`,
 ] as const;
 
+const headRouteShapes = [
+  {
+    method: "GET",
+    path: "/head/:id",
+  },
+] as const;
+
+const headHandlers = [
+  ({
+    request,
+    params,
+  }: {
+    request: Request;
+
+    params: Record<string, string>;
+  }) =>
+    new Response(
+      `get:${request.method}:${params.id}`,
+
+      {
+        headers: {
+          "content-length": "11",
+
+          "x-route": "GET",
+        },
+      },
+    ),
+] as const;
+
 describe("ALL and custom methods across production AOT runtimes", () => {
   test("flat AOT preserves exact custom-method precedence over ALL", async () => {
     const plan = await compileSemanticRoutePlan(routeShapes);
@@ -158,5 +187,87 @@ describe("ALL and custom methods across production AOT runtimes", () => {
     expect(await exact.text()).toBe("purge:42");
 
     expect(await fallback.text()).toBe("all:42");
+  });
+});
+
+describe("HEAD semantics across production AOT runtimes", () => {
+  test("flat AOT inherits implicit HEAD to GET semantics", async () => {
+    const plan = await compileSemanticRoutePlan(headRouteShapes);
+
+    const artifact = compileFlatAotArtifact(plan);
+
+    const app = new Gelis();
+
+    installFlatAotRuntime(
+      app,
+
+      artifact,
+
+      {
+        version: FLAT_AOT_ARTIFACT_VERSION,
+
+        shapeFingerprint: artifact[2],
+
+        handlers: headHandlers,
+      },
+    );
+
+    const response = await app.fetch(
+      new Request(
+        "http://gelis.test/head/42",
+
+        {
+          method: "HEAD",
+        },
+      ),
+    );
+
+    expect(response.status).toBe(200);
+
+    expect(response.headers.get("x-route")).toBe("GET");
+
+    expect(response.headers.get("content-length")).toBe("11");
+
+    expect(await response.text()).toBe("");
+  });
+
+  test("preorder AOT inherits implicit HEAD to GET semantics", async () => {
+    const plan = await compileSemanticRoutePlan(headRouteShapes);
+
+    const artifact = compilePreorderAotArtifact(plan);
+
+    const app = new Gelis();
+
+    installPreorderAotRuntime(
+      app,
+
+      artifact,
+
+      {
+        version: PREORDER_AOT_ARTIFACT_VERSION,
+
+        shapeFingerprint: artifact[2],
+
+        handlers: headHandlers,
+      },
+    );
+
+    const response = await app.fetch(
+      new Request(
+        "http://gelis.test/head/42",
+
+        {
+          method: "HEAD",
+        },
+      ),
+    );
+
+    expect(response.status).toBe(200);
+
+    expect(response.headers.get("x-route")).toBe("GET");
+
+    expect(response.headers.get("content-length")).toBe("11");
+
+    expect(await response.text()).toBe("");
   });
 });

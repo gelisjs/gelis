@@ -44,7 +44,11 @@ import { Router, type RuntimeRouteMatch } from "./runtime/router";
 
 import { activateAllFallback } from "./runtime/router-all";
 
-import { normalizeResponse, runtimeReply } from "./runtime/response";
+import {
+  normalizeResponse,
+  runtimeReply,
+  suppressHeadResponse,
+} from "./runtime/response";
 
 import { compileAfterHandle, compileBeforeHandle } from "./runtime/lifecycle";
 
@@ -120,14 +124,24 @@ type RuntimeRouteInvoker = (
   body: unknown,
 ) => Response | Promise<Response>;
 
-const unavailableApplicationFetch: RuntimeFetch = () =>
-  new Response(
-    "Service Unavailable",
+const activeHeadDispatches = new WeakSet<Request>();
 
-    {
-      status: 503,
-    },
-  );
+const unavailableApplicationFetch: RuntimeFetch = (request) =>
+  request.method === "HEAD"
+    ? new Response(
+        null,
+
+        {
+          status: 503,
+        },
+      )
+    : new Response(
+        "Service Unavailable",
+
+        {
+          status: 503,
+        },
+      );
 
 export interface GelisInternalRouter {
   register(route: RuntimeRouteRecord): void;
@@ -545,9 +559,41 @@ export class Gelis extends RouteBuilder<""> {
   }
 
   fetch(request: Request): Response | Promise<Response> {
+    if (request.method === "HEAD" && !activeHeadDispatches.has(request)) {
+      activeHeadDispatches.add(request);
+
+      try {
+        const result = Gelis.prototype.fetch.call(
+          this,
+
+          request,
+        );
+
+        if (isPromiseLike(result)) {
+          return Promise.resolve(result).then(suppressHeadResponse);
+        }
+
+        return suppressHeadResponse(result);
+      } finally {
+        activeHeadDispatches.delete(request);
+      }
+    }
+
     const pathname = pathnameFromUrl(request.url);
 
-    const matched = this.#state.router.match(request.method, pathname);
+    let matched = this.#state.router.match(
+      request.method,
+
+      pathname,
+    );
+
+    if (matched === undefined && request.method === "HEAD") {
+      matched = this.#state.router.match(
+        "GET",
+
+        pathname,
+      );
+    }
 
     if (!matched) {
       return new Response(

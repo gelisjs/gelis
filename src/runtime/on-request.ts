@@ -1,4 +1,4 @@
-import { normalizeResponse } from "./response";
+import { normalizeResponseForRequest } from "./response";
 
 import type { OnRequest, OnRequestContext } from "../request";
 
@@ -29,7 +29,7 @@ export function compileOnRequestFetch(
         if (isPromiseLike(result)) {
           return Promise.resolve(result).then((early) => {
             if (early !== undefined) {
-              return normalizeResponse(early);
+              return normalizeResponseForRequest(request, early);
             }
 
             return routedFetch(request);
@@ -37,7 +37,7 @@ export function compileOnRequestFetch(
         }
 
         if (result !== undefined) {
-          return normalizeResponse(result);
+          return normalizeResponseForRequest(request, result);
         }
 
         return routedFetch(request);
@@ -71,7 +71,7 @@ export function compileOnRequestFetch(
         if (isPromiseLike(firstResult)) {
           return Promise.resolve(firstResult).then((early) => {
             if (early !== undefined) {
-              return normalizeResponse(early);
+              return normalizeResponseForRequest(request, early);
             }
 
             const secondResult = second(context);
@@ -79,7 +79,7 @@ export function compileOnRequestFetch(
             if (isPromiseLike(secondResult)) {
               return Promise.resolve(secondResult).then((secondEarly) => {
                 if (secondEarly !== undefined) {
-                  return normalizeResponse(secondEarly);
+                  return normalizeResponseForRequest(request, secondEarly);
                 }
 
                 return routedFetch(request);
@@ -87,7 +87,7 @@ export function compileOnRequestFetch(
             }
 
             if (secondResult !== undefined) {
-              return normalizeResponse(secondResult);
+              return normalizeResponseForRequest(request, secondResult);
             }
 
             return routedFetch(request);
@@ -95,7 +95,7 @@ export function compileOnRequestFetch(
         }
 
         if (firstResult !== undefined) {
-          return normalizeResponse(firstResult);
+          return normalizeResponseForRequest(request, firstResult);
         }
 
         const secondResult = second(context);
@@ -103,7 +103,7 @@ export function compileOnRequestFetch(
         if (isPromiseLike(secondResult)) {
           return Promise.resolve(secondResult).then((early) => {
             if (early !== undefined) {
-              return normalizeResponse(early);
+              return normalizeResponseForRequest(request, early);
             }
 
             return routedFetch(request);
@@ -111,7 +111,7 @@ export function compileOnRequestFetch(
         }
 
         if (secondResult !== undefined) {
-          return normalizeResponse(secondResult);
+          return normalizeResponseForRequest(request, secondResult);
         }
 
         return routedFetch(request);
@@ -143,7 +143,7 @@ export function compileOnRequestFetch(
         if (isPromiseLike(firstResult)) {
           return Promise.resolve(firstResult).then((early) => {
             if (early !== undefined) {
-              return normalizeResponse(early);
+              return normalizeResponseForRequest(request, early);
             }
 
             return runRemainingTriple(
@@ -157,7 +157,7 @@ export function compileOnRequestFetch(
         }
 
         if (firstResult !== undefined) {
-          return normalizeResponse(firstResult);
+          return normalizeResponseForRequest(request, firstResult);
         }
 
         const secondResult = second(context);
@@ -165,7 +165,7 @@ export function compileOnRequestFetch(
         if (isPromiseLike(secondResult)) {
           return Promise.resolve(secondResult).then((early) => {
             if (early !== undefined) {
-              return normalizeResponse(early);
+              return normalizeResponseForRequest(request, early);
             }
 
             return runLastHook(third, context, request, routedFetch);
@@ -173,7 +173,7 @@ export function compileOnRequestFetch(
         }
 
         if (secondResult !== undefined) {
-          return normalizeResponse(secondResult);
+          return normalizeResponseForRequest(request, secondResult);
         }
 
         const thirdResult = third(context);
@@ -181,7 +181,7 @@ export function compileOnRequestFetch(
         if (isPromiseLike(thirdResult)) {
           return Promise.resolve(thirdResult).then((early) => {
             if (early !== undefined) {
-              return normalizeResponse(early);
+              return normalizeResponseForRequest(request, early);
             }
 
             return routedFetch(request);
@@ -189,7 +189,7 @@ export function compileOnRequestFetch(
         }
 
         if (thirdResult !== undefined) {
-          return normalizeResponse(thirdResult);
+          return normalizeResponseForRequest(request, thirdResult);
         }
 
         return routedFetch(request);
@@ -228,7 +228,7 @@ function runRemainingTriple(
   if (isPromiseLike(secondResult)) {
     return Promise.resolve(secondResult).then((early) => {
       if (early !== undefined) {
-        return normalizeResponse(early);
+        return normalizeResponseForRequest(request, early);
       }
 
       return runLastHook(third, context, request, routedFetch);
@@ -236,7 +236,7 @@ function runRemainingTriple(
   }
 
   if (secondResult !== undefined) {
-    return normalizeResponse(secondResult);
+    return normalizeResponseForRequest(request, secondResult);
   }
 
   return runLastHook(third, context, request, routedFetch);
@@ -253,7 +253,7 @@ function runLastHook(
   if (isPromiseLike(result)) {
     return Promise.resolve(result).then((early) => {
       if (early !== undefined) {
-        return normalizeResponse(early);
+        return normalizeResponseForRequest(request, early);
       }
 
       return routedFetch(request);
@@ -261,7 +261,7 @@ function runLastHook(
   }
 
   if (result !== undefined) {
-    return normalizeResponse(result);
+    return normalizeResponseForRequest(request, result);
   }
 
   return routedFetch(request);
@@ -286,7 +286,7 @@ function runMany(
     if (isPromiseLike(result)) {
       return Promise.resolve(result).then((early) => {
         if (early !== undefined) {
-          return normalizeResponse(early);
+          return normalizeResponseForRequest(request, early);
         }
 
         return runMany(hooks, context, request, routedFetch, index + 1);
@@ -294,7 +294,7 @@ function runMany(
     }
 
     if (result !== undefined) {
-      return normalizeResponse(result);
+      return normalizeResponseForRequest(request, result);
     }
   }
 
