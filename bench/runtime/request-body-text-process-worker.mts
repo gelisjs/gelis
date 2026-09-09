@@ -115,26 +115,23 @@ function createApplication(
       continue;
     }
 
-    application.post(path, async ({ request }) => {
+    application.post(path, ({ request }) => {
       if (!isTextPlain(request)) {
         return unsupportedMediaTypeResponse();
       }
 
-      let decoded: string;
+      return request.text().then(
+        (decoded) => {
+          const validation = Body["~standard"].validate(decoded);
 
-      try {
-        decoded = await request.text();
-      } catch {
-        return malformedBodyResponse();
-      }
+          if ("issues" in validation) {
+            return validationErrorResponse();
+          }
 
-      const validation = Body["~standard"].validate(decoded);
-
-      if ("issues" in validation) {
-        return validationErrorResponse();
-      }
-
-      return response;
+          return response;
+        },
+        () => malformedBodyResponse(),
+      );
     });
   }
 
