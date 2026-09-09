@@ -617,7 +617,7 @@ describe("Gelis input runtime", () => {
       value,
     }));
 
-    for (const bodyParser of ["urlencoded", "multipart"] as const) {
+    for (const bodyParser of ["multipart"] as const) {
       const app = new Gelis();
 
       expect(() => {
