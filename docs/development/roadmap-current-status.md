@@ -17,7 +17,7 @@ At documentation-freeze boundaries, accepted package status is consolidated back
 ```text
 P9   HTTP Surface Architecture             COMPLETE
 
-P10  OpenAPI & Contract Integration        ACTIVE
+P10  OpenAPI & Contract Integration        COMPLETE
 ├── A  post-P9 contract/OpenAPI audit      COMPLETE
 ├── B  version + method strategy           FROZEN
 ├── C  request-body/media strategy         FROZEN
@@ -25,7 +25,7 @@ P10  OpenAPI & Contract Integration        ACTIVE
 ├── E  provider compatibility              ACCEPTED
 ├── F  generation scalability              ACCEPTED
 ├── G  zero-runtime-overhead               ACCEPTED
-└── H  public API + documentation freeze   ACTIVE
+└── H  public API + documentation freeze   ACCEPTED
 ```
 
 ## P10 package ownership
@@ -36,7 +36,7 @@ Implementation repository:
 gelisjs/openapi
 ```
 
-Current integration branch:
+Accepted integration branch:
 
 ```text
 architecture/post-p9-integration-v0.1
@@ -70,6 +70,15 @@ generate-once request-time isolation
 plain + rich documented applications
 5,000 routes
 41 mirrored ABBA/BAAB samples
+
+P10-H
+public API freeze
+README user documentation
+3.1.2 / 3.2.0 compatibility guidance
+QUERY/custom-method/ALL documentation semantics
+managed body/media documentation
+provider compatibility guidance
+error model documentation
 ```
 
 P10-F accepted measured source:
@@ -88,35 +97,39 @@ P10-G accepted measured source:
 
 P10-G request-time results all passed the frozen `<= 1.03x` per-case gate. Package import/generate isolation produced a canonical geomean of `1.0055x`, passing the frozen `<= 1.02x` gate. Ratios below `1.0x` are treated as no-regression evidence only.
 
-## Active P10-H objective
-
-P10-H is the public API and documentation freeze boundary for OpenAPI & Contract Integration v0.1.
-
-P10 does not complete merely because generation works.
-
-P10-H must consolidate:
+P10-H exact checked candidate:
 
 ```text
-accepted public API
-OpenAPI 3.1.2 compatibility behavior
-OpenAPI 3.2.0 full-fidelity behavior
-QUERY/custom-method documentation semantics
-managed body/media semantics
-provider compatibility guidance
-zero-runtime-overhead evidence
-user-facing examples
-migration/compatibility notes
-package README
-core master roadmap status
+0ea37471af520c4a19c826187786c09021c8ce37
 ```
 
-Internal phase labels may remain in historical architecture documents, but user-facing package documentation should describe features rather than requiring users to understand P10 labels.
+Final package gate:
 
-P10-H must not introduce new runtime semantics unless a correctness issue requires reopening an earlier accepted phase. Documentation-only and packaging-surface work should preserve accepted D/E/F/G evidence.
+```text
+84 pass
+0 fail
+463 expect() calls
+```
 
-## After P10
+The package-side final acceptance is recorded in:
 
-The next ecosystem planning work remains evidence-driven and is informed by the industrial capability matrix.
+```text
+docs/p10-h-public-api-documentation-acceptance.md
+```
+
+The core milestone acceptance is recorded in:
+
+```text
+docs/architecture/p10-openapi-contract-integration-acceptance.md
+```
+
+## Next planning boundary
+
+The next phase code is **not frozen yet**.
+
+Planning now returns to the industrial capability matrix and competitor study before naming or freezing the next implementation phase.
+
+The purpose is to define the minimum official ecosystem required for Gelis to mature into an industry-ready framework while retaining its performance architecture.
 
 Near-term capability families include:
 
@@ -160,6 +173,18 @@ project scaffolding
 ```
 
 Prioritization must continue to study Hono, Elysia, Fastify, and NestJS as different maturity/performance/ecosystem references rather than copying one framework wholesale.
+
+The next roadmap phase should be frozen only after the capability matrix identifies:
+
+```text
+must-have production capabilities
+core vs gelis/* vs @gelis/* ownership
+zero-unused/runtime cost expectations
+security boundaries
+cross-package dependencies
+competitive reference behavior
+acceptance and benchmark gates
+```
 
 ## Repository rule
 
