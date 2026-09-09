@@ -2,6 +2,8 @@ import type { RequestBodyParser, RouteOptions } from "../route";
 
 import type { StandardSchemaV1 } from "../schema";
 
+import { readMultipartBody } from "./multipart";
+
 export const RUNTIME_INPUT_QUERY = 1;
 
 export const RUNTIME_INPUT_BODY = 2;
@@ -436,7 +438,13 @@ function readDefaultMultipartBody(
     return unsupportedMediaTypeResponse();
   }
 
-  return request.formData().then(normalizeMultipartFormData);
+  const contentType = request.headers.get("content-type");
+
+  if (contentType === null) {
+    return unsupportedMediaTypeResponse();
+  }
+
+  return readMultipartBody(request, multipartParserContentType(contentType));
 }
 
 function handleMalformedMultipartBody(_error: unknown): Response {
@@ -457,43 +465,16 @@ function compileMultipartBodyReader(
       return unsupportedMediaTypeResponse();
     }
 
-    const separator = contentType.indexOf(";");
-    const parserContentType =
-      separator === -1
-        ? "multipart/form-data"
-        : `multipart/form-data${contentType.slice(separator)}`;
-
-    return new Response(request.body, {
-      headers: {
-        "content-type": parserContentType,
-      },
-    })
-      .formData()
-      .then(normalizeMultipartFormData);
+    return readMultipartBody(request, multipartParserContentType(contentType));
   };
 }
 
-function normalizeMultipartFormData(
-  formData: FormData,
-): Record<string, string | File | Array<string | File>> {
-  const result = Object.create(null) as Record<
-    string,
-    string | File | Array<string | File>
-  >;
+function multipartParserContentType(contentType: string): string {
+  const separator = contentType.indexOf(";");
 
-  formData.forEach((entryValue, key) => {
-    const existing = result[key];
-
-    if (existing === undefined) {
-      result[key] = entryValue;
-    } else if (Array.isArray(existing)) {
-      existing.push(entryValue);
-    } else {
-      result[key] = [existing, entryValue];
-    }
-  });
-
-  return result;
+  return separator === -1
+    ? "multipart/form-data"
+    : `multipart/form-data${contentType.slice(separator)}`;
 }
 
 export function parseQueryFromUrl(
