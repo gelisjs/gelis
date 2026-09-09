@@ -124,7 +124,7 @@ type RuntimeRouteInvoker = (
   body: unknown,
 ) => Response | Promise<Response>;
 
-const activeHeadDispatches = new WeakSet<Request>();
+const activeHeadDispatches = new WeakMap<Request, Gelis>();
 
 const unavailableApplicationFetch: RuntimeFetch = (request) =>
   request.method === "HEAD"
@@ -559,23 +559,35 @@ export class Gelis extends RouteBuilder<""> {
   }
 
   fetch(request: Request): Response | Promise<Response> {
-    if (request.method === "HEAD" && !activeHeadDispatches.has(request)) {
-      activeHeadDispatches.add(request);
+    if (request.method === "HEAD") {
+      const activeApplication = activeHeadDispatches.get(request);
 
-      try {
-        const result = Gelis.prototype.fetch.call(
-          this,
+      if (activeApplication !== this) {
+        activeHeadDispatches.set(request, this);
 
-          request,
-        );
+        try {
+          const result = Gelis.prototype.fetch.call(
+            this,
 
-        if (isPromiseLike(result)) {
-          return Promise.resolve(result).then(suppressHeadResponse);
+            request,
+          );
+
+          if (isPromiseLike(result)) {
+            return Promise.resolve(result).then(suppressHeadResponse);
+          }
+
+          return suppressHeadResponse(result);
+        } finally {
+          if (activeApplication === undefined) {
+            activeHeadDispatches.delete(request);
+          } else {
+            activeHeadDispatches.set(
+              request,
+
+              activeApplication,
+            );
+          }
         }
-
-        return suppressHeadResponse(result);
-      } finally {
-        activeHeadDispatches.delete(request);
       }
     }
 

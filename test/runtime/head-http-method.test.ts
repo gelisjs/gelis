@@ -276,4 +276,58 @@ describe("HEAD HTTP semantics", () => {
     expect(response.status).toBe(503);
     expect(await response.text()).toBe("");
   });
+
+  test("isolates HEAD dispatch for the same Request across applications", async () => {
+    const outer = new Gelis();
+
+    const inner = new Gelis();
+
+    let innerBody: string | undefined;
+
+    inner.get(
+      "/shared",
+      () =>
+        new Response(
+          "inner-body",
+
+          {
+            headers: {
+              "x-app": "inner",
+            },
+          },
+        ),
+    );
+
+    outer.get("/shared", async ({ request }) => {
+      const innerResponse = await inner.fetch(request);
+
+      innerBody = await innerResponse.text();
+
+      return new Response(
+        "outer-body",
+
+        {
+          headers: {
+            "x-app": "outer",
+          },
+        },
+      );
+    });
+
+    const request = new Request(
+      "http://gelis.test/shared",
+
+      {
+        method: "HEAD",
+      },
+    );
+
+    const response = await outer.fetch(request);
+
+    expect(innerBody).toBe("");
+
+    expect(response.headers.get("x-app")).toBe("outer");
+
+    expect(await response.text()).toBe("");
+  });
 });
