@@ -370,8 +370,12 @@ function findEmptyNameInsertion(
     let lineEnd = lineStart;
 
     while (
-      lineEnd + 1 < end &&
-      !(bytes[lineEnd] === CR && bytes[lineEnd + 1] === LF)
+      lineEnd < end &&
+      !(
+        lineEnd + 1 < bytes.length &&
+        bytes[lineEnd] === CR &&
+        bytes[lineEnd + 1] === LF
+      )
     ) {
       lineEnd++;
     }
