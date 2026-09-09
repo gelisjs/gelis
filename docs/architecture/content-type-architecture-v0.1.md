@@ -1,6 +1,6 @@
 # Content-Type Architecture v0.1
 
-Status: Draft — P9-E2 request body contract frozen
+Status: Draft — P9-E3 built-in request body reader semantics frozen
 Phase: P9-E  
 Framework: Gelis
 
@@ -382,15 +382,267 @@ The negative `body-json` delta is not treated as evidence of a performance impro
 7. Unsupported media type, malformed representation, and schema-validation failures remain distinct.
 8. Runtime performance must remain within the frozen +3% mirrored-median gate for the default JSON body paths.
 
-## Next step — P9-E3
+## P9-E3-A — Built-in Request Body Reader Semantics Freeze
 
-P9-E3 implements the remaining built-in body readers:
+P9-E3 adds the remaining built-in managed request-body readers without changing the P9-E2-A public type surface or P9-E2-B registration-time compiled runtime architecture.
 
-```text
-text
-urlencoded
-multipart
-arrayBuffer
+No P9-E3 reader may introduce request-time interpretation of the public `bodyParser` string.
+
+### Built-in defaults and schema inputs
+
+The built-in parser defaults are:
+
+| `bodyParser` | Default accepted media type | Value passed to Standard Schema |
+| --- | --- | --- |
+| `json` | existing JSON defaults | parsed JSON value |
+| `text` | `text/plain` | `string` |
+| `urlencoded` | `application/x-www-form-urlencoded` | normalized null-prototype object |
+| `multipart` | `multipart/form-data` | normalized null-prototype object |
+| `arrayBuffer` | `application/octet-stream` | `ArrayBuffer` |
+
+`text` does not implicitly accept `text/*`. Other textual representations such as `text/csv` or `text/xml` require an explicit `bodyContentTypes` declaration.
+
+`arrayBuffer` does not implicitly accept arbitrary media types. Binary representations outside `application/octet-stream` require an explicit `bodyContentTypes` declaration.
+
+The existing JSON shorthand and structured-JSON defaults remain unchanged.
+
+### Parser selection and media-type aliases
+
+`bodyParser` defines the decoding grammar. `bodyContentTypes` defines which incoming media-type essences are allowed to select that already-compiled grammar.
+
+Therefore an explicit custom media type is an alias for the selected parser rather than a request to infer a parser from the media type:
+
+```ts
+{
+  body: FormSchema,
+  bodyParser: "urlencoded",
+  bodyContentTypes: ["application/vnd.gelis-form"],
+}
 ```
 
-The P9-E2-A public type surface and P9-E2-B compiled runtime architecture remain unchanged.
+The payload is decoded with URL-encoded form semantics.
+
+The same rule applies to custom aliases for `text`, `multipart`, and `arrayBuffer`.
+
+For multipart aliases, the boundary parameter remains parser-significant even though ordinary media-type matching compares only the configured essence.
+
+P9-E2 media-type-list semantics remain unchanged:
+
+- `bodyContentTypes: undefined` uses parser defaults
+- an explicit list replaces parser defaults
+- an explicit empty list is invalid
+- configured wildcards remain unsupported in v0.1
+- configured essences are normalized and deduplicated at registration
+- incoming ambiguous comma-combined `Content-Type` remains rejected
+
+### Text reader semantics
+
+The `text` reader exposes Web Body text semantics.
+
+The body is decoded as UTF-8. A `charset` parameter does not cause Gelis to select a different transcoder.
+
+An empty text body produces the empty string.
+
+Text decoding does not add representation-specific syntax validation. Body-consumption failures still map to `400 Bad Request`.
+
+### ArrayBuffer reader semantics
+
+The `arrayBuffer` reader exposes the exact request-body bytes as an `ArrayBuffer`.
+
+An empty binary body produces a zero-length `ArrayBuffer`.
+
+The reader performs no representation-specific syntax validation. Body-consumption failures still map to `400 Bad Request`.
+
+### URL-encoded reader semantics
+
+The `urlencoded` reader follows Web `application/x-www-form-urlencoded` parsing semantics:
+
+- `+` decodes to U+0020 SPACE
+- percent-encoded bytes are decoded according to the URL-encoded parser
+- form strings are decoded as UTF-8 according to the Web form parsing model
+- repeated field names are preserved before normalization
+
+The URL-encoded reader must not reuse Gelis's strict query-percent-decoding failure policy. The Web URL-encoded parser is intentionally forgiving of malformed percent triplets such as `%ZZ`; such input remains data rather than automatically becoming a `400` representation failure.
+
+### Form normalization
+
+Managed `urlencoded` and `multipart` bodies are normalized before Standard Schema validation.
+
+The result is a null-prototype object so form field names cannot mutate the object's prototype chain.
+
+URL-encoded values have the conceptual shape:
+
+```ts
+type UrlEncodedBody = Record<string, string | string[]>;
+```
+
+Multipart values have the conceptual shape:
+
+```ts
+type MultipartBody = Record<
+  string,
+  string | File | Array<string | File>
+>;
+```
+
+Normalization rules are:
+
+1. The first occurrence of a field name is stored as a scalar value.
+2. The second occurrence promotes that field to an array containing both values in arrival order.
+3. Later occurrences append to that array in arrival order.
+4. Multipart fields may mix `string` and `File` values under the same field name.
+5. Multipart file entries retain their native Web Standards `File` objects.
+6. Field names are literal. Gelis performs no implicit bracket, dot, or nested-object coercion for names such as `user[name]`, `tags[]`, or `a.b`.
+7. Empty field names and empty string values remain data rather than being dropped by normalization.
+
+The normalized object preserves ordering among repeated values of the same field name but does not preserve global interleaving between different field names.
+
+Applications that require the complete ordered `FormData` entry stream must use an unmanaged/raw request route and parse `context.request.formData()` directly instead of using the managed normalized form reader.
+
+### Multipart reader semantics
+
+Multipart decoding follows `multipart/form-data` semantics.
+
+A valid multipart representation requires a usable `boundary` parameter. The boundary is part of decoding semantics and is not discarded merely because ordinary media-type matching ignores parameters.
+
+Each file part is retained as a `File`. Multiple parts with the same field name remain separate values and are combined only by Gelis's explicit repeated-field normalization rule.
+
+A missing, invalid, or unusable multipart boundary is a malformed representation and maps to `400 Bad Request`, not `415 Unsupported Media Type`, because the declared media-type essence is supported and decoding is what failed.
+
+The implementation must not invent or synthesize a multipart boundary that is absent from the incoming request metadata.
+
+### Error taxonomy
+
+P9-E3 preserves the frozen error separation:
+
+| Condition | Status |
+| --- | --- |
+| missing `Content-Type` on a managed body | `415` |
+| unsupported media-type essence | `415` |
+| ambiguous comma-combined `Content-Type` | `415` |
+| accepted media type with malformed representation | `400` |
+| multipart boundary missing/invalid/unusable | `400` |
+| request-body consumption/decoder failure | `400` |
+| Standard Schema issues | `422` |
+
+A decoder may have no ordinary malformed-syntax state. In particular, `text` and `arrayBuffer` primarily produce `400` only when body consumption fails, while URL-encoded parsing follows its forgiving Web grammar.
+
+### Runtime architecture freeze
+
+P9-E3 inherits the registration-time compilation boundary from P9-E2-B.
+
+Conceptually:
+
+```text
+route registration
+  bodyParser + bodyContentTypes
+    -> compile RuntimeBodyReader
+    -> RuntimeInputPlan.readBody
+
+request execution
+  readBody(request)
+    -> decoder promise
+    -> body validation continuation
+```
+
+The successful request path must not add a request-time `switch` or equivalent dispatch over `bodyParser`.
+
+Decoder rejection handling must remain part of the same success/rejection Promise continuation strategy accepted in P9-E2-B. The rejected `.catch(...).then(...)` shape must not return to the default JSON path.
+
+Form normalization semantics are frozen here, but the concrete normalization implementation is not yet frozen. Candidate implementations must be measured before acceptance, especially if they introduce an additional Promise continuation or intermediate allocation.
+
+### Zero-unused freeze
+
+P9-E3 does not weaken zero-unused behavior.
+
+1. Plain routes do not read `Content-Type` and do not allocate managed-body reader state.
+2. Query-only routes do not read `Content-Type` and do not allocate managed-body reader state.
+3. Routes using raw `context.request` without a managed body schema remain responsible for their own body parsing.
+4. Adding built-in reader implementations must not move parser dispatch, parser state, or form normalization into routes that do not use them.
+
+### Frozen regression and acceptance gates
+
+The regression control for P9-E3 implementation is:
+
+```text
+Control SHA: 313adf97932a80b95b1d2e4f0f27039a51e74013
+```
+
+The following existing workloads must retain the frozen mirrored-median regression gate:
+
+```text
+plain           <= +3%
+query-only      <= +3%
+body-json       <= +3%
+query-body-json <= +3%
+custom-json     <= +3%
+```
+
+The process-isolated measurement discipline remains aligned with the accepted P9-E2-B workflow:
+
+- mirrored control/candidate and candidate/control orientations
+- ABBA / BAAB pairing
+- geometric canonical candidate/control ratios
+- warmup before measurement
+- GC-controlled/process-isolated execution where used by the accepted harness
+- order buckets remain diagnostic only
+- a gate is never relaxed after seeing candidate results
+
+For each new reader, the managed candidate must also be compared with a semantically equivalent manual Gelis route using the same decoder semantics, normalization semantics, and Standard Schema validation:
+
+```text
+text        managed/manual mirrored median <= +5%
+urlencoded  managed/manual mirrored median <= +5%
+multipart   managed/manual mirrored median <= +5%
+arrayBuffer managed/manual mirrored median <= +5%
+```
+
+If a manual control is discovered not to be semantically equivalent, the benchmark is invalid and must be corrected. The threshold must not be changed to accommodate an invalid comparison.
+
+All frozen P9-E2-A TypeScript scaling gates remain in force. P9-E3 must not turn parser metadata into new route generics or reintroduce the rejected nested body descriptor model.
+
+### AOT boundary
+
+P9-E3 freezes reader semantics for the normal runtime registration path, including routes introduced through composition surfaces that ultimately use the same runtime input-plan compiler.
+
+P9-E3 does not expand the current flat/source AOT artifact to serialize managed request-body readers.
+
+The current flat AOT path is a plain-route topology/runtime optimization and does not transport managed input-plan state. Managed-body AOT transport, source-tooling projection, and equivalent tooling parity remain P9-E5 work.
+
+P9-E3 implementations therefore must not enlarge the AOT artifact format merely to add the four built-in readers.
+
+### Frozen P9-E3-A invariants
+
+1. `json`, `text`, `urlencoded`, `multipart`, and `arrayBuffer` remain the complete built-in v0.1 request-body parser set.
+2. Parser defaults are fixed to the table above.
+3. `bodyParser` selects decoding grammar; `bodyContentTypes` selects accepted media-type aliases.
+4. `text` defaults only to `text/plain` and decodes with Web UTF-8 text semantics.
+5. `arrayBuffer` defaults only to `application/octet-stream` and returns `ArrayBuffer`.
+6. URL-encoded parsing follows Web form semantics and preserves repeated names before normalization.
+7. Managed URL-encoded forms normalize to a null-prototype object with scalar-first / array-on-repeat semantics.
+8. Managed multipart forms use the same repeated-field normalization while retaining `File` objects.
+9. Form field names remain literal; no implicit nested-form coercion exists in v0.1.
+10. Multipart boundary is decoder-significant; missing/invalid/unusable boundary maps to `400` after the media type is accepted.
+11. Unsupported or missing managed-body media type remains `415`; schema rejection remains `422`.
+12. Parser choice remains compiled at registration and is not switched over on each request.
+13. The accepted default JSON Promise/Content-Type fast path must remain intact.
+14. Plain and query-only routes retain zero-unused behavior.
+15. Existing JSON/plain/query/custom-JSON workloads retain the frozen `+3%` mirrored-median regression gate.
+16. New reader managed/manual framework overhead is gated at `+5%` mirrored median per reader.
+17. Frozen TypeScript scaling gates remain unchanged.
+18. Managed-body AOT transport is deferred to P9-E5; P9-E3 does not enlarge the flat AOT artifact.
+
+## Standards basis for P9-E3-A
+
+The semantics above are intentionally aligned with Web Standards rather than Bun-only APIs:
+
+- WHATWG Fetch body/form parsing defines URL-encoded form parsing, multipart form parsing, native `File` entries, text consumption, and binary body consumption.
+- RFC 7578 defines `multipart/form-data`, including the required boundary parameter, repeated field names, ordered form parts, and multiple files represented as separate parts with the same field name.
+
+The Gelis normalization layer is framework policy applied after standards-compatible form decoding; it is not intended to redefine the underlying wire format.
+
+## Next step — P9-E3-B
+
+Implement and validate the `text` built-in reader first.
+
+The implementation must preserve every P9-E3-A semantic decision and pass the frozen regression/managed-overhead gates before moving to `urlencoded`, `multipart`, or `arrayBuffer`.
