@@ -3,7 +3,7 @@ export type RuntimeMultipartValue = string | File | Array<string | File>;
 export type RuntimeMultipartBody = Record<string, RuntimeMultipartValue>;
 
 interface PreparedMultipartBody {
-  readonly bytes: Uint8Array;
+  readonly bytes: Uint8Array<ArrayBuffer>;
   readonly emptyNameSentinel: string | undefined;
 }
 
@@ -200,7 +200,7 @@ function validateMultipartBoundary(value: string): void {
 }
 
 function prepareMultipartBody(
-  bytes: Uint8Array,
+  bytes: Uint8Array<ArrayBuffer>,
   boundary: string,
 ): PreparedMultipartBody {
   const delimiter = textEncoder.encode(`--${boundary}`);
