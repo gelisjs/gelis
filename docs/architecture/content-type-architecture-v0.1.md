@@ -1,6 +1,6 @@
 # Content-Type Architecture v0.1
 
-Status: Draft — P9-E3 built-in request body reader semantics frozen
+Status: Draft — P9-E3-B text request body reader accepted and frozen
 Phase: P9-E  
 Framework: Gelis
 
@@ -641,8 +641,122 @@ The semantics above are intentionally aligned with Web Standards rather than Bun
 
 The Gelis normalization layer is framework policy applied after standards-compatible form decoding; it is not intended to redefine the underlying wire format.
 
-## Next step — P9-E3-B
+## P9-E3-B — Text Request Body Reader Acceptance
 
-Implement and validate the `text` built-in reader first.
+Status: **FROZEN / ACCEPTED**
 
-The implementation must preserve every P9-E3-A semantic decision and pass the frozen regression/managed-overhead gates before moving to `urlencoded`, `multipart`, or `arrayBuffer`.
+Candidate implementation SHA:
+
+```text
+11820282f9ddb9951a494f3b8936e92452240435
+```
+
+The accepted implementation adds the built-in `text` reader while preserving the P9-E3-A contract:
+
+- parser choice is compiled at route registration
+- the default reader accepts only `text/plain` by media-type essence
+- parameters and case normalization follow the frozen Content-Type matching rules
+- explicit `bodyContentTypes` replace the default and act as aliases for text decoding
+- successful decoding uses `Request.text()`
+- decoder/body-consumption rejection maps to `400`
+- Standard Schema issues remain `422`
+- missing, unsupported, or ambiguous Content-Type remains `415`
+- the default JSON reader and JSON Content-Type fast path are not changed by text request execution
+
+Correctness acceptance:
+
+```text
+bun run check
+530 pass
+0 fail
+1469 expect() calls
+```
+
+### A/A calibration
+
+The P9-E3 regression harness was calibrated by running the frozen control against itself:
+
+```text
+Control SHA:    313adf97932a80b95b1d2e4f0f27039a51e74013
+Candidate SHA:  313adf97932a80b95b1d2e4f0f27039a51e74013
+Samples:        41 mirrored samples
+Routes:         5,000 per workload
+Gate:           mirrored median <= +3%
+```
+
+Results:
+
+```text
+plain            +0.37% PASS
+query-only       -0.98% PASS
+body-json        -0.81% PASS
+query-body-json  +1.21% PASS
+custom-json      -0.06% PASS
+```
+
+The A/A calibration therefore remained inside the predeclared gate for every protected workload.
+
+### Existing-path regression acceptance
+
+Candidate `11820282f9ddb9951a494f3b8936e92452240435` was compared with frozen control `313adf97932a80b95b1d2e4f0f27039a51e74013` using the frozen process-isolated protocol.
+
+Results:
+
+```text
+plain            +1.85% PASS
+query-only       -3.34% PASS
+body-json        +0.57% PASS
+query-body-json  +0.06% PASS
+custom-json      -0.54% PASS
+
+gate             <= +3% mirrored median per workload
+```
+
+Order-specific buckets remain diagnostic only and do not replace the mirrored-median acceptance metric.
+
+### Managed/manual text acceptance
+
+The managed `text` reader was compared against a semantically equivalent manual Gelis route using the same text decoding, media admission, Standard Schema validation, and single success/rejection Promise continuation shape.
+
+Protocol:
+
+```text
+Routes:         5,000 POST routes
+Samples:        41 mirrored samples
+Workers:        4 persistent processes
+Orientations:   manual/managed + managed/manual
+Pair shape:     semantic ABBA / BAAB
+Warmup:         10,000 app.fetch calls per worker
+Measurement:    20,000 app.fetch calls per measurement
+Aggregation:    geometric mean of canonical managed/manual ratios
+Gate:           mirrored median managed/manual delta <= +5%
+```
+
+Accepted result:
+
+```text
+text managed/manual  -6.74% PASS
+```
+
+The negative delta is not accepted as evidence that managed text is intrinsically faster than the manual route. The measured distribution remains noisy. The accepted conclusion is only that the managed reader does not exceed the predeclared `+5%` framework-overhead gate.
+
+### Frozen P9-E3-B invariants
+
+1. The `text` reader is now an accepted built-in runtime reader.
+2. Its built-in media default remains exactly `text/plain`.
+3. Text decoding uses Web `Request.text()` UTF-8 semantics.
+4. Custom media aliases reuse text decoding grammar rather than changing parser selection at request time.
+5. Decoder rejection remains `400`; schema issues remain `422`; unsupported/missing/ambiguous media remains `415`.
+6. Text reader selection remains registration-time compiled.
+7. The default JSON hot path is preserved.
+8. Plain and query-only zero-unused behavior is preserved.
+9. Existing protected workloads passed the frozen `+3%` mirrored-median regression gate.
+10. Managed text passed the frozen `+5%` managed/manual overhead gate.
+11. The TypeScript public contract and scaling gates remain unchanged.
+12. Managed-body AOT transport remains deferred to P9-E5.
+
+## Next step — P9-E3-C
+
+Implement and validate the built-in `arrayBuffer` reader next.
+
+`arrayBuffer` is intentionally sequenced before form readers because it can extend the accepted compiled-reader architecture without introducing form normalization, multipart boundary handling, or form-entry allocation policy. The same frozen `+3%` protected-workload regression gates and `+5%` managed/manual reader gate remain in force.
