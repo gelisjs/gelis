@@ -241,9 +241,16 @@ export function createRuntimeInputPlan(
         : compileTextBodyReader(compiledContentTypes.matches);
 
     readBodyError = handleMalformedTextBody;
+  } else if (parser === "arrayBuffer") {
+    readBody =
+      compiledContentTypes === undefined
+        ? readDefaultArrayBufferBody
+        : compileArrayBufferBodyReader(compiledContentTypes.matches);
+
+    readBodyError = handleMalformedArrayBufferBody;
   } else {
     throw new TypeError(
-      "Gelis urlencoded, multipart, and arrayBuffer request body parsers require later P9-E3 runtime support",
+      "Gelis urlencoded and multipart request body parsers require later P9-E3 runtime support",
     );
   }
 
@@ -332,6 +339,32 @@ function compileTextBodyReader(
     }
 
     return request.text();
+  };
+}
+
+function readDefaultArrayBufferBody(
+  request: Request,
+): Response | Promise<unknown> {
+  if (!isArrayBufferContentType(request)) {
+    return unsupportedMediaTypeResponse();
+  }
+
+  return request.arrayBuffer();
+}
+
+function handleMalformedArrayBufferBody(_error: unknown): Response {
+  return malformedBodyResponse();
+}
+
+function compileArrayBufferBodyReader(
+  matchesContentType: RuntimeContentTypeMatcher,
+): RuntimeBodyReader {
+  return (request) => {
+    if (!matchesContentType(request)) {
+      return unsupportedMediaTypeResponse();
+    }
+
+    return request.arrayBuffer();
   };
 }
 
@@ -533,6 +566,35 @@ function isTextContentType(request: Request): boolean {
     .toLowerCase();
 
   return mediaType === "text/plain";
+}
+
+function isArrayBufferContentType(request: Request): boolean {
+  const contentType = request.headers.get("content-type");
+
+  if (contentType === null) {
+    return false;
+  }
+
+  if (
+    contentType.length === 24 &&
+    contentType === "application/octet-stream"
+  ) {
+    return true;
+  }
+
+  if (hasCombinedContentType(contentType)) {
+    return false;
+  }
+
+  const separator = contentType.indexOf(";");
+
+  const mediaType = (
+    separator === -1 ? contentType : contentType.slice(0, separator)
+  )
+    .trim()
+    .toLowerCase();
+
+  return mediaType === "application/octet-stream";
 }
 
 export function validationErrorResponse(
