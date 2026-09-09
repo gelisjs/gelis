@@ -28,8 +28,8 @@ P10  OpenAPI & Contract Integration        COMPLETE
 └── H  public API + documentation freeze   ACCEPTED
 
 P11  Industrial HTTP Essentials            ACTIVE
-├── A  competitor semantics + API audit    ACTIVE
-├── B  ownership + execution architecture  PLANNED
+├── A  competitor semantics + API audit    COMPLETE
+├── B  ownership + execution architecture  ACTIVE
 ├── C  cookie capability                   PLANNED
 ├── D  CORS capability                     PLANNED
 ├── E  request/body limit capability       PLANNED
@@ -66,27 +66,6 @@ Final package gate:
 463 expect() calls
 ```
 
-P10-F accepted measured source:
-
-```text
-85765908b91a400f01fa891f9ae64b7c15a376fa
-```
-
-P10-G accepted measured source:
-
-```text
-6e84bd324fb83de228e17c99736deea92e23d070
-```
-
-P10-G package import/generate isolation produced a canonical geomean of `1.0055x`, passing the frozen `<= 1.02x` gate. Ratios below `1.0x` remain no-regression evidence only.
-
-Package-side final acceptance:
-
-```text
-gelisjs/openapi
-docs/p10-h-public-api-documentation-acceptance.md
-```
-
 Core milestone acceptance:
 
 ```text
@@ -94,8 +73,6 @@ docs/architecture/p10-openapi-contract-integration-acceptance.md
 ```
 
 ## P11 Industrial HTTP Essentials
-
-P11 is the first numbered phase derived from the post-P10 industrial capability prioritization.
 
 Roadmap freeze:
 
@@ -121,48 +98,69 @@ request ID
 timeout / abort policy
 ```
 
-These capabilities are sequenced before auth/state and upload/realtime because they provide foundational browser security, abuse resistance, state/cookie primitives, request correlation, and cancellation/deadline behavior.
+P11 explicitly does not yet own JWT, sessions, CSRF implementation, rate limiting, industrial streaming multipart, SSE, WebSocket, OpenTelemetry, structured logging, or typed-client productionization.
 
-P11 explicitly does not yet own:
+## P11-A result
 
-```text
-JWT
-sessions
-CSRF implementation
-rate limiting
-industrial streaming multipart
-SSE
-WebSocket
-OpenTelemetry
-structured logging package
-typed client productionization
-```
-
-## Active P11-A objective
-
-P11-A performs capability-specific semantic/API research against:
+P11-A is complete:
 
 ```text
-Hono
-Elysia
-Fastify
-NestJS
+docs/architecture/p11-a-competitor-semantics-api-audit.md
 ```
 
-The audit must classify for every P11 capability:
+Key findings:
 
 ```text
-semantic requirements
-security defaults
-configuration surface
-error behavior
-portable vs runtime-specific behavior
-request-time topology
-type/DX model
-core vs official package vs documented integration
+cookies
+-> prefer portable pure primitives where possible;
+   retain strong prefix/security semantics and plan for signing/rotation
+
+CORS
+-> production baseline; must integrate with existing P9 automatic OPTIONS/Allow semantics
+
+request/body limits
+-> distinguish transport hard ceilings from portable framework policy;
+   never trust Content-Length as the only enforcement
+
+secure headers
+-> static precompiled policy is a likely cheap fast path;
+   dynamic CSP state must remain optional
+
+request ID
+-> inbound IDs are security/observability input and should not be blindly trusted by default
+
+timeout/abort
+-> distinguish transport timeout from application deadline;
+   cancellation must be explicitly cooperative through AbortSignal
 ```
 
-P11-A is research/architecture work. It must not copy competitor syntax or begin production implementation before the ownership/execution boundary is established in P11-B.
+## Active P11-B objective
+
+P11-B now decides **ownership + execution architecture** before any production capability implementation.
+
+It must answer:
+
+```text
+core vs gelis/* vs @gelis/* placement for each capability
+
+pure helper vs installed application capability vs route input plan
+
+how CORS composes with automatic OPTIONS/Allow
+
+how request/body limits specialize managed body readers
+
+how request ID is exposed without inflating every RouteContext generic
+
+how framework timeout signal composes with incoming Request.signal
+
+which Bun adapter options remain transport-only hints/ceilings
+
+how every unused capability avoids permanent request branches
+```
+
+P11-B may design shared internal primitives only when they reduce real cost/duplication. It must not introduce a universal middleware chain merely to make the six capabilities look uniform.
+
+No production API/package name is frozen until P11-B completes.
 
 ## Post-P11 waves
 
@@ -189,8 +187,6 @@ structured logging / OpenTelemetry / Server-Timing / health / metrics
 
 @gelis/client / testing utilities / OpenAPI UI / scaffolding
 ```
-
-Every capability still requires explicit classification as core, `gelis/*`, `@gelis/*`, or external/community integration.
 
 ## Performance policy
 
