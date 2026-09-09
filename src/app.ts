@@ -131,6 +131,74 @@ type RuntimeRouteInvoker = (
 
 const activeHeadDispatches = new WeakMap<Request, Gelis>();
 
+function dispatchHeadRequest(
+  application: Gelis,
+  request: Request,
+): Response | Promise<Response> | undefined {
+  const activeApplication = activeHeadDispatches.get(request);
+
+  /*
+   * Recursive dispatch for the same application
+   * must continue into normal routing so HEAD can
+   * resolve exact HEAD / ALL / implicit GET.
+   */
+  if (activeApplication === application) {
+    return undefined;
+  }
+
+  activeHeadDispatches.set(request, application);
+
+  try {
+    const result = Gelis.prototype.fetch.call(application, request);
+
+    if (isPromiseLike(result)) {
+      return Promise.resolve(result).then(suppressHeadResponse);
+    }
+
+    return suppressHeadResponse(result);
+  } finally {
+    if (activeApplication === undefined) {
+      activeHeadDispatches.delete(request);
+    } else {
+      activeHeadDispatches.set(request, activeApplication);
+    }
+  }
+}
+
+function resolveMethodMiss(
+  router: GelisInternalRouter,
+  method: string,
+  pathname: string,
+): RuntimeRouteMatch | Response {
+  if (method === "HEAD") {
+    const getMatch = router.match("GET", pathname);
+
+    if (getMatch !== undefined) {
+      return getMatch;
+    }
+  }
+
+  const matchingMethods = router.matchingMethods(pathname);
+
+  if (method === "OPTIONS") {
+    const automaticOptions = createAutomaticOptionsResponse(matchingMethods);
+
+    if (automaticOptions !== undefined) {
+      return automaticOptions;
+    }
+  }
+
+  const methodNotAllowed = createMethodNotAllowedResponse(matchingMethods);
+
+  if (methodNotAllowed !== undefined) {
+    return methodNotAllowed;
+  }
+
+  return new Response("Not Found", {
+    status: 404,
+  });
+}
+
 const unavailableApplicationFetch: RuntimeFetch = (request) =>
   request.method === "HEAD"
     ? new Response(
@@ -566,79 +634,28 @@ export class Gelis extends RouteBuilder<""> {
   }
 
   fetch(request: Request): Response | Promise<Response> {
-    if (request.method === "HEAD") {
-      const activeApplication = activeHeadDispatches.get(request);
+    const method = request.method;
 
-      if (activeApplication !== this) {
-        activeHeadDispatches.set(request, this);
+    if (method === "HEAD") {
+      const headResult = dispatchHeadRequest(this, request);
 
-        try {
-          const result = Gelis.prototype.fetch.call(
-            this,
-
-            request,
-          );
-
-          if (isPromiseLike(result)) {
-            return Promise.resolve(result).then(suppressHeadResponse);
-          }
-
-          return suppressHeadResponse(result);
-        } finally {
-          if (activeApplication === undefined) {
-            activeHeadDispatches.delete(request);
-          } else {
-            activeHeadDispatches.set(
-              request,
-
-              activeApplication,
-            );
-          }
-        }
+      if (headResult !== undefined) {
+        return headResult;
       }
     }
 
     const pathname = pathnameFromUrl(request.url);
 
-    let matched = this.#state.router.match(
-      request.method,
+    let matched = this.#state.router.match(method, pathname);
 
-      pathname,
-    );
+    if (matched === undefined) {
+      const fallback = resolveMethodMiss(this.#state.router, method, pathname);
 
-    if (matched === undefined && request.method === "HEAD") {
-      matched = this.#state.router.match(
-        "GET",
-
-        pathname,
-      );
-    }
-
-    if (!matched) {
-      const matchingMethods = this.#state.router.matchingMethods(pathname);
-
-      if (request.method === "OPTIONS") {
-        const automaticOptions =
-          createAutomaticOptionsResponse(matchingMethods);
-
-        if (automaticOptions !== undefined) {
-          return automaticOptions;
-        }
+      if (fallback instanceof Response) {
+        return fallback;
       }
 
-      const methodNotAllowed = createMethodNotAllowedResponse(matchingMethods);
-
-      if (methodNotAllowed !== undefined) {
-        return methodNotAllowed;
-      }
-
-      return new Response(
-        "Not Found",
-
-        {
-          status: 404,
-        },
-      );
+      matched = fallback;
     }
 
     const { route, params } = matched;
