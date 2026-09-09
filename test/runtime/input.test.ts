@@ -612,23 +612,29 @@ describe("Gelis input runtime", () => {
     }).toThrow(TypeError);
   });
 
-  test("rejects non-JSON body parsers before P9-E3 runtime support", () => {
+  test("rejects request body parsers not yet implemented in P9-E3", () => {
     const Body = createSchema((value) => ({
       value,
     }));
 
-    const app = new Gelis();
+    for (const bodyParser of [
+      "urlencoded",
+      "multipart",
+      "arrayBuffer",
+    ] as const) {
+      const app = new Gelis();
 
-    expect(() => {
-      app.post(
-        "/text-body",
-        {
-          body: Body,
-          bodyParser: "text",
-        },
-        ({ body }) => body,
-      );
-    }).toThrow(TypeError);
+      expect(() => {
+        app.post(
+          `/${bodyParser}`,
+          {
+            body: Body,
+            bodyParser,
+          },
+          ({ body }) => body,
+        );
+      }).toThrow(TypeError);
+    }
   });
 
   test("accepts compiled custom JSON media types", async () => {
