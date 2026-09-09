@@ -248,9 +248,16 @@ export function createRuntimeInputPlan(
         : compileArrayBufferBodyReader(compiledContentTypes.matches);
 
     readBodyError = handleMalformedArrayBufferBody;
+  } else if (parser === "urlencoded") {
+    readBody =
+      compiledContentTypes === undefined
+        ? readDefaultUrlEncodedBody
+        : compileUrlEncodedBodyReader(compiledContentTypes.matches);
+
+    readBodyError = handleMalformedUrlEncodedBody;
   } else {
     throw new TypeError(
-      "Gelis urlencoded and multipart request body parsers require later P9-E3 runtime support",
+      "Gelis multipart request body parser requires later P9-E3 runtime support",
     );
   }
 
@@ -366,6 +373,53 @@ function compileArrayBufferBodyReader(
 
     return request.arrayBuffer();
   };
+}
+
+function readDefaultUrlEncodedBody(
+  request: Request,
+): Response | Promise<unknown> {
+  if (!isUrlEncodedContentType(request)) {
+    return unsupportedMediaTypeResponse();
+  }
+
+  return request.text().then(parseUrlEncodedBody);
+}
+
+function handleMalformedUrlEncodedBody(_error: unknown): Response {
+  return malformedBodyResponse();
+}
+
+function compileUrlEncodedBodyReader(
+  matchesContentType: RuntimeContentTypeMatcher,
+): RuntimeBodyReader {
+  return (request) => {
+    if (!matchesContentType(request)) {
+      return unsupportedMediaTypeResponse();
+    }
+
+    return request.text().then(parseUrlEncodedBody);
+  };
+}
+
+function parseUrlEncodedBody(
+  value: string,
+): Record<string, string | string[]> {
+  const result = Object.create(null) as Record<string, string | string[]>;
+  const entries = new URLSearchParams(value);
+
+  entries.forEach((entryValue, key) => {
+    const existing = result[key];
+
+    if (existing === undefined) {
+      result[key] = entryValue;
+    } else if (Array.isArray(existing)) {
+      existing.push(entryValue);
+    } else {
+      result[key] = [existing, entryValue];
+    }
+  });
+
+  return result;
 }
 
 export function parseQueryFromUrl(
@@ -595,6 +649,35 @@ function isArrayBufferContentType(request: Request): boolean {
     .toLowerCase();
 
   return mediaType === "application/octet-stream";
+}
+
+function isUrlEncodedContentType(request: Request): boolean {
+  const contentType = request.headers.get("content-type");
+
+  if (contentType === null) {
+    return false;
+  }
+
+  if (
+    contentType.length === 33 &&
+    contentType === "application/x-www-form-urlencoded"
+  ) {
+    return true;
+  }
+
+  if (hasCombinedContentType(contentType)) {
+    return false;
+  }
+
+  const separator = contentType.indexOf(";");
+
+  const mediaType = (
+    separator === -1 ? contentType : contentType.slice(0, separator)
+  )
+    .trim()
+    .toLowerCase();
+
+  return mediaType === "application/x-www-form-urlencoded";
 }
 
 export function validationErrorResponse(
