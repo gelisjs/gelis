@@ -612,27 +612,6 @@ describe("Gelis input runtime", () => {
     }).toThrow(TypeError);
   });
 
-  test("rejects request body parsers not yet implemented in P9-E3", () => {
-    const Body = createSchema((value) => ({
-      value,
-    }));
-
-    for (const bodyParser of ["multipart"] as const) {
-      const app = new Gelis();
-
-      expect(() => {
-        app.post(
-          `/${bodyParser}`,
-          {
-            body: Body,
-            bodyParser,
-          },
-          ({ body }) => body,
-        );
-      }).toThrow(TypeError);
-    }
-  });
-
   test("accepts compiled custom JSON media types", async () => {
     const Body = createSchema<{
       name: string;
