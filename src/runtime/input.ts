@@ -26,6 +26,28 @@ export function createRuntimeInputPlan(
 
   const body = options?.body;
 
+  const bodyParser = options?.bodyParser;
+
+  const bodyContentTypes = options?.bodyContentTypes;
+
+  if (body === undefined) {
+    if (bodyParser !== undefined || bodyContentTypes !== undefined) {
+      throw new TypeError("Gelis body parser metadata requires a body schema");
+    }
+  } else {
+    if (bodyParser !== undefined && bodyParser !== "json") {
+      throw new TypeError(
+        "Gelis non-JSON request body parsers require P9-E3 runtime support",
+      );
+    }
+
+    if (bodyContentTypes !== undefined) {
+      throw new TypeError(
+        "Gelis custom request body content types require P9-E3 runtime support",
+      );
+    }
+  }
+
   if (query === undefined && body === undefined) {
     return undefined;
   }

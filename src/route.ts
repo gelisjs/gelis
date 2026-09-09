@@ -16,6 +16,13 @@ export interface RouteRequestContract<
   body: Body;
 }
 
+export type RequestBodyParser =
+  | "json"
+  | "text"
+  | "urlencoded"
+  | "multipart"
+  | "arrayBuffer";
+
 export type RouteResponses = Readonly<Record<number, unknown>>;
 
 /*
@@ -86,6 +93,10 @@ export interface RouteOptions {
   readonly query?: StandardSchemaV1;
 
   readonly body?: StandardSchemaV1;
+
+  readonly bodyParser?: RequestBodyParser;
+
+  readonly bodyContentTypes?: readonly string[];
 
   readonly responses?: ResponseContractMap;
 
@@ -272,12 +283,16 @@ export type GlobalAfterHandle = (
 
 export type RouteOptionsFor<
   QuerySchema extends StandardSchemaV1 | undefined = undefined,
-  BodySchema extends StandardSchemaV1 | undefined = undefined,
+  Body extends StandardSchemaV1 | undefined = undefined,
   Responses extends ResponseContractMap | undefined = undefined,
 > = {
   readonly query?: QuerySchema;
 
-  readonly body?: BodySchema;
+  readonly body?: Body;
+
+  readonly bodyParser?: RequestBodyParser;
+
+  readonly bodyContentTypes?: readonly string[];
 
   readonly responses?: Responses;
 
@@ -287,14 +302,14 @@ export type RouteOptionsFor<
 export type RouteLifecycleFor<
   Path extends string,
   QuerySchema extends StandardSchemaV1 | undefined = undefined,
-  BodySchema extends StandardSchemaV1 | undefined = undefined,
+  Body extends StandardSchemaV1 | undefined = undefined,
   Responses extends ResponseContractMap | undefined = undefined,
   Result = unknown,
 > = {
   readonly beforeHandle?: RouteBeforeHandle<
     Path,
     SchemaOutput<QuerySchema>,
-    SchemaOutput<BodySchema>,
+    SchemaOutput<Body>,
     Responses extends ResponseContractMap
       ? InferResponseContracts<Responses>
       : Record<never, never>
@@ -303,7 +318,7 @@ export type RouteLifecycleFor<
   readonly afterHandle?: RouteAfterHandle<
     Path,
     SchemaOutput<QuerySchema>,
-    SchemaOutput<BodySchema>,
+    SchemaOutput<Body>,
     Responses extends ResponseContractMap
       ? InferResponseContracts<Responses>
       : Record<never, never>,

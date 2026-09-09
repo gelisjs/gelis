@@ -81,6 +81,7 @@ export type {
   RouteLifecycleFor,
   RouteRef,
   RouteRequestContract,
+  RequestBodyParser,
 } from "./route";
 
 export type {

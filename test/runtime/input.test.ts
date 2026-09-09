@@ -542,6 +542,114 @@ describe("Gelis input runtime", () => {
       count: 42,
     });
   });
+
+  test("accepts explicit JSON body parser metadata", async () => {
+    const Body = createSchema<
+      {
+        name: string;
+      },
+      {
+        name: string;
+        normalized: true;
+      }
+    >((value) => {
+      const body = value as {
+        name: string;
+      };
+
+      return {
+        value: {
+          name: body.name.trim(),
+          normalized: true,
+        },
+      };
+    });
+
+    const app = new Gelis();
+
+    app.post(
+      "/explicit-json",
+      {
+        body: Body,
+        bodyParser: "json",
+      },
+      ({ body }) => body,
+    );
+
+    const response = await app.fetch(
+      new Request("http://gelis.test/explicit-json", {
+        method: "POST",
+
+        headers: {
+          "content-type": "application/json",
+        },
+
+        body: JSON.stringify({
+          name: " Gelis ",
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(200);
+
+    expect(await response.json()).toEqual({
+      name: "Gelis",
+      normalized: true,
+    });
+  });
+
+  test("rejects body parser metadata without a body schema", () => {
+    const app = new Gelis();
+
+    expect(() => {
+      app.post(
+        "/missing-body-schema",
+        {
+          bodyParser: "json",
+        },
+        () => "never",
+      );
+    }).toThrow(TypeError);
+  });
+
+  test("rejects non-JSON body parsers before P9-E3 runtime support", () => {
+    const Body = createSchema((value) => ({
+      value,
+    }));
+
+    const app = new Gelis();
+
+    expect(() => {
+      app.post(
+        "/text-body",
+        {
+          body: Body,
+          bodyParser: "text",
+        },
+        ({ body }) => body,
+      );
+    }).toThrow(TypeError);
+  });
+
+  test("rejects custom body content types before P9-E3 runtime support", () => {
+    const Body = createSchema((value) => ({
+      value,
+    }));
+
+    const app = new Gelis();
+
+    expect(() => {
+      app.post(
+        "/vendor-json",
+        {
+          body: Body,
+          bodyParser: "json",
+          bodyContentTypes: ["application/vnd.gelis+json"],
+        },
+        ({ body }) => body,
+      );
+    }).toThrow(TypeError);
+  });
 });
 
 function createSchema<Input = unknown, Output = Input>(
