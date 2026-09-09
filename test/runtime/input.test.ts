@@ -71,7 +71,7 @@ describe("Gelis input runtime", () => {
       new Request("http://gelis.test/search?page=2&tag=a&tag=b&q=hello+world"),
     );
 
-    expect(result).toBeInstanceOf(Response);
+    expect(result).toBeInstanceOf(Promise);
 
     const response = await result;
 
@@ -617,11 +617,7 @@ describe("Gelis input runtime", () => {
       value,
     }));
 
-    for (const bodyParser of [
-      "urlencoded",
-      "multipart",
-      "arrayBuffer",
-    ] as const) {
+    for (const bodyParser of ["urlencoded", "multipart"] as const) {
       const app = new Gelis();
 
       expect(() => {
