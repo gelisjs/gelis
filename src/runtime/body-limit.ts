@@ -29,6 +29,10 @@ type RuntimePromisePeek = {
   status(promise: Promise<unknown>): string;
 };
 
+type RuntimeLimitedBodyReadMaybePromise =
+  | RuntimeLimitedBodyReadResult
+  | Promise<RuntimeLimitedBodyReadResult>;
+
 const BODY_LIMIT_EXCEEDED: RuntimeLimitedBodyReadExceeded = {
   ok: false,
 };
@@ -51,8 +55,9 @@ export function compileRuntimeLimitedBodyReader(
   const maxBytesText = String(maxBytes);
   const promisePeek = resolveRuntimePromisePeek();
 
-  return (request) =>
-    readLimitedBody(request, maxBytes, maxBytesText, promisePeek);
+  return function readRequest(request) {
+    return readLimitedBody(request, maxBytes, maxBytesText, promisePeek);
+  };
 }
 
 export function bodyTooLargeResponse(): Response {
@@ -165,16 +170,13 @@ function readLimitedBodyPeek(
     return undefined;
   };
 
-  const next = ():
-    | RuntimeLimitedBodyReadResult
-    | Promise<RuntimeLimitedBodyReadResult> => {
+  const next = (): RuntimeLimitedBodyReadMaybePromise => {
     while (true) {
       const pending = reader.read();
 
       if (promisePeek.status(pending) === "fulfilled") {
-        const result = promisePeek(
-          pending,
-        ) as ReadableStreamReadResult<Uint8Array>;
+        const peeked = promisePeek(pending);
+        const result = peeked as ReadableStreamReadResult<Uint8Array>;
         const consumed = consume(result);
 
         if (consumed !== undefined) {
@@ -214,7 +216,7 @@ function cancelReaderAfterOverflow(
 }
 
 function resolveRuntimePromisePeek(): RuntimePromisePeek | undefined {
-  const runtime = globalThis as typeof globalThis & {
+  const runtime = globalThis as {
     Bun?: {
       peek?: RuntimePromisePeek;
     };
