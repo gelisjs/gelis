@@ -20,12 +20,8 @@ const strategies: readonly Strategy[] = [
 console.log("P11-E10 success cleanup diagnostic");
 console.log(`Bun: ${Bun.version}`);
 console.log(`Payload: ${UNDER_BYTES} bytes`);
-console.log(
-  "Diagnostic only: isolates reader.releaseLock() cost after successful full consumption.\n",
-);
-console.log(
-  "| scenario | strategy | ns/op | body used | body locked | bytes |",
-);
+console.log("Diagnostic only: isolates reader.releaseLock() cost after successful full consumption.\n");
+console.log("| scenario | strategy | ns/op | body used | body locked | bytes |");
 console.log("| --- | --- | ---: | --- | --- | ---: |");
 
 for (const scenario of scenarios) {
