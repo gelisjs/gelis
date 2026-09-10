@@ -7,6 +7,7 @@ import {
   getCookie,
   setCookie,
 } from "gelis/cookie";
+import { cors } from "gelis/cors";
 
 describe("Gelis package exports", () => {
   test("resolves the portable root export", () => {
@@ -32,6 +33,16 @@ describe("Gelis package exports", () => {
     expect(generateCookie("theme", "dark")).toBe("theme=dark; Path=/");
   });
 
+  test("resolves the portable CORS subpath", () => {
+    expect(typeof cors).toBe("function");
+
+    const app = new Gelis();
+    app.use(cors());
+    app.get("/", () => "ok");
+
+    expect(app).toBeInstanceOf(Gelis);
+  });
+
   test("does not expose Bun adapter APIs from the portable root", async () => {
     const root = await import("gelis");
 
@@ -45,5 +56,11 @@ describe("Gelis package exports", () => {
     expect("getCookie" in root).toBe(false);
     expect("generateCookie" in root).toBe(false);
     expect("setCookie" in root).toBe(false);
+  });
+
+  test("does not re-export CORS helpers from the portable root", async () => {
+    const root = await import("gelis");
+
+    expect("cors" in root).toBe(false);
   });
 });
