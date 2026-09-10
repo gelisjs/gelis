@@ -151,7 +151,9 @@ function readPeek(request: Request): Promise<ReadResult> {
       const promise = reader.read();
 
       if (Bun.peek.status(promise) === "fulfilled") {
-        const result = Bun.peek(promise) as Awaited<ReturnType<typeof reader.read>>;
+        const result = Bun.peek(promise) as Awaited<
+          ReturnType<typeof reader.read>
+        >;
         const consumed = consume(result);
         if (consumed !== undefined) return consumed;
         continue;
