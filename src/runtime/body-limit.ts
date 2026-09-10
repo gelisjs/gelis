@@ -30,8 +30,7 @@ type RuntimePromisePeek = {
 };
 
 type RuntimeLimitedBodyReadMaybePromise =
-  | RuntimeLimitedBodyReadResult
-  | Promise<RuntimeLimitedBodyReadResult>;
+  RuntimeLimitedBodyReadResult | Promise<RuntimeLimitedBodyReadResult>;
 
 const BODY_LIMIT_EXCEEDED: RuntimeLimitedBodyReadExceeded = {
   ok: false,
