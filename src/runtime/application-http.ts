@@ -1,11 +1,25 @@
 import type { OnError } from "../error";
 import type { OnRequest } from "../request";
 import type { RuntimeFetch } from "./fetch";
+import { normalizeResponseForRequest } from "./response";
+
+export interface RuntimeApplicationHttpRuntime {
+  matchingMethods(request: Request): readonly string[];
+}
 
 export interface RuntimeApplicationHttpPolicy {
-  wrap(innerFetch: RuntimeFetch): RuntimeFetch;
+  prepare(
+    request: Request,
+    runtime: RuntimeApplicationHttpRuntime,
+  ):
+    | void
+    | Response
+    | PromiseLike<void | Response>;
 
-  wrapOnError(hook: OnError): OnError;
+  finalize(
+    request: Request,
+    response: Response,
+  ): Response | PromiseLike<Response>;
 }
 
 export interface RuntimeApplicationHttpPlan {
@@ -123,12 +137,13 @@ export function extractApplicationHttpPlan(
 export function compileApplicationHttpFetch(
   plan: RuntimeApplicationHttpPlan,
   innerFetch: RuntimeFetch,
+  runtime: RuntimeApplicationHttpRuntime,
 ): RuntimeFetch {
   let fetch = innerFetch;
 
   const cors = plan.cors;
   if (cors !== undefined) {
-    fetch = cors.wrap(fetch);
+    fetch = compilePolicyFetch(cors, fetch, runtime);
   }
 
   return fetch;
@@ -147,12 +162,106 @@ export function compileApplicationHttpErrorHooks(
   const compiled = new Array<OnError>(hooks.length);
 
   for (let index = 0; index < hooks.length; index++) {
-    compiled[index] = cors.wrapOnError(hooks[index]!);
+    compiled[index] = compilePolicyErrorHook(cors, hooks[index]!);
   }
 
   return compiled;
 }
 
+function compilePolicyFetch(
+  policy: RuntimeApplicationHttpPolicy,
+  innerFetch: RuntimeFetch,
+  runtime: RuntimeApplicationHttpRuntime,
+): RuntimeFetch {
+  return (request) => {
+    const prepared = policy.prepare(request, runtime);
+
+    if (isPromiseLike(prepared)) {
+      return Promise.resolve(prepared).then((early) => {
+        if (early !== undefined) {
+          return early;
+        }
+
+        return finalizeFetchResult(policy, request, innerFetch(request));
+      });
+    }
+
+    if (prepared !== undefined) {
+      return prepared;
+    }
+
+    return finalizeFetchResult(policy, request, innerFetch(request));
+  };
+}
+
+function finalizeFetchResult(
+  policy: RuntimeApplicationHttpPolicy,
+  request: Request,
+  result: Response | Promise<Response>,
+): Response | Promise<Response> {
+  if (result instanceof Promise) {
+    return result.then((response) => resolveFinalized(policy, request, response));
+  }
+
+  return resolveFinalized(policy, request, result);
+}
+
+function compilePolicyErrorHook(
+  policy: RuntimeApplicationHttpPolicy,
+  hook: OnError,
+): OnError {
+  return (context) => {
+    const handled = hook(context);
+
+    if (isPromiseLike(handled)) {
+      return Promise.resolve(handled).then((value) => {
+        if (value === undefined) {
+          return undefined;
+        }
+
+        return resolveFinalized(
+          policy,
+          context.request,
+          normalizeResponseForRequest(context.request, value),
+        );
+      });
+    }
+
+    if (handled === undefined) {
+      return undefined;
+    }
+
+    return resolveFinalized(
+      policy,
+      context.request,
+      normalizeResponseForRequest(context.request, handled),
+    );
+  };
+}
+
+function resolveFinalized(
+  policy: RuntimeApplicationHttpPolicy,
+  request: Request,
+  response: Response,
+): Response | Promise<Response> {
+  const finalized = policy.finalize(request, response);
+
+  return isPromiseLike(finalized)
+    ? Promise.resolve(finalized)
+    : finalized;
+}
+
 function readMarker(hook: OnRequest): RuntimeApplicationHttpMarker | undefined {
   return (hook as Partial<MarkedOnRequest>)[GELIS_APPLICATION_HTTP_MARKER];
+}
+
+function isPromiseLike<T>(value: T | PromiseLike<T>): value is PromiseLike<T> {
+  if (
+    value === null ||
+    (typeof value !== "object" && typeof value !== "function")
+  ) {
+    return false;
+  }
+
+  return typeof (value as { then?: unknown }).then === "function";
 }
