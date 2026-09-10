@@ -31,8 +31,8 @@ P11  Industrial HTTP Essentials            ACTIVE
 ├── A  competitor semantics + API audit    COMPLETE
 ├── B  ownership + execution architecture  FROZEN
 ├── C  cookie capability                   ACCEPTED
-├── D  CORS capability                     ACTIVE
-├── E  request/body limit capability       PLANNED
+├── D  CORS capability                     ACCEPTED
+├── E  request/body limit capability       ACTIVE
 ├── F  secure headers capability           PLANNED
 ├── G  request ID + timeout/abort           PLANNED
 └── H  cumulative acceptance/docs freeze   PLANNED
@@ -185,29 +185,89 @@ These ratios are workload-specific acceptance evidence, not a universal speed cl
 
 The accepted cookie implementation remains isolated to `gelis/cookie`; root Gelis does not re-export the helper surface and ordinary application routing receives no cookie-specific request integration.
 
-## Active P11-D objective
+## P11-D result
 
-P11-D owns the first compiled application HTTP-boundary capability:
-
-```text
-gelis/cors
-```
-
-Its architecture must preserve the P11-B invariants:
+P11-D CORS capability is accepted in:
 
 ```text
-actual CORS preflight handled before ordinary routing
-ordinary OPTIONS remains owned by P9 semantics
-route-aware methods rather than a stale hard-coded method list
-QUERY/custom method support
-correct Vary behavior
-credential/wildcard safety
-no second synthetic OPTIONS router
-final-response CORS policy applied exactly once
-no application wrapper when CORS is absent
+docs/architecture/p11-d-cors-capability-acceptance.md
 ```
 
-P11-D freezes API, correctness, zero-unused, and performance gates before production implementation measurements.
+Accepted source candidate:
+
+```text
+c2c1b9b72b776c073e7a0a0ae9429c8510a91a7a
+```
+
+Final acceptance candidate, including the benchmark ratio-direction correction:
+
+```text
+21790d2086fdbbc9fea0557e1eea62fc0fc33bd5
+```
+
+Final correctness gate:
+
+```text
+646 pass
+0 fail
+1798 expect() calls
+```
+
+Frozen zero-unused gates passed:
+
+```text
+static-raw    1.0040x control
+ dynamic-raw   1.0227x control
+static-json   1.0008x control
+dynamic-json  1.0243x control
+geomean       1.0129x <= 1.015x PASS
+```
+
+Enabled CORS benchmark versus Hono 4.13.5 passed every frozen gate:
+
+```text
+actual-wildcard          0.4731x Hono
+actual-allowlist         0.4120x Hono
+actual-credentialed      0.3975x Hono
+preflight-static-methods 1.0667x Hono
+actual-dynamic-origin    0.4136x Hono
+static geomean           0.5362x <= 1.05x PASS
+```
+
+Route-aware preflight scalability also passed:
+
+```text
+1,000 routes 2678.9 ns/op
+5,000 routes 2674.7 ns/op
+5000/1000   0.9955x <= 1.50x PASS
+```
+
+The first enabled-comparison acceptance output was a false negative caused by an inverted ratio in the benchmark harness. The measured nanoseconds were valid, the gating ratio was not. The harness was corrected without changing any frozen threshold and the complete benchmark was rerun.
+
+These ratios are workload-specific acceptance evidence, not universal performance claims.
+
+## Active P11-E objective
+
+P11-E owns the request/body limit capability:
+
+```text
+gelis/body-limit
+```
+
+The architecture must preserve the P11-A/P11-B invariants:
+
+```text
+portable framework policy must be distinct from transport hard ceilings
+Content-Length may be used as an early rejection hint but never as the only enforcement
+streamed/chunked bodies must still be bounded by actual bytes consumed
+managed P9 body parsing must not accidentally read an oversized body before policy enforcement
+unmanaged routes should not pay body-limit cost when the capability is absent
+route/application ownership must be explicit rather than hidden in a universal middleware chain
+abort/error behavior must be deterministic and testable
+Bun-specific transport limits may be exposed through gelis/bun but must not leak into portable core semantics
+```
+
+P11-E must freeze API, ownership, byte-counting semantics, correctness/security cases, zero-unused gates, and competitor-performance methodology before optimization is judged.
 
 ## Post-P11 waves
 
