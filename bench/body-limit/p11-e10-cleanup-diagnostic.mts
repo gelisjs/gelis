@@ -1,5 +1,8 @@
 const LIMIT_BYTES = 1_024;
-const OVER_STREAM_CHUNKS = [new Uint8Array(768), new Uint8Array(768)] as const;
+const OVER_STREAM_CHUNKS = [
+  new Uint8Array(768),
+  new Uint8Array(768),
+] as const;
 
 const WARMUPS = 1_000;
 const TARGET_MS = 100;
@@ -25,7 +28,9 @@ const strategies: readonly Strategy[] = [
 console.log("P11-E10 overflow cleanup diagnostic");
 console.log(`Bun: ${Bun.version}`);
 console.log(`Limit: ${LIMIT_BYTES} bytes`);
-console.log("Diagnostic only: no-cleanup controls are NOT production candidates.\n");
+console.log(
+  "Diagnostic only: no-cleanup controls are NOT production candidates.\n",
+);
 console.log("| strategy | ns/op | body locked | result |");
 console.log("| --- | ---: | --- | --- |");
 
