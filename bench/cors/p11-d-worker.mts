@@ -7,10 +7,7 @@ const TARGET_MS = 120;
 const MIN_CALIBRATION_MS = 20;
 
 type ZeroScenario =
-  | "static-raw"
-  | "dynamic-raw"
-  | "static-json"
-  | "dynamic-json";
+  "static-raw" | "dynamic-raw" | "static-json" | "dynamic-json";
 
 type EnabledScenario =
   | "actual-wildcard"

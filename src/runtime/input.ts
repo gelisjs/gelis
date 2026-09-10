@@ -267,7 +267,9 @@ export function createRuntimeInputPlan(
   } else {
     const unsupportedParser: never = parser;
 
-    throw new TypeError(`Unsupported Gelis request body parser: ${unsupportedParser}`);
+    throw new TypeError(
+      `Unsupported Gelis request body parser: ${unsupportedParser}`,
+    );
   }
 
   if (query === undefined) {
@@ -410,9 +412,7 @@ function compileUrlEncodedBodyReader(
   };
 }
 
-function parseUrlEncodedBody(
-  value: string,
-): Record<string, string | string[]> {
+function parseUrlEncodedBody(value: string): Record<string, string | string[]> {
   const result = Object.create(null) as Record<string, string | string[]>;
   const entries = new URLSearchParams(value);
 
@@ -684,10 +684,7 @@ function isArrayBufferContentType(request: Request): boolean {
     return false;
   }
 
-  if (
-    contentType.length === 24 &&
-    contentType === "application/octet-stream"
-  ) {
+  if (contentType.length === 24 && contentType === "application/octet-stream") {
     return true;
   }
 

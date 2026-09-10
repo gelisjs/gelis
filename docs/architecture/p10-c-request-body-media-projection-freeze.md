@@ -68,13 +68,13 @@ Parser/media metadata without a body schema remains invalid in core and is not a
 
 When `bodyContentTypes` is `undefined`, P10-C freezes the following canonical OpenAPI content keys:
 
-| Gelis parser | OpenAPI content key |
-| --- | --- |
-| `json` | `application/json` |
-| `text` | `text/plain` |
-| `urlencoded` | `application/x-www-form-urlencoded` |
-| `multipart` | `multipart/form-data` |
-| `arrayBuffer` | `application/octet-stream` |
+| Gelis parser  | OpenAPI content key                 |
+| ------------- | ----------------------------------- |
+| `json`        | `application/json`                  |
+| `text`        | `text/plain`                        |
+| `urlencoded`  | `application/x-www-form-urlencoded` |
+| `multipart`   | `multipart/form-data`               |
+| `arrayBuffer` | `application/octet-stream`          |
 
 For all parsers except default JSON, this is the direct canonical media type used by the runtime default policy.
 
@@ -117,10 +117,7 @@ OpenAPI 3.2's media-type guidance still treats concrete `+json` media types as J
 If an API requires exact vendor JSON media types to appear in generated OpenAPI, the route should declare them explicitly with `bodyContentTypes`, for example:
 
 ```ts
-bodyContentTypes: [
-  "application/json",
-  "application/vnd.example+json",
-]
+bodyContentTypes: ["application/json", "application/vnd.example+json"];
 ```
 
 That route then accepts exactly the explicit normalized list under the frozen P9 replacement semantics.
@@ -323,7 +320,7 @@ For a runtime-managed body, the legacy singular:
 openapi: {
   request: {
     body: {
-      mediaType: "..."
+      mediaType: "...";
     }
   }
 }
@@ -397,7 +394,7 @@ Documentation-only bodies may still use either required value.
 For a managed body with:
 
 ```ts
-openapi.request.body.opaque = true
+openapi.request.body.opaque = true;
 ```
 
 P10 still projects all runtime-owned content keys, but no schema is attached to those Media Type Objects.
@@ -421,7 +418,7 @@ It does not suppress or rewrite runtime media admission facts.
 For a managed body with explicit:
 
 ```ts
-openapi.request.body.schema
+openapi.request.body.schema;
 ```
 
 that schema takes precedence over automatic Standard JSON Schema conversion.

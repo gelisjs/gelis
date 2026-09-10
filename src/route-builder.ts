@@ -1328,8 +1328,7 @@ export class RouteBuilder<Prefix extends string = ""> {
       const handler = optionsOrHandler as RuntimeRouteHandler;
 
       const routeLifecycle = handlerOrLifecycle as
-        | RuntimeRouteLifecycle
-        | undefined;
+        RuntimeRouteLifecycle | undefined;
 
       /*
        * Completely plain routes have no input,

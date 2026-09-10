@@ -20,10 +20,7 @@ const KINDS = ["static", "dynamic"] as const;
 type RouteKind = (typeof KINDS)[number];
 
 type Scenario =
-  | "builder-only"
-  | "router-prebuilt"
-  | "builder-router"
-  | "full-app";
+  "builder-only" | "router-prebuilt" | "builder-router" | "full-app";
 
 interface Row {
   readonly kind: RouteKind;

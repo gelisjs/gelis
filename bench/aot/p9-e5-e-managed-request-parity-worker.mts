@@ -18,11 +18,7 @@ interface RuntimeRouteContext {
 type RuntimeRouteHandler = (context: RuntimeRouteContext) => unknown;
 
 interface AppLike {
-  post(
-    path: string,
-    options: object,
-    handler: RuntimeRouteHandler,
-  ): unknown;
+  post(path: string, options: object, handler: RuntimeRouteHandler): unknown;
   fetch(request: Request): Response | Promise<Response>;
 }
 
@@ -68,7 +64,8 @@ const indexModule = (await import(
 };
 
 const semanticModule = (await import(
-  pathToFileURL(resolve(root, "src/tooling/semantic-route-plan-compiler.ts")).href
+  pathToFileURL(resolve(root, "src/tooling/semantic-route-plan-compiler.ts"))
+    .href
 )) as Pick<ToolingModules, "compileSemanticRoutePlan">;
 
 const artifactModule = (await import(
@@ -88,7 +85,12 @@ const tooling: ToolingModules = {
   ...adapterModule,
 };
 
-const app = await createApplication(indexModule.Gelis, tooling, workload, scenario);
+const app = await createApplication(
+  indexModule.Gelis,
+  tooling,
+  workload,
+  scenario,
+);
 const request = createRequest(workload);
 
 let sink = 0;

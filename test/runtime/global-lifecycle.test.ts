@@ -505,8 +505,7 @@ function createSchema<Input = unknown, Output = Input>(
   validate: (
     value: unknown,
   ) =>
-    | StandardSchemaV1.Result<Output>
-    | Promise<StandardSchemaV1.Result<Output>>,
+    StandardSchemaV1.Result<Output> | Promise<StandardSchemaV1.Result<Output>>,
 ): StandardSchemaV1<Input, Output> {
   return {
     "~standard": {

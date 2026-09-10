@@ -15,14 +15,7 @@ import type {
 import type { Equal, Expect } from "./assert";
 
 type FrozenHttpMethod =
-  | "GET"
-  | "POST"
-  | "PUT"
-  | "PATCH"
-  | "DELETE"
-  | "OPTIONS"
-  | "HEAD"
-  | "QUERY";
+  "GET" | "POST" | "PUT" | "PATCH" | "DELETE" | "OPTIONS" | "HEAD" | "QUERY";
 
 type HttpMethodShape = Expect<Equal<HttpMethod, FrozenHttpMethod>>;
 

@@ -34,8 +34,7 @@ export interface FlatAotManagedInputBinding {
 }
 
 export type FlatAotManagedInputBindings = readonly (
-  | FlatAotManagedInputBinding
-  | undefined
+  FlatAotManagedInputBinding | undefined
 )[];
 
 export interface FlatAotManagedRuntimeBinding {
@@ -134,18 +133,11 @@ export function installFlatAotManagedRuntime(
     binding.inputBindings,
   );
 
-  const router = hydrateFlatRouter(
-    methodNames,
-    flatRouter,
-    routes,
-  );
+  const router = hydrateFlatRouter(methodNames, flatRouter, routes);
 
   const control = app[GELIS_INTERNAL_RUNTIME]();
 
-  control.installPrebuiltRuntime(
-    router,
-    routes,
-  );
+  control.installPrebuiltRuntime(router, routes);
 }
 
 function bindFlatManagedRoutes(

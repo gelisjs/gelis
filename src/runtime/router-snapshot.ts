@@ -25,8 +25,7 @@ export interface MethodRoutesSnapshot {
   readonly staticRoutes: readonly (readonly [string, number])[];
 
   readonly trailingParamRoutes:
-    | readonly (readonly [string, TrailingParamRouteSnapshot])[]
-    | undefined;
+    readonly (readonly [string, TrailingParamRouteSnapshot])[] | undefined;
 
   readonly dynamicRoot: DynamicNodeSnapshot;
 
@@ -47,8 +46,7 @@ export interface DynamicRouteSnapshot {
 
 export interface DynamicNodeSnapshot {
   readonly staticChildren:
-    | readonly (readonly [string, DynamicNodeSnapshot])[]
-    | undefined;
+    readonly (readonly [string, DynamicNodeSnapshot])[] | undefined;
 
   readonly paramChild: DynamicNodeSnapshot | undefined;
 

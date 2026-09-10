@@ -8,10 +8,7 @@ const WARMUP_ITERATIONS = 10_000;
 const MEASURED_ITERATIONS = 20_000;
 
 type Workload =
-  | "plain-static"
-  | "plain-dynamic"
-  | "query-json"
-  | "rich-managed";
+  "plain-static" | "plain-dynamic" | "query-json" | "rich-managed";
 
 interface RuntimeContext {
   readonly params: Record<string, string>;
@@ -23,10 +20,7 @@ type RuntimeHandler = (context: RuntimeContext) => unknown;
 
 type RuntimeBeforeHandle = (context: RuntimeContext) => unknown;
 
-type RuntimeAfterHandle = (
-  context: RuntimeContext,
-  result: unknown,
-) => unknown;
+type RuntimeAfterHandle = (context: RuntimeContext, result: unknown) => unknown;
 
 interface AppLike {
   get(path: string, handler: RuntimeHandler): unknown;
@@ -203,8 +197,7 @@ function createRequest(selectedWorkload: Workload): Request {
 
   const dynamicSuffix = selectedWorkload === "rich-managed" ? "/target" : "";
   const url =
-    `http://gelis.test/r/${TARGET_INDEX}${dynamicSuffix}` +
-    "?q=gelis";
+    `http://gelis.test/r/${TARGET_INDEX}${dynamicSuffix}` + "?q=gelis";
 
   const payload = {
     value: "gelis",
@@ -250,7 +243,11 @@ async function verifyCorrectness(
       readonly body?: unknown;
     };
 
-    if (body.id !== "target" || body.query === undefined || body.body === undefined) {
+    if (
+      body.id !== "target" ||
+      body.query === undefined ||
+      body.body === undefined
+    ) {
       throw new Error("P9-F rich-managed correctness validation failed");
     }
   }

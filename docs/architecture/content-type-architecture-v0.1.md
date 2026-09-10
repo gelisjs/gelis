@@ -133,11 +133,7 @@ interface RouteOptions {
 }
 
 type RequestBodyParser =
-  | "json"
-  | "text"
-  | "urlencoded"
-  | "multipart"
-  | "arrayBuffer";
+  "json" | "text" | "urlencoded" | "multipart" | "arrayBuffer";
 ```
 
 `body: schema` remains the backwards-compatible JSON shorthand.
@@ -392,13 +388,13 @@ No P9-E3 reader may introduce request-time interpretation of the public `bodyPar
 
 The built-in parser defaults are:
 
-| `bodyParser` | Default accepted media type | Value passed to Standard Schema |
-| --- | --- | --- |
-| `json` | existing JSON defaults | parsed JSON value |
-| `text` | `text/plain` | `string` |
-| `urlencoded` | `application/x-www-form-urlencoded` | normalized null-prototype object |
-| `multipart` | `multipart/form-data` | normalized null-prototype object |
-| `arrayBuffer` | `application/octet-stream` | `ArrayBuffer` |
+| `bodyParser`  | Default accepted media type         | Value passed to Standard Schema  |
+| ------------- | ----------------------------------- | -------------------------------- |
+| `json`        | existing JSON defaults              | parsed JSON value                |
+| `text`        | `text/plain`                        | `string`                         |
+| `urlencoded`  | `application/x-www-form-urlencoded` | normalized null-prototype object |
+| `multipart`   | `multipart/form-data`               | normalized null-prototype object |
+| `arrayBuffer` | `application/octet-stream`          | `ArrayBuffer`                    |
 
 `text` does not implicitly accept `text/*`. Other textual representations such as `text/csv` or `text/xml` require an explicit `bodyContentTypes` declaration.
 
@@ -479,10 +475,7 @@ type UrlEncodedBody = Record<string, string | string[]>;
 Multipart values have the conceptual shape:
 
 ```ts
-type MultipartBody = Record<
-  string,
-  string | File | Array<string | File>
->;
+type MultipartBody = Record<string, string | File | Array<string | File>>;
 ```
 
 Normalization rules are:
@@ -515,15 +508,15 @@ The implementation must not invent or synthesize a multipart boundary that is ab
 
 P9-E3 preserves the frozen error separation:
 
-| Condition | Status |
-| --- | --- |
-| missing `Content-Type` on a managed body | `415` |
-| unsupported media-type essence | `415` |
-| ambiguous comma-combined `Content-Type` | `415` |
-| accepted media type with malformed representation | `400` |
-| multipart boundary missing/invalid/unusable | `400` |
-| request-body consumption/decoder failure | `400` |
-| Standard Schema issues | `422` |
+| Condition                                         | Status |
+| ------------------------------------------------- | ------ |
+| missing `Content-Type` on a managed body          | `415`  |
+| unsupported media-type essence                    | `415`  |
+| ambiguous comma-combined `Content-Type`           | `415`  |
+| accepted media type with malformed representation | `400`  |
+| multipart boundary missing/invalid/unusable       | `400`  |
+| request-body consumption/decoder failure          | `400`  |
+| Standard Schema issues                            | `422`  |
 
 A decoder may have no ordinary malformed-syntax state. In particular, `text` and `arrayBuffer` primarily produce `400` only when body consumption fails, while URL-encoded parsing follows its forgiving Web grammar.
 

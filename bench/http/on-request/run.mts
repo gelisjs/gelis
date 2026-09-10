@@ -409,9 +409,7 @@ function startServer(
   );
 }
 
-async function waitUntilReady(
-  benchmarkCase: OnRequestHttpCase,
-): Promise<void> {
+async function waitUntilReady(benchmarkCase: OnRequestHttpCase): Promise<void> {
   const query = benchmarkCase.query ? "?page=42&q=gelis" : "";
 
   const url = `http://127.0.0.1:${PORT}/r/0${query}`;

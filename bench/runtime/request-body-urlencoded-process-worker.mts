@@ -6,8 +6,7 @@ const ROUTES = 5_000;
 const TARGET_INDEX = ROUTES - 1;
 const WARMUP_ITERATIONS = 10_000;
 const MEASURED_ITERATIONS = 20_000;
-const PAYLOAD =
-  "name=Gelis+Framework&tag=a&tag=b&q=hello+world&literal=%ZZ";
+const PAYLOAD = "name=Gelis+Framework&tag=a&tag=b&q=hello+world&literal=%ZZ";
 
 type Variant = "manual" | "managed";
 type FormBody = Record<string, string | string[]>;

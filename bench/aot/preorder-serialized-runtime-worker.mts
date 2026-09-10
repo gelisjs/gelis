@@ -70,8 +70,7 @@ const loadMs = performance.now() - loadStarted;
 const parseStarted = performance.now();
 
 const parsed = JSON.parse(text) as
-  | FlatAotArtifact
-  | PreorderAotArtifactCandidate;
+  FlatAotArtifact | PreorderAotArtifactCandidate;
 
 const parseMs = performance.now() - parseStarted;
 

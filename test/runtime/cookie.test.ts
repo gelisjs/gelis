@@ -170,9 +170,9 @@ describe("P11-C cookie serialization", () => {
       `Max-Age=${MAX_AGE}`,
     );
 
-    expect(() =>
-      generateCookie("age", "bad", { maxAge: MAX_AGE + 1 }),
-    ).toThrow(RangeError);
+    expect(() => generateCookie("age", "bad", { maxAge: MAX_AGE + 1 })).toThrow(
+      RangeError,
+    );
   });
 
   test("rejects invalid and overlong Expires values", () => {
@@ -291,9 +291,11 @@ describe("P11-C signed cookies", () => {
     const signed = getCookie(request, "session")!;
     const tampered = `X${signed.slice(1)}`;
 
-    await expect(verifySignedCookie(tampered, CURRENT_SECRET)).resolves.toEqual({
-      status: "invalid",
-    });
+    await expect(verifySignedCookie(tampered, CURRENT_SECRET)).resolves.toEqual(
+      {
+        status: "invalid",
+      },
+    );
 
     await expect(
       verifySignedCookie("not-a-signed-cookie", CURRENT_SECRET),
@@ -445,7 +447,8 @@ function cookieRequest(cookie: string): Request {
 
 function requestFromSetCookie(setCookieValue: string): Request {
   const separator = setCookieValue.indexOf(";");
-  const pair = separator === -1 ? setCookieValue : setCookieValue.slice(0, separator);
+  const pair =
+    separator === -1 ? setCookieValue : setCookieValue.slice(0, separator);
 
   return cookieRequest(pair);
 }

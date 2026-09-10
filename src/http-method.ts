@@ -7,14 +7,7 @@
  */
 
 export type HttpMethod =
-  | "GET"
-  | "POST"
-  | "PUT"
-  | "PATCH"
-  | "DELETE"
-  | "OPTIONS"
-  | "HEAD"
-  | "QUERY";
+  "GET" | "POST" | "PUT" | "PATCH" | "DELETE" | "OPTIONS" | "HEAD" | "QUERY";
 
 /*
  * Reserved by Gelis for the P9-C ALL pseudo-method.
@@ -26,12 +19,7 @@ export const ALL_ROUTE_METHOD = "*" as const;
 type FetchForbiddenMethod = "CONNECT" | "TRACE" | "TRACK";
 
 type FetchNormalizedMethod =
-  | "DELETE"
-  | "GET"
-  | "HEAD"
-  | "OPTIONS"
-  | "POST"
-  | "PUT";
+  "DELETE" | "GET" | "HEAD" | "OPTIONS" | "POST" | "PUT";
 
 type HttpTokenCharacter =
   | "!"

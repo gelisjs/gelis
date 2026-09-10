@@ -70,11 +70,11 @@ control→candidate and candidate→control orientations
 
 Final summary:
 
-| profile | ready ratio | first-fetch ratio | RSS ratio | artifact | version | zero-unused | verdict |
-| --- | ---: | ---: | ---: | --- | --- | --- | --- |
-| static | 0.9791x | 0.9867x | 1.0012x | exact | exact | yes | PASS |
-| trailing | 0.9659x | 0.9867x | 1.0084x | exact | exact | yes | PASS |
-| mixed-balanced | 0.9768x | 1.0029x | 1.0020x | exact | exact | yes | PASS |
+| profile        | ready ratio | first-fetch ratio | RSS ratio | artifact | version | zero-unused | verdict |
+| -------------- | ----------: | ----------------: | --------: | -------- | ------- | ----------- | ------- |
+| static         |     0.9791x |           0.9867x |   1.0012x | exact    | exact   | yes         | PASS    |
+| trailing       |     0.9659x |           0.9867x |   1.0084x | exact    | exact   | yes         | PASS    |
+| mixed-balanced |     0.9768x |           1.0029x |   1.0020x | exact    | exact   | yes         | PASS    |
 
 Aggregate:
 
@@ -119,11 +119,11 @@ Bun.gc(true) inside measured worker
 
 Final summary:
 
-| workload | mirrored AOT/normal delta | gate | verdict |
-| --- | ---: | ---: | --- |
-| JSON shorthand | -7.91% | <= +3% | PASS |
-| query + JSON | +0.64% | <= +3% | PASS |
-| multipart | +0.27% | <= +3% | PASS |
+| workload       | mirrored AOT/normal delta |   gate | verdict |
+| -------------- | ------------------------: | -----: | ------- |
+| JSON shorthand |                    -7.91% | <= +3% | PASS    |
+| query + JSON   |                    +0.64% | <= +3% | PASS    |
+| multipart      |                    +0.27% | <= +3% | PASS    |
 
 Order buckets remain diagnostic only.
 

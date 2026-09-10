@@ -1,4 +1,8 @@
 {
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+  "editor.formatOnSave": true,
+  "prettier.requireConfig": true,
+  "prettier.useEditorConfig": true,
   "github.copilot.chat.commitMessageGeneration.instructions": [
     {
       "text": "Generate commit messages in English using Conventional Commits format: <type>(<scope>): <description>."

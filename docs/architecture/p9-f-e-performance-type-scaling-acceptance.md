@@ -56,16 +56,16 @@ check-time ratio     <= 1.25x
 
 Observed relative results:
 
-| scenario | control | routes | inst ratio | memory ratio | check ratio | verdict |
-| --- | --- | ---: | ---: | ---: | ---: | --- |
-| p9-method-mix | routes | 100 | 1.0161x | 1.0039x | 0.9618x | PASS |
-| p9-rich | rich-contract | 100 | 1.0128x | 1.0141x | 1.0030x | PASS |
-| p9-method-mix | routes | 500 | 1.0219x | 1.0066x | 1.0130x | PASS |
-| p9-rich | rich-contract | 500 | 1.0056x | 1.0246x | 1.0531x | PASS |
-| p9-method-mix | routes | 1000 | 1.0190x | 1.0067x | 1.0285x | PASS |
-| p9-rich | rich-contract | 1000 | 1.0031x | 1.0292x | 1.0520x | PASS |
-| p9-method-mix | routes | 5000 | 1.0143x | 1.0054x | 1.0344x | PASS |
-| p9-rich | rich-contract | 5000 | 1.0007x | 1.0405x | 0.9744x | PASS |
+| scenario      | control       | routes | inst ratio | memory ratio | check ratio | verdict |
+| ------------- | ------------- | -----: | ---------: | -----------: | ----------: | ------- |
+| p9-method-mix | routes        |    100 |    1.0161x |      1.0039x |     0.9618x | PASS    |
+| p9-rich       | rich-contract |    100 |    1.0128x |      1.0141x |     1.0030x | PASS    |
+| p9-method-mix | routes        |    500 |    1.0219x |      1.0066x |     1.0130x | PASS    |
+| p9-rich       | rich-contract |    500 |    1.0056x |      1.0246x |     1.0531x | PASS    |
+| p9-method-mix | routes        |   1000 |    1.0190x |      1.0067x |     1.0285x | PASS    |
+| p9-rich       | rich-contract |   1000 |    1.0031x |      1.0292x |     1.0520x | PASS    |
+| p9-method-mix | routes        |   5000 |    1.0143x |      1.0054x |     1.0344x | PASS    |
+| p9-rich       | rich-contract |   5000 |    1.0007x |      1.0405x |     0.9744x | PASS    |
 
 All per-size gates passed.
 
@@ -80,10 +80,10 @@ check-time growth     <= 6.0x
 
 Observed:
 
-| scenario | instantiations growth | check-time growth | verdict |
-| --- | ---: | ---: | --- |
-| p9-method-mix | 3.4592x | 1.6677x | PASS |
-| p9-rich | 4.6524x | 4.1829x | PASS |
+| scenario      | instantiations growth | check-time growth | verdict |
+| ------------- | --------------------: | ----------------: | ------- |
+| p9-method-mix |               3.4592x |           1.6677x | PASS    |
+| p9-rich       |               4.6524x |           4.1829x | PASS    |
 
 Both growth gates passed.
 
@@ -135,12 +135,12 @@ mirrored median candidate/control delta <= +3.0%
 
 Observed final summary:
 
-| workload | mirrored delta | control-start diagnostic | candidate-start diagnostic | gate | verdict |
-| --- | ---: | ---: | ---: | ---: | --- |
-| plain-static | +2.31% | +5.66% | -0.90% | <= +3.0% | PASS |
-| plain-dynamic | +0.34% | +2.25% | -0.84% | <= +3.0% | PASS |
-| query-json | +0.59% | +1.48% | -0.77% | <= +3.0% | PASS |
-| rich-managed | +0.01% | -0.32% | +2.32% | <= +3.0% | PASS |
+| workload      | mirrored delta | control-start diagnostic | candidate-start diagnostic |     gate | verdict |
+| ------------- | -------------: | -----------------------: | -------------------------: | -------: | ------- |
+| plain-static  |         +2.31% |                   +5.66% |                     -0.90% | <= +3.0% | PASS    |
+| plain-dynamic |         +0.34% |                   +2.25% |                     -0.84% | <= +3.0% | PASS    |
+| query-json    |         +0.59% |                   +1.48% |                     -0.77% | <= +3.0% | PASS    |
+| rich-managed  |         +0.01% |                   -0.32% |                     +2.32% | <= +3.0% | PASS    |
 
 All cumulative runtime workloads passed.
 

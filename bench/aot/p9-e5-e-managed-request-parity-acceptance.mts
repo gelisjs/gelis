@@ -45,7 +45,9 @@ console.log("Warmup:         10,000 async app.fetch calls/worker");
 console.log("Measurement:    20,000 async app.fetch calls/measurement");
 console.log("GC:             Bun.gc(true) inside measured worker");
 console.log("Combine:        geometric mean of mirrored AOT/normal ratios");
-console.log(`Gate:           mirrored median delta <= +${MAX_DELTA_PERCENT}% per workload`);
+console.log(
+  `Gate:           mirrored median delta <= +${MAX_DELTA_PERCENT}% per workload`,
+);
 console.log("Order buckets:  diagnostic only\n");
 
 const results = [];
@@ -130,7 +132,9 @@ async function runWorkload(workload: Workload): Promise<{
     ]);
   }
 
-  const mirroredMedianDelta = median(samples.map((sample) => sample.deltaPercent));
+  const mirroredMedianDelta = median(
+    samples.map((sample) => sample.deltaPercent),
+  );
   const normalStartMedianDelta = median(
     samples
       .filter((sample) => sample.order === "normal-start")

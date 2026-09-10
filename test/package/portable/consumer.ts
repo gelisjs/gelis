@@ -1,9 +1,5 @@
 import { Gelis } from "gelis";
-import {
-  generateCookie,
-  getCookie,
-  setCookie,
-} from "gelis/cookie";
+import { generateCookie, getCookie, setCookie } from "gelis/cookie";
 import { cors } from "gelis/cors";
 
 const app = new Gelis();

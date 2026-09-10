@@ -57,7 +57,7 @@ responses: {
 For v0.1 Gelis therefore does **not** add:
 
 ```ts
-serialize: "html"
+serialize: "html";
 ```
 
 and does not add a separate HTML response engine.

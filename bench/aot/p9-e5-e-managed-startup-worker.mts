@@ -34,7 +34,9 @@ const response = await app.fetch(
 const firstFetchUs = (performance.now() - firstStarted) * 1_000;
 
 if (response.status !== 200) {
-  throw new Error(`Unexpected managed startup response status: ${response.status}`);
+  throw new Error(
+    `Unexpected managed startup response status: ${response.status}`,
+  );
 }
 
 if ((await response.text()) !== "ok") {

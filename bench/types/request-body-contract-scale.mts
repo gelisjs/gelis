@@ -29,9 +29,7 @@ const EXPLICIT_GATES = {
 type BenchmarkSize = (typeof DEFAULT_SIZES)[number];
 
 type CaseName =
-  | "control-shorthand"
-  | "candidate-shorthand"
-  | "candidate-explicit";
+  "control-shorthand" | "candidate-shorthand" | "candidate-explicit";
 
 interface TypeDiagnostics {
   readonly instantiations: number;

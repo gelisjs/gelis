@@ -193,8 +193,7 @@ interface ScopedRuntimeModuleLifecycle {
 }
 
 type RuntimeModuleLifecycle =
-  | StaticRuntimeModuleLifecycle
-  | ScopedRuntimeModuleLifecycle;
+  StaticRuntimeModuleLifecycle | ScopedRuntimeModuleLifecycle;
 
 interface RuntimeModuleDefinition {
   readonly routes: readonly RuntimeRouteRecord[];
@@ -219,8 +218,7 @@ interface ModuleSetupFrame {
 type ModuleMountCommit = (routes: readonly RuntimeRouteRecord[]) => void;
 
 type ModuleRuntimeInstantiation =
-  | readonly RuntimeRouteRecord[]
-  | Promise<readonly RuntimeRouteRecord[]>;
+  readonly RuntimeRouteRecord[] | Promise<readonly RuntimeRouteRecord[]>;
 
 class ModuleSetupContextRuntime implements ModuleSetupContext {
   readonly #frame: ModuleSetupFrame;

@@ -21,8 +21,7 @@ import type { RuntimeRouteRecord } from "../../src/runtime/types.ts";
 
 export type HybridAotNodeCandidate = readonly [
   staticChildren:
-    | 0
-    | readonly (readonly [segment: string, child: HybridAotNodeCandidate])[],
+    0 | readonly (readonly [segment: string, child: HybridAotNodeCandidate])[],
 
   paramChild: 0 | HybridAotNodeCandidate,
 

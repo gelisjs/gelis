@@ -369,12 +369,10 @@ function bindRequestScopeRoute<Scope extends object>(
     derive: derive as RuntimeRequestScopeDerive,
 
     beforeHandle: route.beforeHandle as unknown as
-      | RuntimeRequestScopeBeforeHandle
-      | undefined,
+      RuntimeRequestScopeBeforeHandle | undefined,
 
     afterHandle: route.afterHandle as unknown as
-      | RuntimeRequestScopeAfterHandle
-      | undefined,
+      RuntimeRequestScopeAfterHandle | undefined,
   };
 
   return {

@@ -25,8 +25,7 @@ type Scenario = (typeof scenarios)[number];
 type Validate = (
   value: unknown,
 ) =>
-  | StandardSchemaV1.Result<unknown>
-  | Promise<StandardSchemaV1.Result<unknown>>;
+  StandardSchemaV1.Result<unknown> | Promise<StandardSchemaV1.Result<unknown>>;
 
 interface PairSample {
   readonly sample: number;

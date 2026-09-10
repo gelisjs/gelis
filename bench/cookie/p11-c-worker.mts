@@ -70,7 +70,9 @@ function measureSync(
   for (let index = 0; index < warmupCount; index++) {
     const value = operation();
     if (isPromiseLike(value)) {
-      throw new Error("Unsigned cookie benchmark unexpectedly returned a Promise");
+      throw new Error(
+        "Unsigned cookie benchmark unexpectedly returned a Promise",
+      );
     }
     sink ^= consume(value);
   }
@@ -80,7 +82,9 @@ function measureSync(
   for (let index = 0; index < iterationCount; index++) {
     const value = operation();
     if (isPromiseLike(value)) {
-      throw new Error("Unsigned cookie benchmark unexpectedly returned a Promise");
+      throw new Error(
+        "Unsigned cookie benchmark unexpectedly returned a Promise",
+      );
     }
     sink ^= consume(value);
   }
@@ -253,7 +257,9 @@ async function createHonoSignedReadOperation(
   });
 
   if (operation === undefined) {
-    throw new Error("Failed to initialize Hono signed-cookie benchmark context");
+    throw new Error(
+      "Failed to initialize Hono signed-cookie benchmark context",
+    );
   }
 
   return operation;

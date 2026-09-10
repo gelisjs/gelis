@@ -19,8 +19,7 @@ type Shape = (typeof SHAPES)[number];
 
 type CompactHybridNode = readonly [
   staticChildren:
-    | 0
-    | readonly (readonly [segment: string, child: CompactHybridNode])[],
+    0 | readonly (readonly [segment: string, child: CompactHybridNode])[],
 
   paramChild: 0 | CompactHybridNode,
 

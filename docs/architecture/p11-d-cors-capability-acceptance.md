@@ -151,12 +151,12 @@ No frozen threshold was changed.
 
 ## Final zero-unused result
 
-| scenario | control ns/op | candidate ns/op | candidate/control | gate |
-| --- | ---: | ---: | ---: | --- |
-| static-raw | 351.8 | 351.4 | 1.0040x | PASS |
-| dynamic-raw | 500.4 | 502.5 | 1.0227x | PASS |
-| static-json | 713.0 | 699.6 | 1.0008x | PASS |
-| dynamic-json | 833.6 | 880.5 | 1.0243x | PASS |
+| scenario     | control ns/op | candidate ns/op | candidate/control | gate |
+| ------------ | ------------: | --------------: | ----------------: | ---- |
+| static-raw   |         351.8 |           351.4 |           1.0040x | PASS |
+| dynamic-raw  |         500.4 |           502.5 |           1.0227x | PASS |
+| static-json  |         713.0 |           699.6 |           1.0008x | PASS |
+| dynamic-json |         833.6 |           880.5 |           1.0243x | PASS |
 
 ```text
 zero-unused geomean: 1.0129x <= 1.015x => PASS
@@ -166,13 +166,13 @@ This is evidence that the accepted CORS architecture preserves the frozen no-fea
 
 ## Final enabled CORS comparison
 
-| scenario | Gelis ns/op | Hono ns/op | Gelis/Hono | gate |
-| --- | ---: | ---: | ---: | --- |
-| actual-wildcard | 1727.5 | 3716.6 | 0.4731x | PASS |
-| actual-allowlist | 1832.2 | 4378.3 | 0.4120x | PASS |
-| actual-credentialed | 2076.7 | 5141.2 | 0.3975x | PASS |
-| preflight-static-methods | 3465.4 | 3228.2 | 1.0667x | PASS |
-| actual-dynamic-origin | 1776.6 | 4361.0 | 0.4136x | PASS |
+| scenario                 | Gelis ns/op | Hono ns/op | Gelis/Hono | gate |
+| ------------------------ | ----------: | ---------: | ---------: | ---- |
+| actual-wildcard          |      1727.5 |     3716.6 |    0.4731x | PASS |
+| actual-allowlist         |      1832.2 |     4378.3 |    0.4120x | PASS |
+| actual-credentialed      |      2076.7 |     5141.2 |    0.3975x | PASS |
+| preflight-static-methods |      3465.4 |     3228.2 |    1.0667x | PASS |
+| actual-dynamic-origin    |      1776.6 |     4361.0 |    0.4136x | PASS |
 
 ```text
 enabled static geomean: 0.5362x <= 1.05x => PASS

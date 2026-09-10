@@ -100,7 +100,9 @@ try {
   ]);
 }
 
-const mirroredMedianDelta = median(samples.map((sample) => sample.deltaPercent));
+const mirroredMedianDelta = median(
+  samples.map((sample) => sample.deltaPercent),
+);
 const manualStartMedianDelta = median(
   samples
     .filter((sample) => sample.order === "manual-start")

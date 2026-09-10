@@ -72,5 +72,8 @@ function methodTokens(response: Response): string[] {
 
   return value === null
     ? []
-    : value.split(",").map((method) => method.trim()).filter(Boolean);
+    : value
+        .split(",")
+        .map((method) => method.trim())
+        .filter(Boolean);
 }

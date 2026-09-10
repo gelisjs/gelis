@@ -75,9 +75,7 @@ describe("managed request-body flat AOT binding", () => {
       "const __gelisAotInputBindings = new Array(1);",
     );
 
-    expect(result.code).toContain(
-      "const __gI = __gelisAotInputBindings;",
-    );
+    expect(result.code).toContain("const __gI = __gelisAotInputBindings;");
 
     expect(result.code).toContain(
       "const __gC = __gelisAotCaptureManagedInput;",

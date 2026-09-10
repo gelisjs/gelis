@@ -8,11 +8,7 @@ const WARMUP_ITERATIONS = 10_000;
 const MEASURED_ITERATIONS = 20_000;
 
 type Workload =
-  | "plain"
-  | "query-only"
-  | "body-json"
-  | "query-body-json"
-  | "custom-json";
+  "plain" | "query-only" | "body-json" | "query-body-json" | "custom-json";
 
 interface AppLike {
   post(path: string, handler: () => unknown): unknown;
@@ -130,15 +126,15 @@ function createApplication(
 
 function createRequest(selectedWorkload: Workload): Request {
   const needsQuery =
-    selectedWorkload === "query-only" ||
-    selectedWorkload === "query-body-json";
+    selectedWorkload === "query-only" || selectedWorkload === "query-body-json";
 
   const url = `http://gelis.test/r/${TARGET_INDEX}${needsQuery ? "?q=1" : ""}`;
 
   const contentType =
     selectedWorkload === "custom-json"
       ? "application/vnd.gelis+json"
-      : selectedWorkload === "body-json" || selectedWorkload === "query-body-json"
+      : selectedWorkload === "body-json" ||
+          selectedWorkload === "query-body-json"
         ? "application/json"
         : null;
 

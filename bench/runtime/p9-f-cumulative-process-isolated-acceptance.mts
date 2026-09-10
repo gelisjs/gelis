@@ -9,10 +9,7 @@ const SAMPLES = 41;
 const MAX_DELTA_PERCENT = 3;
 
 type Workload =
-  | "plain-static"
-  | "plain-dynamic"
-  | "query-json"
-  | "rich-managed";
+  "plain-static" | "plain-dynamic" | "query-json" | "rich-managed";
 
 interface WorkerClient {
   readonly measure: () => Promise<number>;
@@ -61,8 +58,12 @@ console.log("Pair shape:     semantic ABBA / BAAB");
 console.log("Warmup:         10,000 app.fetch calls/worker");
 console.log("Measurement:    20,000 app.fetch calls/measurement");
 console.log("GC:             Bun.gc(true) inside measured worker");
-console.log("Combine:        geometric mean of canonical candidate/control ratios");
-console.log(`Gate:           mirrored median delta <= +${MAX_DELTA_PERCENT}% per workload`);
+console.log(
+  "Combine:        geometric mean of canonical candidate/control ratios",
+);
+console.log(
+  `Gate:           mirrored median delta <= +${MAX_DELTA_PERCENT}% per workload`,
+);
 console.log("Order buckets:  diagnostic only");
 
 const results = [];

@@ -10,9 +10,7 @@ export type OnError = (
 ) => unknown | PromiseLike<unknown>;
 
 export type ResponseContractErrorKind =
-  | "validation"
-  | "serialization"
-  | "status";
+  "validation" | "serialization" | "status";
 
 export interface ResponseContractErrorOptions {
   readonly kind: ResponseContractErrorKind;

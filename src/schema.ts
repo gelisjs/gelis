@@ -103,10 +103,7 @@ export declare namespace StandardJSONSchemaV1 {
   }
 
   export type Target =
-    | "draft-2020-12"
-    | "draft-07"
-    | "openapi-3.0"
-    | ({} & string);
+    "draft-2020-12" | "draft-07" | "openapi-3.0" | ({} & string);
 
   export interface Options {
     readonly target: Target;

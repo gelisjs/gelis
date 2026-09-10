@@ -200,8 +200,7 @@ export interface RuntimeStaticModuleRequestScopePlan {
   readonly derive: RuntimeStaticModuleRequestScopeDerive;
 
   readonly beforeHandle:
-    | RuntimeStaticModuleRequestScopeBeforeHandle
-    | undefined;
+    RuntimeStaticModuleRequestScopeBeforeHandle | undefined;
 
   readonly afterHandle: RuntimeStaticModuleRequestScopeAfterHandle | undefined;
 
@@ -216,8 +215,7 @@ export interface RuntimeScopedModuleRequestScopePlan {
   readonly derive: RuntimeScopedModuleRequestScopeDerive;
 
   readonly beforeHandle:
-    | RuntimeScopedModuleRequestScopeBeforeHandle
-    | undefined;
+    RuntimeScopedModuleRequestScopeBeforeHandle | undefined;
 
   readonly afterHandle: RuntimeScopedModuleRequestScopeAfterHandle | undefined;
 
@@ -227,8 +225,7 @@ export interface RuntimeScopedModuleRequestScopePlan {
 }
 
 export type RuntimeModuleRequestScopePlan =
-  | RuntimeStaticModuleRequestScopePlan
-  | RuntimeScopedModuleRequestScopePlan;
+  RuntimeStaticModuleRequestScopePlan | RuntimeScopedModuleRequestScopePlan;
 
 export interface RuntimeRouteRecord {
   readonly method: string;

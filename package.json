@@ -37,7 +37,9 @@
   },
   "homepage": "https://github.com/gelisjs/gelis#readme",
   "scripts": {
-    "check": "bun run typecheck && bun run typecheck:package:portable && bun run typecheck:package:bun && bun run typecheck:bench && bun run test:types && bun run typecheck:runtime-tests && bun run typecheck:bun-adapter && bun run test:package && bun run test:runtime",
+    "format": "prettier . --write",
+    "format:check": "prettier . --check",
+    "check": "bun run format:check && bun run typecheck && bun run typecheck:package:portable && bun run typecheck:package:bun && bun run typecheck:bench && bun run test:types && bun run typecheck:runtime-tests && bun run typecheck:bun-adapter && bun run test:package && bun run test:runtime",
     "typecheck": "bun ./node_modules/typescript/bin/tsc -p tsconfig.json --noEmit",
     "typecheck:bench": "bun ./node_modules/typescript/bin/tsc -p bench/tsconfig.json --noEmit",
     "test:types": "bun ./node_modules/typescript/bin/tsc -p test/types/tsconfig.json --noEmit",
@@ -122,6 +124,7 @@
     "elysia": "^1.4.30",
     "elysia-v2": "npm:elysia@2.0.0-beta.11",
     "hono": "^4.13.5",
+    "prettier": "3.9.6",
     "typescript": "7.0.2"
   }
 }

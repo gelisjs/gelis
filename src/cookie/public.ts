@@ -61,21 +61,14 @@ export function getCookie(request: Request, name: string): string | undefined {
   }
 
   const header = request.headers.get("cookie");
-  if (
-    header === null ||
-    header.length === 0 ||
-    header.indexOf(name) === -1
-  ) {
+  if (header === null || header.length === 0 || header.indexOf(name) === -1) {
     return undefined;
   }
 
   return findCookieValue(header, name);
 }
 
-export function getCookies(
-  request: Request,
-  name: string,
-): readonly string[];
+export function getCookies(request: Request, name: string): readonly string[];
 export function getCookies(
   request: Request,
 ): Readonly<Record<string, readonly string[]>>;
@@ -285,14 +278,14 @@ function parseNamedCookieValue(
   }
 
   let nameEnd = equals;
-  while (nameEnd > start && isOptionalWhitespace(header.charCodeAt(nameEnd - 1))) {
+  while (
+    nameEnd > start &&
+    isOptionalWhitespace(header.charCodeAt(nameEnd - 1))
+  ) {
     nameEnd -= 1;
   }
 
-  if (
-    nameEnd - start !== name.length ||
-    !header.startsWith(name, start)
-  ) {
+  if (nameEnd - start !== name.length || !header.startsWith(name, start)) {
     return null;
   }
 
@@ -342,7 +335,10 @@ function parseCookiePair(
   }
 
   let nameEnd = equals;
-  while (nameEnd > start && isOptionalWhitespace(header.charCodeAt(nameEnd - 1))) {
+  while (
+    nameEnd > start &&
+    isOptionalWhitespace(header.charCodeAt(nameEnd - 1))
+  ) {
     nameEnd -= 1;
   }
 

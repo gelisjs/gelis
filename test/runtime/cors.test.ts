@@ -80,7 +80,9 @@ describe("P11-D CORS actual responses", () => {
       headers: { Origin: ORIGIN },
     });
 
-    expect(syncResponse.headers.get("access-control-allow-origin")).toBe(ORIGIN);
+    expect(syncResponse.headers.get("access-control-allow-origin")).toBe(
+      ORIGIN,
+    );
     expect(syncCalls).toBe(1);
 
     let asyncCalls = 0;
@@ -100,7 +102,9 @@ describe("P11-D CORS actual responses", () => {
       headers: { Origin: ORIGIN },
     });
 
-    expect(asyncResponse.headers.get("access-control-allow-origin")).toBe(ORIGIN);
+    expect(asyncResponse.headers.get("access-control-allow-origin")).toBe(
+      ORIGIN,
+    );
     expect(asyncCalls).toBe(1);
   });
 
@@ -146,7 +150,9 @@ describe("P11-D CORS actual responses", () => {
     });
 
     expect(response.headers.get("access-control-allow-origin")).toBe(ORIGIN);
-    expect(response.headers.get("access-control-allow-credentials")).toBe("true");
+    expect(response.headers.get("access-control-allow-credentials")).toBe(
+      "true",
+    );
     expect(response.headers.get("access-control-expose-headers")).toBe(
       "X-Request-Id, ETag",
     );
@@ -214,7 +220,9 @@ describe("P11-D CORS actual responses", () => {
     expect(notFound.status).toBe(404);
     expect(notFound.headers.get("access-control-allow-origin")).toBe("*");
     expect(methodNotAllowed.status).toBe(405);
-    expect(methodNotAllowed.headers.get("access-control-allow-origin")).toBe("*");
+    expect(methodNotAllowed.headers.get("access-control-allow-origin")).toBe(
+      "*",
+    );
   });
 
   test("applies CORS to handled route errors exactly once", async () => {
@@ -241,7 +249,9 @@ describe("P11-D CORS actual responses", () => {
     expect(response.status).toBe(597);
     expect(response.headers.get("access-control-allow-origin")).toBe(ORIGIN);
     expect(resolverCalls).toBe(1);
-    expect(varyTokens(response).filter((token) => token === "origin")).toHaveLength(1);
+    expect(
+      varyTokens(response).filter((token) => token === "origin"),
+    ).toHaveLength(1);
   });
 
   test("preserves HEAD suppression while applying CORS headers", async () => {
@@ -432,7 +442,9 @@ describe("P11-D CORS preflight and method topology", () => {
       "X-Token, Content-Type",
     );
     expect(response.headers.get("access-control-max-age")).toBe("600");
-    expect(varyTokens(response)).not.toContain("access-control-request-headers");
+    expect(varyTokens(response)).not.toContain(
+      "access-control-request-headers",
+    );
   });
 });
 
@@ -458,10 +470,7 @@ describe("P11-D CORS Vary behavior", () => {
   test("preserves Vary wildcard", async () => {
     const app = new Gelis();
     app.use(cors({ origin: ORIGIN }));
-    app.get(
-      "/resource",
-      () => new Response("ok", { headers: { Vary: "*" } }),
-    );
+    app.get("/resource", () => new Response("ok", { headers: { Vary: "*" } }));
 
     const response = await dispatch(app, "/resource", {
       headers: { Origin: ORIGIN },
@@ -500,7 +509,10 @@ function methodTokens(response: Response): string[] {
 
   return value === null
     ? []
-    : value.split(",").map((method) => method.trim()).filter(Boolean);
+    : value
+        .split(",")
+        .map((method) => method.trim())
+        .filter(Boolean);
 }
 
 function varyTokens(response: Response): string[] {

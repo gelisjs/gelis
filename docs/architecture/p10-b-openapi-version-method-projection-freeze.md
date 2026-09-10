@@ -138,14 +138,14 @@ divergent metadata behavior
 For both 3.1.2 and 3.2.0, these Gelis methods map to ordinary Path Item fields:
 
 | Gelis method | Path Item field |
-| --- | --- |
-| GET | `get` |
-| POST | `post` |
-| PUT | `put` |
-| PATCH | `patch` |
-| DELETE | `delete` |
-| OPTIONS | `options` |
-| HEAD | `head` |
+| ------------ | --------------- |
+| GET          | `get`           |
+| POST         | `post`          |
+| PUT          | `put`           |
+| PATCH        | `patch`         |
+| DELETE       | `delete`        |
+| OPTIONS      | `options`       |
+| HEAD         | `head`          |
 
 Existing deterministic behavior and operation collision detection remain.
 
@@ -253,7 +253,7 @@ and generation remains all-or-error under the existing package error model.
 The route can be intentionally omitted with:
 
 ```ts
-openapi: false
+openapi: false;
 ```
 
 P10 v0.1 does **not** automatically expand `ALL` into a finite list of methods.

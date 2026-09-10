@@ -407,8 +407,8 @@ Benchmark:
 
 Result:
 
-| Stage               | Median ns/op | CV |
-| ------------------- | -----------: | -: |
+| Stage               | Median ns/op |     CV |
+| ------------------- | -----------: | -----: |
 | request-json-small  |       337.26 | 28.49% |
 | body-fetch-small    |      1131.04 | 10.15% |
 | request-json-medium |       735.38 | 10.21% |
@@ -441,8 +441,8 @@ Methodology changes:
 
 Result:
 
-| Stage               | Median ns/op | CV |
-| ------------------- | -----------: | -: |
+| Stage               | Median ns/op |    CV |
+| ------------------- | -----------: | ----: |
 | request-json-small  |       326.65 | 5.12% |
 | body-fetch-small    |       892.36 | 3.92% |
 | request-json-medium |       572.96 | 4.01% |
@@ -486,11 +486,11 @@ Paired benchmark:
 
 Result:
 
-| Scenario        | `.then()` ns | `await` ns | Paired delta | Delta | Await faster |
-| --------------- | -----------: | ---------: | -----------: | ----: | -----------: |
-| valid-small     |       490.72 |     511.18 |    +25.12 ns | +5.14% | 9/41 |
-| valid-medium    |       834.71 |     825.52 |     +6.68 ns | +0.82% | 17/41 |
-| malformed-small |      1135.42 |    1542.62 |   +390.77 ns | +35.56% | 0/41 |
+| Scenario        | `.then()` ns | `await` ns | Paired delta |   Delta | Await faster |
+| --------------- | -----------: | ---------: | -----------: | ------: | -----------: |
+| valid-small     |       490.72 |     511.18 |    +25.12 ns |  +5.14% |         9/41 |
+| valid-medium    |       834.71 |     825.52 |     +6.68 ns |  +0.82% |        17/41 |
+| malformed-small |      1135.42 |    1542.62 |   +390.77 ns | +35.56% |         0/41 |
 
 Order halves:
 
@@ -527,12 +527,12 @@ The Gelis side performed the same semantics through `app.fetch()`.
 
 Result:
 
-| Scenario          | Control ns | Gelis ns | Paired delta | Delta | Control faster |
-| ----------------- | ---------: | -------: | -----------: | ----: | -------------: |
-| valid-small       |     603.80 |   865.13 |   +266.53 ns | +43.85% | 41/41 |
-| valid-medium      |     911.29 |  1245.67 |   +339.83 ns | +38.07% | 41/41 |
-| malformed-small   |    1822.08 |  2176.39 |   +340.00 ns | +18.62% | 41/41 |
-| unsupported-media |     700.74 |   878.20 |   +181.13 ns | +25.90% | 41/41 |
+| Scenario          | Control ns | Gelis ns | Paired delta |   Delta | Control faster |
+| ----------------- | ---------: | -------: | -----------: | ------: | -------------: |
+| valid-small       |     603.80 |   865.13 |   +266.53 ns | +43.85% |          41/41 |
+| valid-medium      |     911.29 |  1245.67 |   +339.83 ns | +38.07% |          41/41 |
+| malformed-small   |    1822.08 |  2176.39 |   +340.00 ns | +18.62% |          41/41 |
+| unsupported-media |     700.74 |   878.20 |   +181.13 ns | +25.90% |          41/41 |
 
 Both order halves agreed in all scenarios.
 
@@ -574,8 +574,8 @@ Gelis validated route
 
 Result:
 
-| Scenario          | Manual ns | Native ns | Paired delta | Delta |
-| ----------------- | --------: | --------: | -----------: | ----: |
+| Scenario          | Manual ns | Native ns | Paired delta |  Delta |
+| ----------------- | --------: | --------: | -----------: | -----: |
 | valid-small       |    934.30 |    888.01 |    -21.64 ns | -2.49% |
 | valid-medium      |   1239.75 |   1191.74 |    -47.57 ns | -3.75% |
 | malformed-small   |   2155.09 |   2133.44 |    -20.11 ns | -0.92% |
@@ -645,23 +645,23 @@ CV > 5%
 
 ### Median throughput
 
-| Case        | Gelis | Hono | Elysia 1 | Elysia 1 precompile | Elysia 2 | Elysia 2 AOT |
-| ----------- | ----: | ---: | -------: | -------------------: | --------: | ------------: |
-| query-sync  | 14,771 | 13,223 | 8,729 | 8,919 | 14,390 | 14,337 |
-| query-async | 14,589 | 13,268 | 8,608 | 8,748 | 14,153 | 14,219 |
-| body-sync   | 13,351 | 12,725 | 10,488 | 10,575 | 13,185 | 12,971 |
-| query-body  | 13,118 | 11,912 | 9,862 | 10,014 | 12,775 | 12,795 |
+| Case        |  Gelis |   Hono | Elysia 1 | Elysia 1 precompile | Elysia 2 | Elysia 2 AOT |
+| ----------- | -----: | -----: | -------: | ------------------: | -------: | -----------: |
+| query-sync  | 14,771 | 13,223 |    8,729 |               8,919 |   14,390 |       14,337 |
+| query-async | 14,589 | 13,268 |    8,608 |               8,748 |   14,153 |       14,219 |
+| body-sync   | 13,351 | 12,725 |   10,488 |              10,575 |   13,185 |       12,971 |
+| query-body  | 13,118 | 11,912 |    9,862 |              10,014 |   12,775 |       12,795 |
 
 All framework/case combinations returned **100% success**.
 
 ### Gelis relative throughput
 
 | Case        | vs Hono | vs Elysia 1 | vs Elysia 1 precompile | vs Elysia 2 | vs Elysia 2 AOT |
-| ----------- | ------: | ----------: | ----------------------: | -----------: | ---------------: |
-| query-sync  | +11.71% | +69.22% | +65.61% | +2.65% | +3.03% |
-| query-async | +9.96% | +69.48% | +66.77% | +3.08% | +2.60% |
-| body-sync   | +4.92% | +27.30% | +26.25% | +1.26% | +2.93% |
-| query-body  | +10.12% | +33.02% | +31.00% | +2.68% | +2.52% |
+| ----------- | ------: | ----------: | ---------------------: | ----------: | --------------: |
+| query-sync  | +11.71% |     +69.22% |                +65.61% |      +2.65% |          +3.03% |
+| query-async |  +9.96% |     +69.48% |                +66.77% |      +3.08% |          +2.60% |
+| body-sync   |  +4.92% |     +27.30% |                +26.25% |      +1.26% |          +2.93% |
+| query-body  | +10.12% |     +33.02% |                +31.00% |      +2.68% |          +2.52% |
 
 ### CV notes
 

@@ -95,17 +95,15 @@ function buildCurrentRouter(size: number): Router {
   const router = new Router();
 
   for (let index = 0; index < size; index++) {
-    router.register(
-      {
-        method: "GET",
+    router.register({
+      method: "GET",
 
-        path: `/r/${index}/:id`,
+      path: `/r/${index}/:id`,
 
-        options: undefined,
+      options: undefined,
 
-        handler: () => undefined,
-      } as unknown as RuntimeRouteRecord,
-    );
+      handler: () => undefined,
+    } as unknown as RuntimeRouteRecord);
   }
 
   return router;

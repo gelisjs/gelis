@@ -63,7 +63,9 @@ try {
   console.log("Isolation:           fresh Bun process per scenario/sample");
   console.log("Orientations:        normal→AOT and AOT→normal");
   console.log("Build time:          excluded from module-ready measurement");
-  console.log(`Gate:                AOT ready / normal ready <= ${READY_MAX}x\n`);
+  console.log(
+    `Gate:                AOT ready / normal ready <= ${READY_MAX}x\n`,
+  );
 
   const normalFirstRatios: number[] = [];
   const aotFirstRatios: number[] = [];
@@ -87,7 +89,8 @@ try {
 
     const firstNormalFirst =
       normalFirstAot.firstFetchUs / normalFirstNormal.firstFetchUs;
-    const firstAotFirst = aotFirstAot.firstFetchUs / aotFirstNormal.firstFetchUs;
+    const firstAotFirst =
+      aotFirstAot.firstFetchUs / aotFirstNormal.firstFetchUs;
     firstFetchRatios.push(Math.sqrt(firstNormalFirst * firstAotFirst));
 
     const rssNormalFirst = normalFirstAot.rssMb / normalFirstNormal.rssMb;
@@ -160,9 +163,7 @@ function createManagedSource(root: string): string {
   ];
 
   for (let index = 0; index < ROUTES; index++) {
-    lines.push(
-      `app.post("/r/${index}", { body: Body }, () => response);`,
-    );
+    lines.push(`app.post("/r/${index}", { body: Body }, () => response);`);
   }
 
   lines.push("", "export default app;", "");

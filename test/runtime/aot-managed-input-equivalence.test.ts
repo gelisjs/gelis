@@ -33,7 +33,8 @@ import { compileSemanticRoutePlan } from "../../src/tooling/semantic-route-plan-
 function createSchema<Input = unknown, Output = Input>(
   validate: (
     value: unknown,
-  ) => StandardSchemaV1.Result<Output> | Promise<StandardSchemaV1.Result<Output>>,
+  ) =>
+    StandardSchemaV1.Result<Output> | Promise<StandardSchemaV1.Result<Output>>,
 ): StandardSchemaV1<Input, Output> {
   return {
     "~standard": {
@@ -90,10 +91,7 @@ async function createAppPair(
     captureFlatAotManagedInput(options, handler),
   ];
 
-  createFlatAotRuntimeAdapter(
-    artifact,
-    plan.shapeFingerprint,
-  )(
+  createFlatAotRuntimeAdapter(artifact, plan.shapeFingerprint)(
     aot,
     handlers,
     inputBindings,
@@ -368,16 +366,15 @@ describe("managed request-body AOT equivalence", () => {
       200,
     );
 
-    const Query = createSchema<
-      Record<string, string | string[]>,
-      number
-    >((value) => {
-      const query = value as Record<string, string | string[]>;
+    const Query = createSchema<Record<string, string | string[]>, number>(
+      (value) => {
+        const query = value as Record<string, string | string[]>;
 
-      return {
-        value: Number(query.page),
-      };
-    });
+        return {
+          value: Number(query.page),
+        };
+      },
+    );
 
     const Body = createSchema<unknown, { name: string }>((value) => ({
       value: value as { name: string },
@@ -498,10 +495,7 @@ describe("managed request-body AOT equivalence", () => {
       },
     } satisfies RouteOptions;
 
-    const pair = await createAppPair(
-      options,
-      ({ body }) => body,
-    );
+    const pair = await createAppPair(options, ({ body }) => body);
 
     const normal = inspectContract(pair.normal);
     const aot = inspectContract(pair.aot);
@@ -535,7 +529,9 @@ describe("managed request-body AOT equivalence", () => {
         const app = new Gelis();
         app.post("/body", options, () => "ok");
       `),
-    ).toThrow("managed request-body AOT options must be a directly analyzable object literal");
+    ).toThrow(
+      "managed request-body AOT options must be a directly analyzable object literal",
+    );
 
     expect(() =>
       analyzeAotSource(`
@@ -544,7 +540,9 @@ describe("managed request-body AOT equivalence", () => {
         const app = new Gelis();
         app.post("/body", { ...base }, () => "ok");
       `),
-    ).toThrow("managed request-body AOT options do not support spread properties");
+    ).toThrow(
+      "managed request-body AOT options do not support spread properties",
+    );
 
     expect(() =>
       analyzeAotSource(`
@@ -677,8 +675,7 @@ describe("managed request-body AOT equivalence", () => {
     );
 
     const binding = installedBindings?.[0] as
-      | FlatAotManagedInputBinding
-      | undefined;
+      FlatAotManagedInputBinding | undefined;
 
     expect(binding?.input.bodyContentTypes).toEqual(["text/plain"]);
   });

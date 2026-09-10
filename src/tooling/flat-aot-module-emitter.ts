@@ -131,11 +131,10 @@ export function emitFlatAotModule(
       ? `import { createFlatAotRuntimeAdapter as ${runtimeAdapterIdentifier} } from ${JSON.stringify(
           options.runtimeAdapterImport,
         )};`
-      :
-          `import { createFlatAotRuntimeAdapter as ${runtimeAdapterIdentifier}, ` +
-          `captureFlatAotManagedInput as ${captureManagedInputIdentifier} } from ${JSON.stringify(
-            options.runtimeAdapterImport,
-          )};`;
+      : `import { createFlatAotRuntimeAdapter as ${runtimeAdapterIdentifier}, ` +
+        `captureFlatAotManagedInput as ${captureManagedInputIdentifier} } from ${JSON.stringify(
+          options.runtimeAdapterImport,
+        )};`;
 
   const prelude = [
     runtimeImport,

@@ -23,7 +23,10 @@ const args = process.argv.slice(2);
 const root = readRoot(args, "--root=", ".");
 
 const currentDirectory = dirname(fileURLToPath(import.meta.url));
-const workerPath = resolve(currentDirectory, "request-body-text-process-worker.mts");
+const workerPath = resolve(
+  currentDirectory,
+  "request-body-text-process-worker.mts",
+);
 
 console.log("\nP9-E3-B text body reader process-isolated acceptance\n");
 console.log(`Runtime:        bun ${Bun.version}`);
@@ -37,10 +40,16 @@ console.log("Pair shape:     semantic ABBA / BAAB");
 console.log("Routes:         5,000 POST routes");
 console.log("Warmup:         10,000 async app.fetch calls/worker");
 console.log("Measurement:    20,000 async app.fetch calls/measurement");
-console.log("Body source:    stable Request-like object; text() returns Promise.resolve(payload)");
+console.log(
+  "Body source:    stable Request-like object; text() returns Promise.resolve(payload)",
+);
 console.log("GC:             Bun.gc(true) inside measured worker");
-console.log("Combine:        geometric mean of canonical managed/manual ratios");
-console.log(`Gate:           mirrored median managed/manual delta <= +${MAX_DELTA_PERCENT}%`);
+console.log(
+  "Combine:        geometric mean of canonical managed/manual ratios",
+);
+console.log(
+  `Gate:           mirrored median managed/manual delta <= +${MAX_DELTA_PERCENT}%`,
+);
 console.log("Order buckets:  diagnostic only");
 
 const manualOne = await createWorker(root, "manual");
@@ -88,7 +97,9 @@ try {
   ]);
 }
 
-const mirroredMedianDelta = median(samples.map((sample) => sample.deltaPercent));
+const mirroredMedianDelta = median(
+  samples.map((sample) => sample.deltaPercent),
+);
 const manualStartMedianDelta = median(
   samples
     .filter((sample) => sample.order === "manual-start")
@@ -148,7 +159,10 @@ async function measureOrientation(
   return managedNs / manualNs;
 }
 
-async function createWorker(root: string, variant: Variant): Promise<WorkerClient> {
+async function createWorker(
+  root: string,
+  variant: Variant,
+): Promise<WorkerClient> {
   const child = spawn(
     process.execPath,
     [workerPath, `--root=${root}`, `--variant=${variant}`],

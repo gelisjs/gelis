@@ -7,8 +7,7 @@ import {
 
 const DEFAULT_HANDLER_IDENTIFIER = "__gelisAotHandlers";
 
-export const AOT_MANAGED_INPUT_BINDINGS_IDENTIFIER =
-  "__gelisAotInputBindings";
+export const AOT_MANAGED_INPUT_BINDINGS_IDENTIFIER = "__gelisAotInputBindings";
 
 export const AOT_CAPTURE_MANAGED_INPUT_IDENTIFIER =
   "__gelisAotCaptureManagedInput";
@@ -130,8 +129,7 @@ export function rewriteAotSource(
     });
   }
 
-  let bindingDeclaration =
-    `\n\nconst ${handlerArrayIdentifier} = new Array(${analysis.routes.length});`;
+  let bindingDeclaration = `\n\nconst ${handlerArrayIdentifier} = new Array(${analysis.routes.length});`;
 
   if (hasManagedInput) {
     bindingDeclaration +=

@@ -67,14 +67,7 @@ The known first-class Gelis HTTP method union is:
 
 ```ts
 export type HttpMethod =
-  | "GET"
-  | "POST"
-  | "PUT"
-  | "PATCH"
-  | "DELETE"
-  | "OPTIONS"
-  | "HEAD"
-  | "QUERY";
+  "GET" | "POST" | "PUT" | "PATCH" | "DELETE" | "OPTIONS" | "HEAD" | "QUERY";
 ```
 
 QUERY is intentionally first-class rather than represented as a custom method.

@@ -85,21 +85,21 @@ That architectural boundary remains valuable and should not be replaced merely b
 
 # 2. Findings summary
 
-| Area | Current alignment | P10 action |
-| --- | --- | --- |
-| `inspectContract()` boundary | aligned | retain |
-| path grammar `/static` + `/:param` | aligned with current grammar | retain until Router Grammar v0.2 |
-| ordinary methods GET/POST/PUT/PATCH/DELETE/OPTIONS/HEAD | aligned | retain |
-| QUERY | unsupported by package | add projection |
-| generic custom HTTP methods | unsupported | add projection |
-| ALL pseudo-method | no faithful OpenAPI representation yet | define explicit policy |
-| query schema / metadata | substantially aligned | regression audit |
-| request body schema | stale JSON-only assumption | redesign projection around parser/media metadata |
-| response descriptors / content type | substantially aligned | compatibility regression audit |
-| OpenAPI version | frozen at 3.1.2 | define 3.1/3.2 target strategy |
-| schema serialization boundary | still sound | retain |
-| zero-unused runtime architecture | still sound | retain |
-| generation scaling | existing baseline available | rerun after integration |
+| Area                                                    | Current alignment                      | P10 action                                       |
+| ------------------------------------------------------- | -------------------------------------- | ------------------------------------------------ |
+| `inspectContract()` boundary                            | aligned                                | retain                                           |
+| path grammar `/static` + `/:param`                      | aligned with current grammar           | retain until Router Grammar v0.2                 |
+| ordinary methods GET/POST/PUT/PATCH/DELETE/OPTIONS/HEAD | aligned                                | retain                                           |
+| QUERY                                                   | unsupported by package                 | add projection                                   |
+| generic custom HTTP methods                             | unsupported                            | add projection                                   |
+| ALL pseudo-method                                       | no faithful OpenAPI representation yet | define explicit policy                           |
+| query schema / metadata                                 | substantially aligned                  | regression audit                                 |
+| request body schema                                     | stale JSON-only assumption             | redesign projection around parser/media metadata |
+| response descriptors / content type                     | substantially aligned                  | compatibility regression audit                   |
+| OpenAPI version                                         | frozen at 3.1.2                        | define 3.1/3.2 target strategy                   |
+| schema serialization boundary                           | still sound                            | retain                                           |
+| zero-unused runtime architecture                        | still sound                            | retain                                           |
+| generation scaling                                      | existing baseline available            | rerun after integration                          |
 
 ---
 
@@ -408,12 +408,12 @@ OpenAPI 3.2.0 full-fidelity target
 
 Candidate mapping:
 
-| Gelis method | OAS 3.1.2 | OAS 3.2.0 |
-| --- | --- | --- |
-| standard fixed method | normal Path Item field | normal Path Item field |
-| QUERY | `x-oai-additionalOperations.QUERY` | `query` |
-| custom HTTP method | `x-oai-additionalOperations[METHOD]` | `additionalOperations[METHOD]` |
-| ALL | explicit policy required | explicit policy required |
+| Gelis method          | OAS 3.1.2                            | OAS 3.2.0                      |
+| --------------------- | ------------------------------------ | ------------------------------ |
+| standard fixed method | normal Path Item field               | normal Path Item field         |
+| QUERY                 | `x-oai-additionalOperations.QUERY`   | `query`                        |
+| custom HTTP method    | `x-oai-additionalOperations[METHOD]` | `additionalOperations[METHOD]` |
+| ALL                   | explicit policy required             | explicit policy required       |
 
 The default target is **not frozen by P10-A**.
 

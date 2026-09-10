@@ -1,6 +1,14 @@
 import { execFileSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { mkdir, mkdtemp, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
+import {
+  mkdir,
+  mkdtemp,
+  readFile,
+  rename,
+  rm,
+  stat,
+  writeFile,
+} from "node:fs/promises";
 import { cpus, tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -111,7 +119,11 @@ try {
 
   for (const profile of PROFILES) {
     const control = await generateScenario(controlRoot, "control", profile);
-    const candidate = await generateScenario(candidateRoot, "candidate", profile);
+    const candidate = await generateScenario(
+      candidateRoot,
+      "candidate",
+      profile,
+    );
 
     const routes = createRouteShapes(profile);
     const target = routes.at(-1);
@@ -140,7 +152,9 @@ try {
   console.log(`Candidate HEAD:         ${candidateHead}`);
   console.log("Profiles:               static, trailing, mixed-balanced");
   console.log("Isolation:              fresh Bun process per scenario/sample");
-  console.log("Orientations:           control→candidate and candidate→control");
+  console.log(
+    "Orientations:           control→candidate and candidate→control",
+  );
   console.log("Artifact gate:          exact JSON bytes + exact version");
   console.log("Plain generated source: no managed-input sidecar/import");
   console.log("Ready gates:            geomean <= 1.03x; profile <= 1.05x");
@@ -220,8 +234,12 @@ try {
       !candidateSource.includes("__gelisAotCaptureManagedInput") &&
       !candidateSource.includes("captureFlatAotManagedInput");
 
-    const readyRatio = median(readySamples.map((sample) => sample.mirroredRatio));
-    const firstRatio = median(firstSamples.map((sample) => sample.mirroredRatio));
+    const readyRatio = median(
+      readySamples.map((sample) => sample.mirroredRatio),
+    );
+    const firstRatio = median(
+      firstSamples.map((sample) => sample.mirroredRatio),
+    );
     const rssRatio = median(rssSamples.map((sample) => sample.mirroredRatio));
 
     summaries.push({
@@ -254,8 +272,12 @@ try {
     });
   }
 
-  const readyGeo = geometricMean(summaries.map((summary) => summary.readyRatio));
-  const firstGeo = geometricMean(summaries.map((summary) => summary.firstRatio));
+  const readyGeo = geometricMean(
+    summaries.map((summary) => summary.readyRatio),
+  );
+  const firstGeo = geometricMean(
+    summaries.map((summary) => summary.firstRatio),
+  );
 
   console.log("\nP9-E5-E plain zero-unused summary\n");
   console.table(

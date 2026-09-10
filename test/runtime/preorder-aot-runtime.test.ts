@@ -398,14 +398,7 @@ describe("Gelis preorder AOT runtime", () => {
 
 type RouteShape = {
   readonly method:
-    | "GET"
-    | "POST"
-    | "PUT"
-    | "PATCH"
-    | "DELETE"
-    | "OPTIONS"
-    | "HEAD"
-    | "QUERY";
+    "GET" | "POST" | "PUT" | "PATCH" | "DELETE" | "OPTIONS" | "HEAD" | "QUERY";
 
   readonly path: string;
 };

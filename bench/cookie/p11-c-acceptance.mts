@@ -56,7 +56,9 @@ console.log(`Bun:       ${Bun.version}`);
 console.log(`CPU:       ${cpus()[0]?.model ?? "unknown"}`);
 console.log(`Hono:      pinned package dependency`);
 console.log(`Samples:   ${SAMPLE_COUNT} mirrored fresh-process pairs`);
-console.log("Semantics: public helper calls only; router setup is outside timed loops\n");
+console.log(
+  "Semantics: public helper calls only; router setup is outside timed loops\n",
+);
 
 const rows: CaseResult[] = [];
 
@@ -70,7 +72,9 @@ for (let caseIndex = 0; caseIndex < cases.length; caseIndex++) {
 }
 
 console.log("\nCookie comparison\n");
-console.log("| scenario | category | Gelis ns/op | Hono ns/op | Gelis/Hono | Hono-first | Gelis-first | gate |");
+console.log(
+  "| scenario | category | Gelis ns/op | Hono ns/op | Gelis/Hono | Hono-first | Gelis-first | gate |",
+);
 console.log("| --- | --- | ---: | ---: | ---: | ---: | ---: | --- |");
 
 for (const row of rows) {
@@ -269,8 +273,7 @@ function geometricMean(values: readonly number[]): number {
   }
 
   return Math.exp(
-    values.reduce((total, value) => total + Math.log(value), 0) /
-      values.length,
+    values.reduce((total, value) => total + Math.log(value), 0) / values.length,
   );
 }
 

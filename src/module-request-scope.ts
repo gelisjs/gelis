@@ -557,14 +557,10 @@ export function createModuleRequestScopeBuilder<
   usesModuleScope: boolean,
 
   moduleBeforeHandle:
-    | RuntimeBeforeHandle
-    | RuntimeScopedModuleBeforeHandle
-    | undefined,
+    RuntimeBeforeHandle | RuntimeScopedModuleBeforeHandle | undefined,
 
   moduleAfterHandle:
-    | RuntimeAfterHandle
-    | RuntimeScopedModuleAfterHandle
-    | undefined,
+    RuntimeAfterHandle | RuntimeScopedModuleAfterHandle | undefined,
 ): ModuleRequestScopeBuilder<ModuleScope, RequestScope, Prefix> {
   const builder = new RouteBuilder(
     prefix,
@@ -616,14 +612,10 @@ function bindModuleRequestScopeRoute<
   usesModuleScope: boolean,
 
   moduleBeforeHandle:
-    | RuntimeBeforeHandle
-    | RuntimeScopedModuleBeforeHandle
-    | undefined,
+    RuntimeBeforeHandle | RuntimeScopedModuleBeforeHandle | undefined,
 
   moduleAfterHandle:
-    | RuntimeAfterHandle
-    | RuntimeScopedModuleAfterHandle
-    | undefined,
+    RuntimeAfterHandle | RuntimeScopedModuleAfterHandle | undefined,
 ): RuntimeRouteRecord {
   const plan: RuntimeModuleRequestScopePlan = usesModuleScope
     ? {
@@ -632,20 +624,16 @@ function bindModuleRequestScopeRoute<
         derive: derive as unknown as RuntimeScopedModuleRequestScopeDerive,
 
         beforeHandle: route.beforeHandle as unknown as
-          | RuntimeScopedModuleRequestScopeBeforeHandle
-          | undefined,
+          RuntimeScopedModuleRequestScopeBeforeHandle | undefined,
 
         afterHandle: route.afterHandle as unknown as
-          | RuntimeScopedModuleRequestScopeAfterHandle
-          | undefined,
+          RuntimeScopedModuleRequestScopeAfterHandle | undefined,
 
         moduleBeforeHandle: moduleBeforeHandle as
-          | RuntimeScopedModuleBeforeHandle
-          | undefined,
+          RuntimeScopedModuleBeforeHandle | undefined,
 
         moduleAfterHandle: moduleAfterHandle as
-          | RuntimeScopedModuleAfterHandle
-          | undefined,
+          RuntimeScopedModuleAfterHandle | undefined,
       }
     : {
         kind: "static",
@@ -653,16 +641,13 @@ function bindModuleRequestScopeRoute<
         derive: derive as unknown as RuntimeStaticModuleRequestScopeDerive,
 
         beforeHandle: route.beforeHandle as unknown as
-          | RuntimeStaticModuleRequestScopeBeforeHandle
-          | undefined,
+          RuntimeStaticModuleRequestScopeBeforeHandle | undefined,
 
         afterHandle: route.afterHandle as unknown as
-          | RuntimeStaticModuleRequestScopeAfterHandle
-          | undefined,
+          RuntimeStaticModuleRequestScopeAfterHandle | undefined,
 
         moduleBeforeHandle: moduleBeforeHandle as
-          | RuntimeBeforeHandle
-          | undefined,
+          RuntimeBeforeHandle | undefined,
 
         moduleAfterHandle: moduleAfterHandle as RuntimeAfterHandle | undefined,
       };

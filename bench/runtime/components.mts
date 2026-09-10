@@ -33,8 +33,9 @@ const JSON_HEADERS = Object.freeze({
 const syncHandler: (context: RuntimeRouteContext) => Response = () =>
   rawResponse;
 
-const asyncHandler: (context: RuntimeRouteContext) => Promise<Response> =
-  async () => rawResponse;
+const asyncHandler: (
+  context: RuntimeRouteContext,
+) => Promise<Response> = async () => rawResponse;
 
 const context: RuntimeRouteContext = {
   request,

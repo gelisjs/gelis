@@ -101,11 +101,7 @@ export type CorsOriginResolver = (
   request: Request,
 ) => boolean | PromiseLike<boolean>;
 
-export type CorsOrigin =
-  | "*"
-  | string
-  | readonly string[]
-  | CorsOriginResolver;
+export type CorsOrigin = "*" | string | readonly string[] | CorsOriginResolver;
 
 export interface CorsOptions {
   readonly origin?: CorsOrigin;

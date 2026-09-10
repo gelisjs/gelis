@@ -57,11 +57,11 @@ The root `gelis` entrypoint does not re-export these helpers.
 The subpath exports the types required by this API, including conceptually:
 
 ```ts
-CookieOptions
-CookieDeleteOptions
-CookieSecret
-CookieSecrets
-SignedCookieResult
+CookieOptions;
+CookieDeleteOptions;
+CookieSecret;
+CookieSecrets;
+SignedCookieResult;
 ```
 
 Exact internal helper types remain private unless required by public signatures.

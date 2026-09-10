@@ -5,14 +5,7 @@ import type { HttpMethod, RouteContractOf } from "../../src";
 import type { Equal, Expect } from "./assert";
 
 type FrozenHttpMethod =
-  | "GET"
-  | "POST"
-  | "PUT"
-  | "PATCH"
-  | "DELETE"
-  | "OPTIONS"
-  | "HEAD"
-  | "QUERY";
+  "GET" | "POST" | "PUT" | "PATCH" | "DELETE" | "OPTIONS" | "HEAD" | "QUERY";
 
 type HttpMethodRemainsFirstClassOnly = Expect<
   Equal<HttpMethod, FrozenHttpMethod>

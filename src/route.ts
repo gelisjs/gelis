@@ -17,11 +17,7 @@ export interface RouteRequestContract<
 }
 
 export type RequestBodyParser =
-  | "json"
-  | "text"
-  | "urlencoded"
-  | "multipart"
-  | "arrayBuffer";
+  "json" | "text" | "urlencoded" | "multipart" | "arrayBuffer";
 
 export type RouteResponses = Readonly<Record<number, unknown>>;
 
@@ -70,14 +66,10 @@ type TextResponse = {
 };
 
 export type ResponseDescriptor =
-  | ValidatedAutoResponse
-  | JsonResponse
-  | TextResponse;
+  ValidatedAutoResponse | JsonResponse | TextResponse;
 
 export type ResponseContract =
-  | BodyBearingSchema
-  | ResponseDescriptor
-  | undefined;
+  BodyBearingSchema | ResponseDescriptor | undefined;
 
 export type ResponseContractMap = Readonly<
   Record<number, ResponseContract> & {
@@ -192,19 +184,16 @@ type DirectManagedHandlerResult<Responses extends RouteResponses> =
   | (204 extends keyof Responses ? undefined : never);
 
 type ManagedHandlerResult<Responses extends RouteResponses> =
-  | DirectManagedHandlerResult<Responses>
-  | StatusReplyResult<Responses>;
+  DirectManagedHandlerResult<Responses> | StatusReplyResult<Responses>;
 
 type ExplicitHandlerResolvedResult<Responses extends ResponseContractMap> =
-  | ManagedHandlerResult<InferResponseProducers<Responses>>
-  | Response;
+  ManagedHandlerResult<InferResponseProducers<Responses>> | Response;
 
 export type RouteHandlerResultFor<
   Responses extends ResponseContractMap | undefined,
 > = Responses extends ResponseContractMap
-  ?
-      | ExplicitHandlerResolvedResult<Responses>
-      | PromiseLike<ExplicitHandlerResolvedResult<Responses>>
+  ? | ExplicitHandlerResolvedResult<Responses>
+    | PromiseLike<ExplicitHandlerResolvedResult<Responses>>
   : unknown;
 
 export interface RouteContext<

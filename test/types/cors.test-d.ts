@@ -20,10 +20,7 @@ const resolver: CorsOriginResolver = (origin, request) => {
 const asyncResolver: CorsOriginResolver = async (origin) =>
   origin === "https://client.example";
 
-const origins: CorsOrigin = [
-  "https://client.example",
-  "https://admin.example",
-];
+const origins: CorsOrigin = ["https://client.example", "https://admin.example"];
 
 const options: CorsOptions = {
   origin: origins,

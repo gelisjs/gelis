@@ -167,10 +167,7 @@ function isApplicationOctetStream(request: Request): boolean {
     return false;
   }
 
-  if (
-    contentType.length === 24 &&
-    contentType === "application/octet-stream"
-  ) {
+  if (contentType.length === 24 && contentType === "application/octet-stream") {
     return true;
   }
 

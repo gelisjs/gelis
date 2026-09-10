@@ -102,7 +102,10 @@ function readMultipartBoundary(contentType: string): string {
 
     const nameEnd = trimStringEnd(contentType, nameStart, index);
 
-    if (index >= contentType.length || contentType.charCodeAt(index) !== EQUALS) {
+    if (
+      index >= contentType.length ||
+      contentType.charCodeAt(index) !== EQUALS
+    ) {
       while (
         index < contentType.length &&
         contentType.charCodeAt(index) !== SEMICOLON
@@ -317,11 +320,7 @@ function findBoundary(
   for (let index = start; index <= bytes.length - delimiter.length; index++) {
     if (
       index !== 0 &&
-      !(
-        index >= 2 &&
-        bytes[index - 2] === CR &&
-        bytes[index - 1] === LF
-      )
+      !(index >= 2 && bytes[index - 2] === CR && bytes[index - 1] === LF)
     ) {
       continue;
     }
@@ -488,11 +487,7 @@ function trimStringEnd(value: string, start: number, end: number): number {
   return end;
 }
 
-function trimBytesStart(
-  bytes: Uint8Array,
-  start: number,
-  end: number,
-): number {
+function trimBytesStart(bytes: Uint8Array, start: number, end: number): number {
   while (start < end && isAsciiWhitespace(bytes[start]!)) {
     start++;
   }
@@ -500,11 +495,7 @@ function trimBytesStart(
   return start;
 }
 
-function trimBytesEnd(
-  bytes: Uint8Array,
-  start: number,
-  end: number,
-): number {
+function trimBytesEnd(bytes: Uint8Array, start: number, end: number): number {
   while (end > start && isAsciiWhitespace(bytes[end - 1]!)) {
     end--;
   }

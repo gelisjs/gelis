@@ -27,7 +27,9 @@ const app = loaded.default as
   | undefined;
 
 if (app === undefined || typeof app.fetch !== "function") {
-  throw new Error("Generated P9-E5-E module did not export a Gelis application");
+  throw new Error(
+    "Generated P9-E5-E module did not export a Gelis application",
+  );
 }
 
 const firstStarted = performance.now();

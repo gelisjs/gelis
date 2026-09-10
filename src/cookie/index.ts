@@ -37,14 +37,15 @@ type CookieOptionCore = CookieCommonOptions & CookieSecurityOptions;
 
 type SecureCookieOptions = Extract<CookieOptionCore, { readonly secure: true }>;
 
-type ApplyCookiePrefix<Name extends string> = Lowercase<Name> extends `__host-${string}`
-  ? Omit<SecureCookieOptions, "domain" | "path"> & {
-      readonly domain?: never;
-      readonly path?: "/";
-    }
-  : Lowercase<Name> extends `__secure-${string}`
-    ? SecureCookieOptions
-    : CookieOptionCore;
+type ApplyCookiePrefix<Name extends string> =
+  Lowercase<Name> extends `__host-${string}`
+    ? Omit<SecureCookieOptions, "domain" | "path"> & {
+        readonly domain?: never;
+        readonly path?: "/";
+      }
+    : Lowercase<Name> extends `__secure-${string}`
+      ? SecureCookieOptions
+      : CookieOptionCore;
 
 /**
  * Cookie serialization options.
@@ -70,14 +71,15 @@ type SecureCookieDeleteOptions = Extract<
   { readonly secure: true }
 >;
 
-type ApplyDeletePrefix<Name extends string> = Lowercase<Name> extends `__host-${string}`
-  ? Omit<SecureCookieDeleteOptions, "domain" | "path"> & {
-      readonly domain?: never;
-      readonly path?: "/";
-    }
-  : Lowercase<Name> extends `__secure-${string}`
-    ? SecureCookieDeleteOptions
-    : CookieDeleteCore;
+type ApplyDeletePrefix<Name extends string> =
+  Lowercase<Name> extends `__host-${string}`
+    ? Omit<SecureCookieDeleteOptions, "domain" | "path"> & {
+        readonly domain?: never;
+        readonly path?: "/";
+      }
+    : Lowercase<Name> extends `__secure-${string}`
+      ? SecureCookieDeleteOptions
+      : CookieDeleteCore;
 
 export type CookieDeleteOptions<Name extends string = string> =
   ApplyDeletePrefix<Name>;
@@ -139,10 +141,7 @@ export function getCookie(request: Request, name: string): string | undefined {
   return undefined;
 }
 
-export function getCookies(
-  request: Request,
-  name: string,
-): readonly string[];
+export function getCookies(request: Request, name: string): readonly string[];
 export function getCookies(
   request: Request,
 ): Readonly<Record<string, readonly string[]>>;
@@ -153,7 +152,11 @@ export function getCookies(
   const header = request.headers.get("cookie");
 
   if (name !== undefined) {
-    if (!COOKIE_NAME_TOKEN.test(name) || header === null || header.length === 0) {
+    if (
+      !COOKIE_NAME_TOKEN.test(name) ||
+      header === null ||
+      header.length === 0
+    ) {
       return [];
     }
 
@@ -298,12 +301,7 @@ export async function verifySignedCookie(
   for (let index = 0; index < normalizedSecrets.length; index++) {
     const secret = normalizedSecrets[index]!;
     const key = await importHmacKey(secret, ["verify"]);
-    const valid = await crypto.subtle.verify(
-      "HMAC",
-      key,
-      signature,
-      data,
-    );
+    const valid = await crypto.subtle.verify("HMAC", key, signature, data);
 
     if (valid) {
       return {
@@ -615,7 +613,9 @@ function assertCookiePrefix(
 function normalizeSecrets(secrets: CookieSecrets): readonly CookieSecret[] {
   const list = Array.isArray(secrets) ? secrets : [secrets];
   if (list.length === 0) {
-    throw new TypeError("Signed cookie secrets must contain at least one secret");
+    throw new TypeError(
+      "Signed cookie secrets must contain at least one secret",
+    );
   }
 
   for (const secret of list) {
@@ -644,13 +644,7 @@ async function importHmacKey(
   usages: KeyUsage[],
 ): Promise<CryptoKey> {
   const bytes = secretBytes(secret);
-  return crypto.subtle.importKey(
-    "raw",
-    bytes,
-    HMAC_ALGORITHM,
-    false,
-    usages,
-  );
+  return crypto.subtle.importKey("raw", bytes, HMAC_ALGORITHM, false, usages);
 }
 
 function secretBytes(secret: CookieSecret): Uint8Array<ArrayBuffer> {

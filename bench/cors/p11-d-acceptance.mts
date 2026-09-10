@@ -17,10 +17,7 @@ const DYNAMIC_CASE_GATE = 1.15;
 const SCALING_GATE = 1.5;
 
 type ZeroScenario =
-  | "static-raw"
-  | "dynamic-raw"
-  | "static-json"
-  | "dynamic-json";
+  "static-raw" | "dynamic-raw" | "static-json" | "dynamic-json";
 
 type EnabledScenario =
   | "actual-wildcard"

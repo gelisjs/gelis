@@ -3,11 +3,7 @@ export type ApplicationStartupTask = () => void | PromiseLike<void>;
 export type ApplicationCleanup = () => void | PromiseLike<void>;
 
 type ApplicationStartupPhase =
-  | "pending"
-  | "running"
-  | "ready"
-  | "failed"
-  | "closed";
+  "pending" | "running" | "ready" | "failed" | "closed";
 
 interface ApplicationStartupState {
   phase: ApplicationStartupPhase;

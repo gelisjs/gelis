@@ -71,22 +71,22 @@ Priority is architectural planning input, not a release promise.
 
 # 2. HTTP + security essentials
 
-| Capability | Gelis now | Hono | Elysia | Fastify | NestJS | Preliminary Gelis placement | Priority |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| Cookies: parse/get/set/delete | NO | O | C | O | D | `gelis/cookie` or small official package | P0 |
-| Signed cookies | NO | O | C | O via cookie/session ecosystem | D/pattern | same cookie capability | P0 |
-| Secret rotation | NO | — in reviewed helper | C | ecosystem-dependent | D/pattern | same cookie capability | P0 |
-| Modern cookie attributes/prefix constraints | NO | O | C | O | D | same cookie capability | P0 |
-| CORS | NO | O | O | O | C/D | `@gelis/cors` or compact subpath | P0 |
-| CSRF protection | NO | O | K | O | D | official security capability | P1 |
-| Secure headers / Helmet-like policy | NO | O | K | O | D | `@gelis/secure-headers` or subpath | P0 |
-| Request/body size limit | NO | O | K | core/platform + plugins | platform configuration | `gelis/body-limit` + adapter hooks | P0 |
-| Compression | NO | O | K | O | D | runtime-aware official package | P1 |
-| ETag / cache helpers | NO | O | K | O | D/pattern | compact helper/plugin | P1 |
-| Request ID | NO | O | K | ecosystem/core patterns | D/pattern | official plugin | P0 |
-| Timeout / abort policy | NO helper | O | lifecycle primitive / K | hooks/plugins | D/pattern | portable helper + adapter awareness | P0 |
-| Static files | NO helper | adapter-specific helper | O | O | D | `@gelis/static`, runtime-aware | P1 |
-| Proxy/IP-aware request metadata | NO first-class | adapter helper / middleware | runtime/integration | core/plugin ecosystem | platform integration | adapter boundary + helper | P1 |
+| Capability                                  | Gelis now      | Hono                        | Elysia                  | Fastify                        | NestJS                 | Preliminary Gelis placement              | Priority |
+| ------------------------------------------- | -------------- | --------------------------- | ----------------------- | ------------------------------ | ---------------------- | ---------------------------------------- | -------- |
+| Cookies: parse/get/set/delete               | NO             | O                           | C                       | O                              | D                      | `gelis/cookie` or small official package | P0       |
+| Signed cookies                              | NO             | O                           | C                       | O via cookie/session ecosystem | D/pattern              | same cookie capability                   | P0       |
+| Secret rotation                             | NO             | — in reviewed helper        | C                       | ecosystem-dependent            | D/pattern              | same cookie capability                   | P0       |
+| Modern cookie attributes/prefix constraints | NO             | O                           | C                       | O                              | D                      | same cookie capability                   | P0       |
+| CORS                                        | NO             | O                           | O                       | O                              | C/D                    | `@gelis/cors` or compact subpath         | P0       |
+| CSRF protection                             | NO             | O                           | K                       | O                              | D                      | official security capability             | P1       |
+| Secure headers / Helmet-like policy         | NO             | O                           | K                       | O                              | D                      | `@gelis/secure-headers` or subpath       | P0       |
+| Request/body size limit                     | NO             | O                           | K                       | core/platform + plugins        | platform configuration | `gelis/body-limit` + adapter hooks       | P0       |
+| Compression                                 | NO             | O                           | K                       | O                              | D                      | runtime-aware official package           | P1       |
+| ETag / cache helpers                        | NO             | O                           | K                       | O                              | D/pattern              | compact helper/plugin                    | P1       |
+| Request ID                                  | NO             | O                           | K                       | ecosystem/core patterns        | D/pattern              | official plugin                          | P0       |
+| Timeout / abort policy                      | NO helper      | O                           | lifecycle primitive / K | hooks/plugins                  | D/pattern              | portable helper + adapter awareness      | P0       |
+| Static files                                | NO helper      | adapter-specific helper     | O                       | O                              | D                      | `@gelis/static`, runtime-aware           | P1       |
+| Proxy/IP-aware request metadata             | NO first-class | adapter helper / middleware | runtime/integration     | core/plugin ecosystem          | platform integration   | adapter boundary + helper                | P1       |
 
 ### Interpretation
 
@@ -110,15 +110,15 @@ maintained documentation
 
 # 3. Authentication + state
 
-| Capability | Gelis now | Hono | Elysia | Fastify | NestJS | Preliminary Gelis placement | Priority |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| Bearer token extraction | NO | O | O | O | D | compact helper or `@gelis/bearer` | P0 |
-| JWT sign/verify | NO | O | O | O | D | `@gelis/jwt` | P0 |
-| Session abstraction | NO | — first-party in reviewed core docs | K/pattern | O | D | `@gelis/session` | P1 |
-| Secure stateless cookie session | NO | custom pattern | core cookie + pattern | O | D/pattern | `@gelis/session` + cookie capability | P1 |
-| Rate limiting | NO | third-party/community commonly used; not built-in list reviewed | K | O | D | `@gelis/rate-limit` | P0 |
-| Authorization composition | plugin foundation only | middleware/pattern | guard/macro/plugin patterns | O auth ecosystem | C/D guards | core/plugin composition + optional package | P1 |
-| OAuth/OIDC integration | NO | integrations/community | K/integrations | O OAuth2 + ecosystem | D | strategy first; vendor-neutral helper or integrations | P2 |
+| Capability                      | Gelis now              | Hono                                                            | Elysia                      | Fastify              | NestJS     | Preliminary Gelis placement                           | Priority |
+| ------------------------------- | ---------------------- | --------------------------------------------------------------- | --------------------------- | -------------------- | ---------- | ----------------------------------------------------- | -------- |
+| Bearer token extraction         | NO                     | O                                                               | O                           | O                    | D          | compact helper or `@gelis/bearer`                     | P0       |
+| JWT sign/verify                 | NO                     | O                                                               | O                           | O                    | D          | `@gelis/jwt`                                          | P0       |
+| Session abstraction             | NO                     | — first-party in reviewed core docs                             | K/pattern                   | O                    | D          | `@gelis/session`                                      | P1       |
+| Secure stateless cookie session | NO                     | custom pattern                                                  | core cookie + pattern       | O                    | D/pattern  | `@gelis/session` + cookie capability                  | P1       |
+| Rate limiting                   | NO                     | third-party/community commonly used; not built-in list reviewed | K                           | O                    | D          | `@gelis/rate-limit`                                   | P0       |
+| Authorization composition       | plugin foundation only | middleware/pattern                                              | guard/macro/plugin patterns | O auth ecosystem     | C/D guards | core/plugin composition + optional package            | P1       |
+| OAuth/OIDC integration          | NO                     | integrations/community                                          | K/integrations              | O OAuth2 + ecosystem | D          | strategy first; vendor-neutral helper or integrations | P2       |
 
 ### Security rule
 
@@ -142,19 +142,19 @@ performance comparison
 
 # 4. File transfer + realtime
 
-| Capability | Gelis now | Hono | Elysia | Fastify | NestJS | Preliminary Gelis placement | Priority |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| Multipart parsing | YES | C/helper | C | O | D | core remains | already present |
-| Native `File` reception | YES | C/helper | C | O | D | core remains | already present |
-| Multiple file fields | YES primitive | C/helper | C | O | D | core remains | already present |
-| Per-file size validation | NO ergonomic policy | body-limit is request-level | C schema support | O multipart config | D upload interceptors | core limit primitive + upload layer | P0 |
-| File count limits | NO | manual/body limit | C schema support | O multipart config | D upload config | upload layer | P0 |
-| MIME/magic-number validation | NO | manual | C utility / typed validator support | application/plugin | application integration | `gelis/file` helper or upload package | P0 |
-| Streaming multipart / large upload architecture | NO | stream/runtime-dependent | Bun/runtime dependent | O multipart streaming patterns | platform-dependent | separate architecture milestone | P0 |
-| Storage adapters | NO | external | external | ecosystem | integrations | optional `@gelis/storage-*` only if justified | P2 |
-| Generic response streaming helper | raw `Response` only | O | C | core/stream plugins | D | `gelis/streaming` over Web Streams | P0 |
-| Server-Sent Events | NO helper | O | C | O | C/D | `gelis/sse` or official package | P0 |
-| WebSocket | NO official surface | adapter helper | C | O | C/D | runtime adapter capability; Bun fast path first | P1 |
+| Capability                                      | Gelis now           | Hono                        | Elysia                              | Fastify                        | NestJS                  | Preliminary Gelis placement                     | Priority        |
+| ----------------------------------------------- | ------------------- | --------------------------- | ----------------------------------- | ------------------------------ | ----------------------- | ----------------------------------------------- | --------------- |
+| Multipart parsing                               | YES                 | C/helper                    | C                                   | O                              | D                       | core remains                                    | already present |
+| Native `File` reception                         | YES                 | C/helper                    | C                                   | O                              | D                       | core remains                                    | already present |
+| Multiple file fields                            | YES primitive       | C/helper                    | C                                   | O                              | D                       | core remains                                    | already present |
+| Per-file size validation                        | NO ergonomic policy | body-limit is request-level | C schema support                    | O multipart config             | D upload interceptors   | core limit primitive + upload layer             | P0              |
+| File count limits                               | NO                  | manual/body limit           | C schema support                    | O multipart config             | D upload config         | upload layer                                    | P0              |
+| MIME/magic-number validation                    | NO                  | manual                      | C utility / typed validator support | application/plugin             | application integration | `gelis/file` helper or upload package           | P0              |
+| Streaming multipart / large upload architecture | NO                  | stream/runtime-dependent    | Bun/runtime dependent               | O multipart streaming patterns | platform-dependent      | separate architecture milestone                 | P0              |
+| Storage adapters                                | NO                  | external                    | external                            | ecosystem                      | integrations            | optional `@gelis/storage-*` only if justified   | P2              |
+| Generic response streaming helper               | raw `Response` only | O                           | C                                   | core/stream plugins            | D                       | `gelis/streaming` over Web Streams              | P0              |
+| Server-Sent Events                              | NO helper           | O                           | C                                   | O                              | C/D                     | `gelis/sse` or official package                 | P0              |
+| WebSocket                                       | NO official surface | adapter helper              | C                                   | O                              | C/D                     | runtime adapter capability; Bun fast path first | P1              |
 
 ### Current upload verdict
 
@@ -168,16 +168,16 @@ Current managed multipart parsing buffers the request body before native `FormDa
 
 # 5. Observability + operations
 
-| Capability | Gelis now | Hono | Elysia | Fastify | NestJS | Preliminary Gelis placement | Priority |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| Request logger | NO official | O | K | core logger ecosystem | C/D | logger integration, not necessarily own logging engine | P0 |
-| Structured application logging | NO | basic logger + integrations | K | strong built-in logger model | C/D | `@gelis/logger` integration strategy | P0 |
-| OpenTelemetry tracing | NO | external/third-party | O | O | ecosystem/integration | `@gelis/opentelemetry` | P0 |
-| Server-Timing | NO | O timing middleware | O | plugins/patterns | pattern | `@gelis/server-timing` or subpath | P1 |
-| Health endpoint helper | NO | simple route pattern | pattern | ecosystem | Terminus/integration patterns | `@gelis/health` | P1 |
-| Readiness/liveness dependency checks | NO | pattern | pattern | O under-pressure + ecosystem | D | `@gelis/health` capability dependencies | P1 |
-| Load/pressure protection | NO | custom | custom/plugin | O `under-pressure` | integration | runtime/adapter-aware plugin | P2 |
-| Metrics integration | NO | external | OTel/community | ecosystem | ecosystem | OTel metrics first; dedicated package only if needed | P1 |
+| Capability                           | Gelis now   | Hono                        | Elysia         | Fastify                      | NestJS                        | Preliminary Gelis placement                            | Priority |
+| ------------------------------------ | ----------- | --------------------------- | -------------- | ---------------------------- | ----------------------------- | ------------------------------------------------------ | -------- |
+| Request logger                       | NO official | O                           | K              | core logger ecosystem        | C/D                           | logger integration, not necessarily own logging engine | P0       |
+| Structured application logging       | NO          | basic logger + integrations | K              | strong built-in logger model | C/D                           | `@gelis/logger` integration strategy                   | P0       |
+| OpenTelemetry tracing                | NO          | external/third-party        | O              | O                            | ecosystem/integration         | `@gelis/opentelemetry`                                 | P0       |
+| Server-Timing                        | NO          | O timing middleware         | O              | plugins/patterns             | pattern                       | `@gelis/server-timing` or subpath                      | P1       |
+| Health endpoint helper               | NO          | simple route pattern        | pattern        | ecosystem                    | Terminus/integration patterns | `@gelis/health`                                        | P1       |
+| Readiness/liveness dependency checks | NO          | pattern                     | pattern        | O under-pressure + ecosystem | D                             | `@gelis/health` capability dependencies                | P1       |
+| Load/pressure protection             | NO          | custom                      | custom/plugin  | O `under-pressure`           | integration                   | runtime/adapter-aware plugin                           | P2       |
+| Metrics integration                  | NO          | external                    | OTel/community | ecosystem                    | ecosystem                     | OTel metrics first; dedicated package only if needed   | P1       |
 
 ### Observability principle
 
@@ -189,15 +189,15 @@ Official observability packages should compile/install through the existing appl
 
 # 6. Contract + developer tooling
 
-| Capability | Gelis now | Hono | Elysia | Fastify | NestJS | Preliminary Gelis placement | Priority |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| OpenAPI generation | PARTIAL: official package exists, post-P9 update pending | ecosystem/integrations | O | O | O/D | `@gelis/openapi` | P0 / active P10 |
-| API documentation UI | NO official Gelis integration yet | integrations | O OpenAPI UI | O Swagger UI | O Swagger | `@gelis/openapi-ui` or provider option | P1 |
-| Typed client | PROTO | C/RPC client helper | O Eden | external ecosystem | generated clients via OpenAPI/ecosystem | `@gelis/client` | P0 |
-| Testing helpers | general `app.fetch()` testing; no focused package | O helper | Bun/testing patterns | inject/testing APIs | C testing utilities | `gelis/testing` or `@gelis/testing` | P0 |
-| Project scaffolding | NO | `create-hono` | community/create tooling | CLI/ecosystem | Nest CLI | `create-gelis` | P1 |
-| Schema provider adapters | Standard Schema + OpenAPI resolver architecture | validator ecosystem | TypeBox/Standard Schema | type-provider ecosystem | class-validator/Zod integrations | keep Standard Schema core; optional tooling adapters | P1 |
-| Contract serialization | core snapshot exists | RPC/types | OpenAPI/Eden | schemas/OpenAPI | decorators/OpenAPI | core semantic contract + official tooling | P0 |
+| Capability               | Gelis now                                                | Hono                   | Elysia                   | Fastify                 | NestJS                                  | Preliminary Gelis placement                          | Priority        |
+| ------------------------ | -------------------------------------------------------- | ---------------------- | ------------------------ | ----------------------- | --------------------------------------- | ---------------------------------------------------- | --------------- |
+| OpenAPI generation       | PARTIAL: official package exists, post-P9 update pending | ecosystem/integrations | O                        | O                       | O/D                                     | `@gelis/openapi`                                     | P0 / active P10 |
+| API documentation UI     | NO official Gelis integration yet                        | integrations           | O OpenAPI UI             | O Swagger UI            | O Swagger                               | `@gelis/openapi-ui` or provider option               | P1              |
+| Typed client             | PROTO                                                    | C/RPC client helper    | O Eden                   | external ecosystem      | generated clients via OpenAPI/ecosystem | `@gelis/client`                                      | P0              |
+| Testing helpers          | general `app.fetch()` testing; no focused package        | O helper               | Bun/testing patterns     | inject/testing APIs     | C testing utilities                     | `gelis/testing` or `@gelis/testing`                  | P0              |
+| Project scaffolding      | NO                                                       | `create-hono`          | community/create tooling | CLI/ecosystem           | Nest CLI                                | `create-gelis`                                       | P1              |
+| Schema provider adapters | Standard Schema + OpenAPI resolver architecture          | validator ecosystem    | TypeBox/Standard Schema  | type-provider ecosystem | class-validator/Zod integrations        | keep Standard Schema core; optional tooling adapters | P1              |
+| Contract serialization   | core snapshot exists                                     | RPC/types              | OpenAPI/Eden             | schemas/OpenAPI         | decorators/OpenAPI                      | core semantic contract + official tooling            | P0              |
 
 ---
 

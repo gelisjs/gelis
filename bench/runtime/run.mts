@@ -159,21 +159,19 @@ function buildRouter(kind: RouteKind, size: number): Router {
   for (let index = 0; index < size; index++) {
     const path = kind === "static" ? `/r/${index}` : `/r/${index}/:id`;
 
-    router.register(
-      {
-        method: "GET",
+    router.register({
+      method: "GET",
 
-        path,
+      path,
 
-        options: undefined,
+      options: undefined,
 
-        handler:
-          kind === "static"
-            ? () => index
-            : ({ params }: { params: Record<string, string> }) =>
-                (params as { id: string }).id,
-      } as unknown as RuntimeRouteRecord,
-    );
+      handler:
+        kind === "static"
+          ? () => index
+          : ({ params }: { params: Record<string, string> }) =>
+              (params as { id: string }).id,
+    } as unknown as RuntimeRouteRecord);
   }
 
   return router;

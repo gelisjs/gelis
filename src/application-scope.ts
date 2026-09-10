@@ -389,12 +389,10 @@ export function bindApplicationScopeRoute<Scope extends object>(
   const scopedHandler = route.handler as unknown as ScopedRuntimeHandler<Scope>;
 
   const scopedBeforeHandle = route.beforeHandle as unknown as
-    | ScopedRuntimeBeforeHandle<Scope>
-    | undefined;
+    ScopedRuntimeBeforeHandle<Scope> | undefined;
 
   const scopedAfterHandle = route.afterHandle as unknown as
-    | ScopedRuntimeAfterHandle<Scope>
-    | undefined;
+    ScopedRuntimeAfterHandle<Scope> | undefined;
 
   return {
     ...route,

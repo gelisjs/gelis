@@ -139,9 +139,7 @@ console.table(
     "memory ratio": round(comparison.memoryRatio, 4),
     "check ratio": round(comparison.checkRatio, 4),
     "check gate":
-      comparison.routes === 5000
-        ? `<= ${CHECK_5000_MAX}x`
-        : `<= ${CHECK_MAX}x`,
+      comparison.routes === 5000 ? `<= ${CHECK_5000_MAX}x` : `<= ${CHECK_MAX}x`,
     verdict: comparison.pass ? "PASS" : "FAIL",
   })),
 );
@@ -150,8 +148,7 @@ const growth = (["p9-method-mix", "p9-rich"] as const).map((scenario) => {
   const at1000 = findCase(scenario, 1000);
   const at5000 = findCase(scenario, 5000);
 
-  const instantiationsRatio =
-    at5000.instantiations / at1000.instantiations;
+  const instantiationsRatio = at5000.instantiations / at1000.instantiations;
   const checkRatio = at5000.checkTime / at1000.checkTime;
   const pass =
     instantiationsRatio <= INSTANTIATIONS_GROWTH_MAX &&
@@ -540,7 +537,9 @@ function parseDiagnostics(output: string): TypeDiagnostics {
   };
 }
 
-function medianDiagnostics(samples: readonly TypeDiagnostics[]): TypeDiagnostics {
+function medianDiagnostics(
+  samples: readonly TypeDiagnostics[],
+): TypeDiagnostics {
   return {
     instantiations: median(samples.map((sample) => sample.instantiations)),
     memoryMB: median(samples.map((sample) => sample.memoryMB)),

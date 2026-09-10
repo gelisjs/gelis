@@ -27,8 +27,7 @@ interface SnapshotDynamicRoute {
 
 interface SnapshotNode {
   readonly staticChildren:
-    | readonly (readonly [string, SnapshotNode])[]
-    | undefined;
+    readonly (readonly [string, SnapshotNode])[] | undefined;
 
   readonly paramChild: SnapshotNode | undefined;
 

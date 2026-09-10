@@ -2,11 +2,7 @@ import { describe, expect, test } from "bun:test";
 
 import { Gelis } from "gelis";
 import { serve, serveReady } from "gelis/bun";
-import {
-  generateCookie,
-  getCookie,
-  setCookie,
-} from "gelis/cookie";
+import { generateCookie, getCookie, setCookie } from "gelis/cookie";
 import { cors } from "gelis/cors";
 
 describe("Gelis package exports", () => {

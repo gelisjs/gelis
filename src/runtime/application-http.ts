@@ -17,10 +17,7 @@ export interface RuntimeApplicationHttpPolicy {
   prepare(
     request: Request,
     runtime: RuntimeApplicationHttpRuntime,
-  ):
-    | void
-    | Response
-    | PromiseLike<void | Response>;
+  ): void | Response | PromiseLike<void | Response>;
 
   finalize(
     request: Request,
@@ -99,7 +96,9 @@ export function extractApplicationHttpPlan(
 
     if (marker.kind === "cors") {
       if (cors !== undefined) {
-        throw new Error("Multiple Gelis CORS application policies were compiled");
+        throw new Error(
+          "Multiple Gelis CORS application policies were compiled",
+        );
       }
 
       cors = marker.policy;
@@ -186,7 +185,9 @@ export function compileApplicationHttpErrorHooks(
   return compiled;
 }
 
-function resolveAdvertisedMethods(methods: readonly string[]): readonly string[] {
+function resolveAdvertisedMethods(
+  methods: readonly string[],
+): readonly string[] {
   let hasHead = false;
   let hasOptions = false;
   let hasAll = false;
@@ -272,7 +273,9 @@ function finalizeFetchResult(
   result: Response | Promise<Response>,
 ): Response | Promise<Response> {
   if (result instanceof Promise) {
-    return result.then((response) => resolveFinalized(policy, request, response));
+    return result.then((response) =>
+      resolveFinalized(policy, request, response),
+    );
   }
 
   return resolveFinalized(policy, request, result);
@@ -318,9 +321,7 @@ function resolveFinalized(
 ): Response | Promise<Response> {
   const finalized = policy.finalize(request, response);
 
-  return isPromiseLike(finalized)
-    ? Promise.resolve(finalized)
-    : finalized;
+  return isPromiseLike(finalized) ? Promise.resolve(finalized) : finalized;
 }
 
 function readMarker(hook: OnRequest): RuntimeApplicationHttpMarker | undefined {
