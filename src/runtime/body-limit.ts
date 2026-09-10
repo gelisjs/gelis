@@ -24,6 +24,11 @@ export interface RuntimeApplicationBodyLimitPolicy {
   readonly onExceeded?: RuntimeBodyLimitExceededHandler;
 }
 
+type RuntimePromisePeek = {
+  <T>(promise: Promise<T>): T | Promise<T>;
+  status(promise: Promise<unknown>): string;
+};
+
 const BODY_LIMIT_EXCEEDED: RuntimeLimitedBodyReadExceeded = {
   ok: false,
 };
@@ -44,8 +49,10 @@ export function compileRuntimeLimitedBodyReader(
   assertBodyLimitMaxBytes(maxBytes);
 
   const maxBytesText = String(maxBytes);
+  const promisePeek = resolveRuntimePromisePeek();
 
-  return (request) => readLimitedBody(request, maxBytes, maxBytesText);
+  return (request) =>
+    readLimitedBody(request, maxBytes, maxBytesText, promisePeek);
 }
 
 export function bodyTooLargeResponse(): Response {
@@ -62,10 +69,11 @@ export function bodyTooLargeResponse(): Response {
   );
 }
 
-async function readLimitedBody(
+function readLimitedBody(
   request: Request,
   maxBytes: number,
   maxBytesText: string,
+  promisePeek: RuntimePromisePeek | undefined,
 ): Promise<RuntimeLimitedBodyReadResult> {
   const contentLength = request.headers.get("content-length");
 
@@ -73,19 +81,29 @@ async function readLimitedBody(
     contentLength !== null &&
     contentLengthExceedsLimit(contentLength, maxBytesText)
   ) {
-    return BODY_LIMIT_EXCEEDED;
+    return Promise.resolve(BODY_LIMIT_EXCEEDED);
   }
 
   const body = request.body;
 
   if (body === null) {
-    return {
+    return Promise.resolve({
       ok: true,
       bytes: EMPTY_BODY,
-    };
+    });
   }
 
   const reader = body.getReader();
+
+  return promisePeek === undefined
+    ? readLimitedBodyStandard(reader, maxBytes)
+    : readLimitedBodyPeek(reader, maxBytes, promisePeek);
+}
+
+async function readLimitedBodyStandard(
+  reader: ReadableStreamDefaultReader<Uint8Array>,
+  maxBytes: number,
+): Promise<RuntimeLimitedBodyReadResult> {
   const chunks: Uint8Array[] = [];
   let totalBytes = 0;
 
@@ -100,12 +118,7 @@ async function readLimitedBody(
       const chunk = result.value;
 
       if (chunk.byteLength > maxBytes - totalBytes) {
-        try {
-          void reader.cancel().catch(() => undefined);
-        } catch {
-          // A confirmed overflow remains authoritative even if cancellation fails.
-        }
-
+        cancelReaderAfterOverflow(reader);
         return BODY_LIMIT_EXCEEDED;
       }
 
@@ -120,6 +133,96 @@ async function readLimitedBody(
     ok: true,
     bytes: concatenateChunks(chunks, totalBytes),
   };
+}
+
+function readLimitedBodyPeek(
+  reader: ReadableStreamDefaultReader<Uint8Array>,
+  maxBytes: number,
+  promisePeek: RuntimePromisePeek,
+): Promise<RuntimeLimitedBodyReadResult> {
+  const chunks: Uint8Array[] = [];
+  let totalBytes = 0;
+
+  const consume = (
+    result: ReadableStreamReadResult<Uint8Array>,
+  ): RuntimeLimitedBodyReadResult | undefined => {
+    if (result.done) {
+      return {
+        ok: true,
+        bytes: concatenateChunks(chunks, totalBytes),
+      };
+    }
+
+    const chunk = result.value;
+
+    if (chunk.byteLength > maxBytes - totalBytes) {
+      cancelReaderAfterOverflow(reader);
+      return BODY_LIMIT_EXCEEDED;
+    }
+
+    totalBytes += chunk.byteLength;
+    chunks.push(chunk);
+    return undefined;
+  };
+
+  const next = ():
+    | RuntimeLimitedBodyReadResult
+    | Promise<RuntimeLimitedBodyReadResult> => {
+    while (true) {
+      const pending = reader.read();
+
+      if (promisePeek.status(pending) === "fulfilled") {
+        const result = promisePeek(pending) as ReadableStreamReadResult<Uint8Array>;
+        const consumed = consume(result);
+
+        if (consumed !== undefined) {
+          return consumed;
+        }
+
+        continue;
+      }
+
+      return pending.then((result) => consume(result) ?? next());
+    }
+  };
+
+  try {
+    const result = next();
+
+    if (result instanceof Promise) {
+      return result.finally(() => reader.releaseLock());
+    }
+
+    reader.releaseLock();
+    return Promise.resolve(result);
+  } catch (error) {
+    reader.releaseLock();
+    return Promise.reject(error);
+  }
+}
+
+function cancelReaderAfterOverflow(
+  reader: ReadableStreamDefaultReader<Uint8Array>,
+): void {
+  try {
+    void reader.cancel().catch(() => undefined);
+  } catch {
+    // A confirmed overflow remains authoritative even if cancellation fails.
+  }
+}
+
+function resolveRuntimePromisePeek(): RuntimePromisePeek | undefined {
+  const runtime = globalThis as typeof globalThis & {
+    Bun?: {
+      peek?: RuntimePromisePeek;
+    };
+  };
+
+  const peek = runtime.Bun?.peek;
+
+  return typeof peek === "function" && typeof peek.status === "function"
+    ? peek
+    : undefined;
 }
 
 function concatenateChunks(
