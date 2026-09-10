@@ -7,6 +7,15 @@ import {
 } from "gelis/body-limit";
 import { generateCookie, getCookie, setCookie } from "gelis/cookie";
 import { cors } from "gelis/cors";
+import {
+  secureHeaders,
+  type SecureHeadersCrossOriginEmbedderPolicy,
+  type SecureHeadersCrossOriginOpenerPolicy,
+  type SecureHeadersCrossOriginResourcePolicy,
+  type SecureHeadersOptions,
+  type SecureHeadersReferrerPolicy,
+  type SecureHeadersStrictTransportSecurityOptions,
+} from "gelis/secure-headers";
 
 const app = new Gelis();
 
@@ -37,6 +46,26 @@ const bodyLimitOptions: BodyLimitOptions = {
 const bodyLimitCapability: BodyLimitCapability = bodyLimit(bodyLimitOptions);
 app.use(bodyLimitCapability);
 
+const strictTransportSecurity: SecureHeadersStrictTransportSecurityOptions = {
+  maxAge: 31536000,
+  includeSubDomains: true,
+  preload: true,
+};
+const referrerPolicy: SecureHeadersReferrerPolicy = "strict-origin";
+const embedderPolicy: SecureHeadersCrossOriginEmbedderPolicy = "require-corp";
+const openerPolicy: SecureHeadersCrossOriginOpenerPolicy = "same-origin";
+const resourcePolicy: SecureHeadersCrossOriginResourcePolicy = "same-site";
+const secureHeaderOptions: SecureHeadersOptions = {
+  strictTransportSecurity,
+  referrerPolicy,
+  crossOriginEmbedderPolicy: embedderPolicy,
+  crossOriginOpenerPolicy: openerPolicy,
+  crossOriginResourcePolicy: resourcePolicy,
+  contentSecurityPolicy: "default-src 'self'",
+  permissionsPolicy: "camera=()",
+};
+
+app.use(secureHeaders(secureHeaderOptions));
 app.get("/", () => "portable");
 
 const request = new Request("https://example.test/", {
@@ -68,7 +97,7 @@ async function inspectLimitedBody(request: Request): Promise<void> {
 }
 
 // Portable consumers must not receive Bun globals through `gelis`,
-// `gelis/cookie`, `gelis/cors`, or `gelis/body-limit`.
+// `gelis/cookie`, `gelis/cors`, `gelis/body-limit`, or `gelis/secure-headers`.
 // @ts-expect-error Bun must not exist in the portable consumer graph.
 Bun.serve;
 

@@ -33,6 +33,11 @@
       "types": "./src/body-limit/index.ts",
       "import": "./src/body-limit/index.ts",
       "default": "./src/body-limit/index.ts"
+    },
+    "./secure-headers": {
+      "types": "./src/secure-headers/index.ts",
+      "import": "./src/secure-headers/index.ts",
+      "default": "./src/secure-headers/index.ts"
     }
   },
   "packageManager": "bun@1.4.0",

@@ -5,6 +5,7 @@ import { serve, serveReady } from "gelis/bun";
 import { bodyLimit } from "gelis/body-limit";
 import { generateCookie, getCookie, setCookie } from "gelis/cookie";
 import { cors } from "gelis/cors";
+import { secureHeaders } from "gelis/secure-headers";
 
 describe("Gelis package exports", () => {
   test("resolves the portable root export", () => {
@@ -54,6 +55,16 @@ describe("Gelis package exports", () => {
     expect(app).toBeInstanceOf(Gelis);
   });
 
+  test("resolves the portable secure-headers subpath", () => {
+    expect(typeof secureHeaders).toBe("function");
+
+    const app = new Gelis();
+    app.use(secureHeaders());
+    app.get("/", () => "ok");
+
+    expect(app).toBeInstanceOf(Gelis);
+  });
+
   test("does not expose Bun adapter APIs from the portable root", async () => {
     const root = await import("gelis");
 
@@ -79,5 +90,11 @@ describe("Gelis package exports", () => {
     const root = await import("gelis");
 
     expect("bodyLimit" in root).toBe(false);
+  });
+
+  test("does not re-export secure-header helpers from the portable root", async () => {
+    const root = await import("gelis");
+
+    expect("secureHeaders" in root).toBe(false);
   });
 });
