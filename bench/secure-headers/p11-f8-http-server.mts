@@ -36,8 +36,8 @@ async function startGelis(root: string, serverPort: number): Promise<void> {
     resolve(root, "src/adapter/bun/index.ts"),
   ).href;
 
-  const [coreModule, secureHeadersModule, bunAdapterModule] =
-    await Promise.all([
+  const [coreModule, secureHeadersModule, bunAdapterModule] = await Promise.all(
+    [
       import(coreUrl) as Promise<{
         Gelis: new () => BenchmarkGelisApp;
       }>,
@@ -54,7 +54,8 @@ async function startGelis(root: string, serverPort: number): Promise<void> {
           },
         ) => unknown;
       }>,
-    ]);
+    ],
+  );
 
   const app = new coreModule.Gelis();
   app.use(secureHeadersModule.secureHeaders());
