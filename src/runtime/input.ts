@@ -2,7 +2,13 @@ import type { RequestBodyParser, RouteOptions } from "../route";
 
 import type { StandardSchemaV1 } from "../schema";
 
-import { readMultipartBody } from "./multipart";
+import {
+  bodyTooLargeResponse,
+  compileRuntimeLimitedBodyReader,
+  type RuntimeLimitedBodyReader,
+} from "./body-limit";
+
+import { normalizeMultipartFormData, readMultipartBody } from "./multipart";
 
 export const RUNTIME_INPUT_QUERY = 1;
 
@@ -43,9 +49,20 @@ export interface RuntimeInputPlan {
    * media-type essences.
    */
   readonly bodyContentTypes?: readonly string[];
+
+  /*
+   * Route-local body limit retained only when explicitly configured.
+   * Request execution uses the already-specialized readBody function.
+   */
+  readonly bodyLimit?: number;
 }
 
 type RuntimeContentTypeMatcher = (request: Request) => boolean;
+
+type RuntimeLimitedBodyParser = (
+  bytes: Uint8Array,
+  request: Request,
+) => unknown | Promise<unknown>;
 
 interface CompiledContentTypes {
   readonly contentTypes: readonly string[];
@@ -54,6 +71,10 @@ interface CompiledContentTypes {
 }
 
 const MEDIA_TYPE_TOKEN = /^[!#$%&'*+\-.^_`|~0-9A-Za-z]+$/;
+
+const BODY_LIMIT_EXCEEDED_ERROR = Symbol("GelisBodyLimitExceeded");
+
+const bodyTextDecoder = new TextDecoder();
 
 function normalizeDeclaredMediaType(value: string): string {
   const separator = value.indexOf(";");
@@ -203,9 +224,15 @@ export function createRuntimeInputPlan(
 
   const bodyContentTypes = options?.bodyContentTypes;
 
+  const bodyLimit = options?.bodyLimit;
+
   if (body === undefined) {
     if (bodyParser !== undefined || bodyContentTypes !== undefined) {
       throw new TypeError("Gelis body parser metadata requires a body schema");
+    }
+
+    if (bodyLimit !== undefined) {
+      throw new TypeError("Gelis bodyLimit requires a body schema");
     }
 
     if (query === undefined) {
@@ -226,44 +253,113 @@ export function createRuntimeInputPlan(
       ? undefined
       : compileContentTypes(bodyContentTypes);
 
+  const limitedBodyReader =
+    bodyLimit === undefined
+      ? undefined
+      : compileRuntimeLimitedBodyReader(bodyLimit);
+
   let readBody: RuntimeBodyReader;
   let readBodyError: RuntimeBodyReadError;
 
   if (parser === "json") {
-    readBody =
-      compiledContentTypes === undefined
-        ? readDefaultJsonBody
-        : compileJsonBodyReader(compiledContentTypes.matches);
+    if (limitedBodyReader === undefined) {
+      readBody =
+        compiledContentTypes === undefined
+          ? readDefaultJsonBody
+          : compileJsonBodyReader(compiledContentTypes.matches);
 
-    readBodyError = handleMalformedJsonBody;
+      readBodyError = handleMalformedJsonBody;
+    } else {
+      readBody = compileLimitedManagedBodyReader(
+        compiledContentTypes === undefined
+          ? isJsonContentType
+          : compiledContentTypes.matches,
+        limitedBodyReader,
+        parseLimitedJsonBody,
+      );
+
+      readBodyError = compileLimitedBodyReadError(handleMalformedJsonBody);
+    }
   } else if (parser === "text") {
-    readBody =
-      compiledContentTypes === undefined
-        ? readDefaultTextBody
-        : compileTextBodyReader(compiledContentTypes.matches);
+    if (limitedBodyReader === undefined) {
+      readBody =
+        compiledContentTypes === undefined
+          ? readDefaultTextBody
+          : compileTextBodyReader(compiledContentTypes.matches);
 
-    readBodyError = handleMalformedTextBody;
+      readBodyError = handleMalformedTextBody;
+    } else {
+      readBody = compileLimitedManagedBodyReader(
+        compiledContentTypes === undefined
+          ? isTextContentType
+          : compiledContentTypes.matches,
+        limitedBodyReader,
+        parseLimitedTextBody,
+      );
+
+      readBodyError = compileLimitedBodyReadError(handleMalformedTextBody);
+    }
   } else if (parser === "arrayBuffer") {
-    readBody =
-      compiledContentTypes === undefined
-        ? readDefaultArrayBufferBody
-        : compileArrayBufferBodyReader(compiledContentTypes.matches);
+    if (limitedBodyReader === undefined) {
+      readBody =
+        compiledContentTypes === undefined
+          ? readDefaultArrayBufferBody
+          : compileArrayBufferBodyReader(compiledContentTypes.matches);
 
-    readBodyError = handleMalformedArrayBufferBody;
+      readBodyError = handleMalformedArrayBufferBody;
+    } else {
+      readBody = compileLimitedManagedBodyReader(
+        compiledContentTypes === undefined
+          ? isArrayBufferContentType
+          : compiledContentTypes.matches,
+        limitedBodyReader,
+        parseLimitedArrayBufferBody,
+      );
+
+      readBodyError = compileLimitedBodyReadError(
+        handleMalformedArrayBufferBody,
+      );
+    }
   } else if (parser === "urlencoded") {
-    readBody =
-      compiledContentTypes === undefined
-        ? readDefaultUrlEncodedBody
-        : compileUrlEncodedBodyReader(compiledContentTypes.matches);
+    if (limitedBodyReader === undefined) {
+      readBody =
+        compiledContentTypes === undefined
+          ? readDefaultUrlEncodedBody
+          : compileUrlEncodedBodyReader(compiledContentTypes.matches);
 
-    readBodyError = handleMalformedUrlEncodedBody;
+      readBodyError = handleMalformedUrlEncodedBody;
+    } else {
+      readBody = compileLimitedManagedBodyReader(
+        compiledContentTypes === undefined
+          ? isUrlEncodedContentType
+          : compiledContentTypes.matches,
+        limitedBodyReader,
+        parseLimitedUrlEncodedBody,
+      );
+
+      readBodyError = compileLimitedBodyReadError(
+        handleMalformedUrlEncodedBody,
+      );
+    }
   } else if (parser === "multipart") {
-    readBody =
-      compiledContentTypes === undefined
-        ? readDefaultMultipartBody
-        : compileMultipartBodyReader(compiledContentTypes.matches);
+    if (limitedBodyReader === undefined) {
+      readBody =
+        compiledContentTypes === undefined
+          ? readDefaultMultipartBody
+          : compileMultipartBodyReader(compiledContentTypes.matches);
 
-    readBodyError = handleMalformedMultipartBody;
+      readBodyError = handleMalformedMultipartBody;
+    } else {
+      readBody = compileLimitedManagedBodyReader(
+        compiledContentTypes === undefined
+          ? isMultipartContentType
+          : compiledContentTypes.matches,
+        limitedBodyReader,
+        parseLimitedMultipartBody,
+      );
+
+      readBodyError = compileLimitedBodyReadError(handleMalformedMultipartBody);
+    }
   } else {
     const unsupportedParser: never = parser;
 
@@ -286,6 +382,12 @@ export function createRuntimeInputPlan(
         : {
             bodyContentTypes: compiledContentTypes.contentTypes,
           }),
+
+      ...(bodyLimit === undefined
+        ? {}
+        : {
+            bodyLimit,
+          }),
     };
   }
 
@@ -302,7 +404,79 @@ export function createRuntimeInputPlan(
       : {
           bodyContentTypes: compiledContentTypes.contentTypes,
         }),
+
+    ...(bodyLimit === undefined
+      ? {}
+      : {
+          bodyLimit,
+        }),
   };
+}
+
+function compileLimitedManagedBodyReader(
+  matchesContentType: RuntimeContentTypeMatcher,
+  readLimitedBody: RuntimeLimitedBodyReader,
+  parseBody: RuntimeLimitedBodyParser,
+): RuntimeBodyReader {
+  return (request) => {
+    if (!matchesContentType(request)) {
+      return unsupportedMediaTypeResponse();
+    }
+
+    return readLimitedBody(request).then((result) => {
+      if (!result.ok) {
+        throw BODY_LIMIT_EXCEEDED_ERROR;
+      }
+
+      return parseBody(result.bytes, request);
+    });
+  };
+}
+
+function compileLimitedBodyReadError(
+  fallback: RuntimeBodyReadError,
+): RuntimeBodyReadError {
+  return (error) =>
+    error === BODY_LIMIT_EXCEEDED_ERROR ? bodyTooLargeResponse() : fallback(error);
+}
+
+function parseLimitedJsonBody(bytes: Uint8Array): unknown {
+  return JSON.parse(bodyTextDecoder.decode(bytes)) as unknown;
+}
+
+function parseLimitedTextBody(bytes: Uint8Array): string {
+  return bodyTextDecoder.decode(bytes);
+}
+
+function parseLimitedArrayBufferBody(bytes: Uint8Array): ArrayBuffer {
+  return Uint8Array.from(bytes).buffer;
+}
+
+function parseLimitedUrlEncodedBody(
+  bytes: Uint8Array,
+): Record<string, string | string[]> {
+  return parseUrlEncodedBody(bodyTextDecoder.decode(bytes));
+}
+
+function parseLimitedMultipartBody(
+  bytes: Uint8Array,
+  request: Request,
+): Promise<unknown> {
+  const contentType = request.headers.get("content-type");
+
+  if (contentType === null) {
+    throw new TypeError("Multipart request body content type is required");
+  }
+
+  const parserContentType = multipartParserContentType(contentType);
+
+  return new Response(Uint8Array.from(bytes), {
+    headers: {
+      "content-type": parserContentType,
+    },
+  })
+    .formData()
+    .then((formData) => normalizeMultipartFormData(formData));
 }
 
 function readDefaultJsonBody(request: Request): Response | Promise<unknown> {
