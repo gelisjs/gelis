@@ -20,14 +20,15 @@ describe("P11-C cookie parser security regressions", () => {
     expect(getCookies(request, "session")).toEqual(["legitimate"]);
   });
 
-  test("does not normalize Unicode whitespace around names", () => {
+  test("strips only RFC OWS and does not normalize adjacent Unicode whitespace", () => {
     const request = new Request("https://example.test/", {
       headers: {
-        Cookie: "\u2003token=attacker; token=legitimate",
+        Cookie: " \u00A0token=attacker; token=legitimate",
       },
     });
 
     expect(getCookie(request, "token")).toBe("legitimate");
+    expect(getCookies(request, "token")).toEqual(["legitimate"]);
   });
 
   test("skips malformed cookie values instead of selecting them", () => {
