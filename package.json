@@ -20,6 +20,11 @@
       "types": "./src/cookie/public.ts",
       "import": "./src/cookie/public.ts",
       "default": "./src/cookie/public.ts"
+    },
+    "./cors": {
+      "types": "./src/cors/index.ts",
+      "import": "./src/cors/index.ts",
+      "default": "./src/cors/index.ts"
     }
   },
   "packageManager": "bun@1.4.0",
