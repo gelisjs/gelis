@@ -38,6 +38,7 @@
     "test:types": "bun ./node_modules/typescript/bin/tsc -p test/types/tsconfig.json --noEmit",
     "typecheck:runtime-tests": "bun ./node_modules/typescript/bin/tsc -p test/runtime/tsconfig.json --noEmit",
     "test:runtime": "bun test test/runtime",
+    "bench:cookie:p11-c": "bun bench/cookie/p11-c-acceptance.mts",
     "bench:types:generate": "bun bench/types/generate.mts",
     "bench:types:quick": "bun bench/types/run.mts --runs=1 --sizes=100,500",
     "bench:types": "bun bench/types/run.mts",
