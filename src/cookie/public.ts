@@ -61,18 +61,15 @@ export function getCookie(request: Request, name: string): string | undefined {
   }
 
   const header = request.headers.get("cookie");
-  if (header === null || header.length === 0) {
+  if (
+    header === null ||
+    header.length === 0 ||
+    header.indexOf(name) === -1
+  ) {
     return undefined;
   }
 
-  let result: string | undefined;
-  scanCookieHeader(header, (pair) => {
-    if (result === undefined && pair.name === name) {
-      result = pair.value;
-    }
-  });
-
-  return result;
+  return findCookieValue(header, name);
 }
 
 export function getCookies(
@@ -89,17 +86,16 @@ export function getCookies(
   const header = request.headers.get("cookie");
 
   if (name !== undefined) {
-    if (!COOKIE_NAME_TOKEN.test(name) || header === null || header.length === 0) {
+    if (
+      !COOKIE_NAME_TOKEN.test(name) ||
+      header === null ||
+      header.length === 0 ||
+      header.indexOf(name) === -1
+    ) {
       return [];
     }
 
-    const values: string[] = [];
-    scanCookieHeader(header, (pair) => {
-      if (pair.name === name) {
-        values.push(pair.value);
-      }
-    });
-    return values;
+    return collectCookieValues(header, name);
   }
 
   const cookies = Object.create(null) as Record<string, string[]>;
@@ -143,8 +139,21 @@ export function generateCookie<const Name extends string>(
   name: Name,
   value: string,
   ...options: CookieOptionArguments<Name>
+): string;
+export function generateCookie(
+  name: string,
+  value: string,
+  options?: CookieOptions,
 ): string {
-  return generateCookieRuntime(name, value, options[0]);
+  if (options === undefined && !hasSecurityPrefix(name)) {
+    if (!COOKIE_NAME_TOKEN.test(name)) {
+      throw new TypeError("Invalid cookie name");
+    }
+
+    return `${name}=${encodeCookieValue(value)}; Path=/`;
+  }
+
+  return generateCookieRuntime(name, value, options);
 }
 
 export function setCookie<const Name extends string>(
@@ -152,16 +161,32 @@ export function setCookie<const Name extends string>(
   name: Name,
   value: string,
   ...options: CookieOptionArguments<Name>
+): void;
+export function setCookie(
+  headers: Headers,
+  name: string,
+  value: string,
+  options?: CookieOptions,
 ): void {
-  setCookieRuntime(headers, name, value, options[0]);
+  if (options === undefined && !hasSecurityPrefix(name)) {
+    headers.append("Set-Cookie", generateCookie(name, value));
+    return;
+  }
+
+  setCookieRuntime(headers, name, value, options);
 }
 
 export function deleteCookie<const Name extends string>(
   headers: Headers,
   name: Name,
   ...options: CookieDeleteOptionArguments<Name>
+): void;
+export function deleteCookie(
+  headers: Headers,
+  name: string,
+  options?: CookieDeleteOptions,
 ): void {
-  deleteCookieRuntime(headers, name, options[0]);
+  deleteCookieRuntime(headers, name, options);
 }
 
 export function generateSignedCookie<const Name extends string>(
@@ -169,8 +194,14 @@ export function generateSignedCookie<const Name extends string>(
   value: string,
   secrets: CookieSecrets,
   ...options: CookieOptionArguments<Name>
+): Promise<string>;
+export function generateSignedCookie(
+  name: string,
+  value: string,
+  secrets: CookieSecrets,
+  options?: CookieOptions,
 ): Promise<string> {
-  return generateSignedCookieRuntime(name, value, secrets, options[0]);
+  return generateSignedCookieRuntime(name, value, secrets, options);
 }
 
 export function setSignedCookie<const Name extends string>(
@@ -179,8 +210,93 @@ export function setSignedCookie<const Name extends string>(
   value: string,
   secrets: CookieSecrets,
   ...options: CookieOptionArguments<Name>
+): Promise<void>;
+export function setSignedCookie(
+  headers: Headers,
+  name: string,
+  value: string,
+  secrets: CookieSecrets,
+  options?: CookieOptions,
 ): Promise<void> {
-  return setSignedCookieRuntime(headers, name, value, secrets, options[0]);
+  return setSignedCookieRuntime(headers, name, value, secrets, options);
+}
+
+function findCookieValue(header: string, name: string): string | undefined {
+  let start = 0;
+
+  for (let index = 0; index <= header.length; index++) {
+    const char = header.charCodeAt(index);
+    if (index !== header.length && char !== 59 && char !== 44) {
+      continue;
+    }
+
+    const value = parseNamedCookieValue(header, start, index, name);
+    start = index + 1;
+
+    if (value !== null) {
+      return value;
+    }
+  }
+
+  return undefined;
+}
+
+function collectCookieValues(header: string, name: string): readonly string[] {
+  const values: string[] = [];
+  let start = 0;
+
+  for (let index = 0; index <= header.length; index++) {
+    const char = header.charCodeAt(index);
+    if (index !== header.length && char !== 59 && char !== 44) {
+      continue;
+    }
+
+    const value = parseNamedCookieValue(header, start, index, name);
+    start = index + 1;
+
+    if (value !== null) {
+      values.push(value);
+    }
+  }
+
+  return values;
+}
+
+function parseNamedCookieValue(
+  header: string,
+  start: number,
+  end: number,
+  name: string,
+): string | null {
+  while (start < end && isOptionalWhitespace(header.charCodeAt(start))) {
+    start += 1;
+  }
+  while (end > start && isOptionalWhitespace(header.charCodeAt(end - 1))) {
+    end -= 1;
+  }
+
+  if (start >= end) {
+    return null;
+  }
+
+  const equals = header.indexOf("=", start);
+  if (equals === -1 || equals >= end) {
+    return null;
+  }
+
+  let nameEnd = equals;
+  while (nameEnd > start && isOptionalWhitespace(header.charCodeAt(nameEnd - 1))) {
+    nameEnd -= 1;
+  }
+
+  if (
+    nameEnd - start !== name.length ||
+    !header.startsWith(name, start)
+  ) {
+    return null;
+  }
+
+  return parseCookieValue(header, equals + 1, end);
 }
 
 function scanCookieHeader(
@@ -225,47 +341,54 @@ function parseCookiePair(
     return undefined;
   }
 
-  let nameStart = start;
   let nameEnd = equals;
-  while (nameStart < nameEnd && isOptionalWhitespace(header.charCodeAt(nameStart))) {
-    nameStart += 1;
-  }
-  while (nameEnd > nameStart && isOptionalWhitespace(header.charCodeAt(nameEnd - 1))) {
+  while (nameEnd > start && isOptionalWhitespace(header.charCodeAt(nameEnd - 1))) {
     nameEnd -= 1;
   }
 
-  const rawName = header.slice(nameStart, nameEnd);
+  const rawName = header.slice(start, nameEnd);
   if (!COOKIE_NAME_TOKEN.test(rawName)) {
     return undefined;
   }
 
-  let valueStart = equals + 1;
-  let valueEnd = end;
-  while (valueStart < valueEnd && isOptionalWhitespace(header.charCodeAt(valueStart))) {
-    valueStart += 1;
-  }
-  while (valueEnd > valueStart && isOptionalWhitespace(header.charCodeAt(valueEnd - 1))) {
-    valueEnd -= 1;
-  }
-
-  if (valueStart < valueEnd && header.charCodeAt(valueStart) === 34) {
-    if (valueEnd - valueStart < 2 || header.charCodeAt(valueEnd - 1) !== 34) {
-      return undefined;
-    }
-
-    valueStart += 1;
-    valueEnd -= 1;
-  }
-
-  const rawValue = header.slice(valueStart, valueEnd);
-  if (!isValidCookieValue(rawValue)) {
+  const value = parseCookieValue(header, equals + 1, end);
+  if (value === null) {
     return undefined;
   }
 
   return {
     name: rawName,
-    value: decodeCookieValue(rawValue),
+    value,
   };
+}
+
+function parseCookieValue(
+  header: string,
+  start: number,
+  end: number,
+): string | null {
+  while (start < end && isOptionalWhitespace(header.charCodeAt(start))) {
+    start += 1;
+  }
+  while (end > start && isOptionalWhitespace(header.charCodeAt(end - 1))) {
+    end -= 1;
+  }
+
+  if (start < end && header.charCodeAt(start) === 34) {
+    if (end - start < 2 || header.charCodeAt(end - 1) !== 34) {
+      return null;
+    }
+
+    start += 1;
+    end -= 1;
+  }
+
+  const rawValue = header.slice(start, end);
+  if (!isValidCookieValue(rawValue)) {
+    return null;
+  }
+
+  return decodeCookieValue(rawValue);
 }
 
 function isValidCookieValue(value: string): boolean {
@@ -298,6 +421,29 @@ function decodeCookieValue(value: string): string {
   } catch {
     return value;
   }
+}
+
+function encodeCookieValue(value: string): string {
+  try {
+    return encodeURIComponent(value);
+  } catch (cause) {
+    throw new TypeError(
+      `Invalid cookie value: ${cause instanceof Error ? cause.message : String(cause)}`,
+    );
+  }
+}
+
+function hasSecurityPrefix(name: string): boolean {
+  if (
+    name.length < 8 ||
+    name.charCodeAt(0) !== 95 ||
+    name.charCodeAt(1) !== 95
+  ) {
+    return false;
+  }
+
+  const lower = name.toLowerCase();
+  return lower.startsWith("__secure-") || lower.startsWith("__host-");
 }
 
 function isOptionalWhitespace(code: number): boolean {
