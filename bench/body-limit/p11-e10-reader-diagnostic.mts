@@ -47,7 +47,10 @@ console.log("| --- | --- | ---: | --- |");
 
 for (const scenario of scenarios) {
   for (const strategy of strategies) {
-    if (strategy === "byob-reader" && !supportsByobReader(createRequest(scenario))) {
+    if (
+      strategy === "byob-reader" &&
+      !supportsByobReader(createRequest(scenario))
+    ) {
       console.log(`| ${scenario} | ${strategy} | n/a | unsupported |`);
       continue;
     }
