@@ -8,7 +8,10 @@ const MIN_CALIBRATION_MS = 20;
 type Scenario = "buffered-under" | "streamed-under";
 type Strategy = "retain-closed-lock" | "release-closed-lock";
 
-const scenarios: readonly Scenario[] = ["buffered-under", "streamed-under"];
+const scenarios: readonly Scenario[] = [
+  "buffered-under",
+  "streamed-under",
+];
 const strategies: readonly Strategy[] = [
   "retain-closed-lock",
   "release-closed-lock",
@@ -20,7 +23,9 @@ console.log(`Payload: ${UNDER_BYTES} bytes`);
 console.log(
   "Diagnostic only: isolates reader.releaseLock() cost after successful full consumption.\n",
 );
-console.log("| scenario | strategy | ns/op | body used | body locked | bytes |");
+console.log(
+  "| scenario | strategy | ns/op | body used | body locked | bytes |",
+);
 console.log("| --- | --- | ---: | --- | --- | ---: |");
 
 for (const scenario of scenarios) {
@@ -40,16 +45,14 @@ for (const scenario of scenarios) {
       observedBytes = await readAll(body, strategy);
 
       if (observedBytes !== UNDER_BYTES) {
-        throw new Error(
-          `${scenario}/${strategy} observed ${observedBytes} bytes; expected ${UNDER_BYTES}`,
-        );
+        throw new Error("Unexpected byte count");
       }
 
       bodyUsed = request.bodyUsed;
       bodyLocked = body.locked;
 
       if (!bodyUsed) {
-        throw new Error(`${scenario}/${strategy} did not consume request body`);
+        throw new Error("Request body was not consumed");
       }
     };
 
@@ -60,10 +63,18 @@ for (const scenario of scenarios) {
     const iterations = await calibrate(operation);
     const elapsed = await measure(operation, iterations);
     const nsPerOp = (elapsed * 1_000_000) / iterations;
+    const usedText = bodyUsed ? "yes" : "no";
+    const lockedText = bodyLocked ? "yes" : "no";
+    const cells = [
+      scenario,
+      strategy,
+      nsPerOp.toFixed(1),
+      usedText,
+      lockedText,
+      String(observedBytes),
+    ];
 
-    console.log(
-      `| ${scenario} | ${strategy} | ${nsPerOp.toFixed(1)} | ${bodyUsed ? "yes" : "no"} | ${bodyLocked ? "yes" : "no"} | ${observedBytes} |`,
-    );
+    console.log(`| ${cells.join(" | ")} |`);
   }
 }
 
