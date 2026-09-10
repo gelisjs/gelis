@@ -90,6 +90,8 @@ export interface RouteOptions {
 
   readonly bodyContentTypes?: readonly string[];
 
+  readonly bodyLimit?: number;
+
   readonly responses?: ResponseContractMap;
 
   readonly openapi?: OpenAPIRouteMetadata | false;
@@ -282,6 +284,8 @@ export type RouteOptionsFor<
   readonly bodyParser?: RequestBodyParser;
 
   readonly bodyContentTypes?: readonly string[];
+
+  readonly bodyLimit?: number;
 
   readonly responses?: Responses;
 
