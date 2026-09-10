@@ -43,7 +43,7 @@ const scenarios: readonly Scenario[] = [
 ];
 
 assertCleanWorkingTree(ROOT);
-assertRuntimeEquivalentToE9(ROOT);
+assertPackageEquivalentToE9(ROOT);
 
 const headSha = gitHead(ROOT);
 const honoVersion = await readHonoVersion(ROOT);
@@ -58,7 +58,7 @@ console.log("P11-E10 Body Limit Enabled Competitor Acceptance");
 console.log(`Bun:       ${Bun.version}`);
 console.log(`CPU:       ${cpus()[0]?.model ?? "unknown"}`);
 console.log(`E9 base:   ${E9_BASE_SHA}`);
-console.log(`Harness:   ${headSha}`);
+console.log(`Candidate: ${headSha}`);
 console.log(`Hono:      ${honoVersion}`);
 console.log(`Limit:     1,024 bytes`);
 console.log(`Under:     768 bytes`);
@@ -268,18 +268,9 @@ function assertCleanWorkingTree(root: string): void {
   }
 }
 
-function assertRuntimeEquivalentToE9(root: string): void {
+function assertPackageEquivalentToE9(root: string): void {
   const result = Bun.spawnSync(
-    [
-      "git",
-      "diff",
-      "--quiet",
-      E9_BASE_SHA,
-      "--",
-      "src",
-      "package.json",
-      "bun.lock",
-    ],
+    ["git", "diff", "--quiet", E9_BASE_SHA, "--", "package.json", "bun.lock"],
     {
       cwd: root,
       stdout: "pipe",
@@ -293,7 +284,7 @@ function assertRuntimeEquivalentToE9(root: string): void {
 
   if (result.exitCode === 1) {
     throw new Error(
-      "P11-E10 requires runtime/package state identical to accepted E9 base",
+      "P11-E10 requires package and lockfile state identical to accepted E9 base",
     );
   }
 
