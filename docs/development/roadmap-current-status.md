@@ -30,8 +30,8 @@ P10  OpenAPI & Contract Integration        COMPLETE
 P11  Industrial HTTP Essentials            ACTIVE
 ├── A  competitor semantics + API audit    COMPLETE
 ├── B  ownership + execution architecture  FROZEN
-├── C  cookie capability                   ACTIVE
-├── D  CORS capability                     PLANNED
+├── C  cookie capability                   ACCEPTED
+├── D  CORS capability                     ACTIVE
 ├── E  request/body limit capability       PLANNED
 ├── F  secure headers capability           PLANNED
 ├── G  request ID + timeout/abort           PLANNED
@@ -155,40 +155,59 @@ gelis/timeout
 
 The root `gelis` entrypoint remains minimal. Capabilities must use pay-for-use execution shapes rather than a universal middleware chain.
 
-## Active P11-C objective
+## P11-C result
 
-P11-C cookie architecture/API/performance gates are frozen in:
-
-```text
-docs/architecture/p11-c-cookie-capability-freeze.md
-```
-
-Current implementation scope:
+P11-C cookie capability is accepted in:
 
 ```text
-portable pure `gelis/cookie` subpath
-cookie parsing with duplicate preservation
-Set-Cookie generation/mutation helpers
-secure prefix validation
-SameSite=None / Partitioned Secure constraints
-400-day persistence limits
-WebCrypto HMAC-SHA256 signed cookies
-secret rotation with discriminated verification results
-portable package export/type checks
-security regression tests
-Hono comparison acceptance harness
+docs/architecture/p11-c-cookie-capability-acceptance.md
 ```
 
-The public parser deliberately trims only RFC optional whitespace (`SP` / `HTAB`) and does not use JavaScript Unicode `trim()` for cookie-name normalization. This protects against same-name confusion from non-ASCII whitespace.
-
-P11-C may move to acceptance only after:
+Accepted source candidate:
 
 ```text
-bun run check                       PASS
-frozen P11-C cookie benchmark       PASS
-no root Gelis runtime integration   verified
-public documentation                frozen
+f2b104df8ffbe96348c51271a1868a1c4f9141c7
 ```
+
+The first measured implementation failed the frozen unsigned performance gates and was not accepted. The gates were retained unchanged. A requested-name parser fast path, duplicate-aware specialized scan, ordinary serialization fast path, and removal of runtime rest-array allocation then produced the accepted measurement:
+
+```text
+get-8            0.5275x Hono
+get-32           0.4736x Hono
+generate-basic   0.6128x Hono
+generate-rich    0.9568x Hono
+signed-generate  0.9268x Hono
+signed-verify    0.9781x Hono
+unsigned geomean 0.6186x <= 1.05x PASS
+```
+
+These ratios are workload-specific acceptance evidence, not a universal speed claim.
+
+The accepted cookie implementation remains isolated to `gelis/cookie`; root Gelis does not re-export the helper surface and ordinary application routing receives no cookie-specific request integration.
+
+## Active P11-D objective
+
+P11-D owns the first compiled application HTTP-boundary capability:
+
+```text
+gelis/cors
+```
+
+Its architecture must preserve the P11-B invariants:
+
+```text
+actual CORS preflight handled before ordinary routing
+ordinary OPTIONS remains owned by P9 semantics
+route-aware methods rather than a stale hard-coded method list
+QUERY/custom method support
+correct Vary behavior
+credential/wildcard safety
+no second synthetic OPTIONS router
+final-response CORS policy applied exactly once
+no application wrapper when CORS is absent
+```
+
+P11-D freezes API, correctness, zero-unused, and performance gates before production implementation measurements.
 
 ## Post-P11 waves
 
