@@ -106,8 +106,6 @@ async function readOverflow(
         reader.releaseLock();
         cancelBody(body);
         return "overflow";
-      case "reader-cancel-finally":
-        throw new Error("unreachable");
     }
   }
 }
