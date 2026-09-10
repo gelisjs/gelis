@@ -1,7 +1,13 @@
 import type { OnError } from "../error";
 import type { OnRequest } from "../request";
+import { ALL_ROUTE_METHOD } from "../http-method";
 import type { RuntimeFetch } from "./fetch";
+import {
+  methodMissIncludesAllRoute,
+} from "./http-method-semantics";
 import { normalizeResponseForRequest } from "./response";
+
+const METHOD_DISCOVERY_PROBE = "CONNECT";
 
 export interface RuntimeApplicationHttpRuntime {
   matchingMethods(request: Request): readonly string[];
@@ -130,6 +136,58 @@ export function extractApplicationHttpPlan(
     onRequestHooks: ordinaryHooks,
     plan: {
       cors,
+    },
+  };
+}
+
+export function createApplicationHttpRuntime(
+  routedFetch: RuntimeFetch,
+): RuntimeApplicationHttpRuntime {
+  return {
+    matchingMethods(request) {
+      /*
+       * CONNECT is rejected by Fetch/Gelis route registration and the ALL
+       * fallback deliberately ignores it. Dispatching a minimal request-like
+       * probe through the bare routed fetch therefore cannot execute a user
+       * route or ordinary onRequest lifecycle.
+       *
+       * P9's method-miss response remains the authority for implicit HEAD /
+       * automatic OPTIONS, while a non-wire symbol tells us whether ALL also
+       * exists for the pathname.
+       */
+      const probe = {
+        method: METHOD_DISCOVERY_PROBE,
+        url: request.url,
+      } as Request;
+
+      const discovered = routedFetch(probe);
+
+      if (isPromiseLike(discovered)) {
+        throw new Error(
+          "Gelis method topology discovery unexpectedly became asynchronous",
+        );
+      }
+
+      const methods: string[] = [];
+      const allow = discovered.headers.get("allow");
+
+      if (allow !== null && allow.length !== 0) {
+        const values = allow.split(",");
+
+        for (let index = 0; index < values.length; index++) {
+          const value = values[index]?.trim();
+
+          if (value !== undefined && value.length !== 0) {
+            methods.push(value);
+          }
+        }
+      }
+
+      if (methodMissIncludesAllRoute(discovered)) {
+        methods.push(ALL_ROUTE_METHOD);
+      }
+
+      return methods;
     },
   };
 }
