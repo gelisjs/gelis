@@ -7,10 +7,11 @@ import type { RuntimeFetch } from "./fetch";
 import {
   compileApplicationHttpErrorHooks,
   compileApplicationHttpFetch,
+  createApplicationHttpRuntime,
   extractApplicationHttpPlan,
 } from "./application-http";
 
-import type { RuntimeApplicationHttpRuntime } from "./application-http";
+import type { RuntimeApplicationHttpMethodResolver } from "./application-http";
 
 import { compileOnErrorFetch } from "./on-error";
 
@@ -20,7 +21,7 @@ export function compileApplicationFetch(
   routedFetch: RuntimeFetch,
   onRequestHooks: readonly OnRequest[] | undefined,
   onErrorHooks: readonly OnError[] | undefined,
-  httpRuntime?: RuntimeApplicationHttpRuntime,
+  resolveHttpMethods?: RuntimeApplicationHttpMethodResolver,
 ): RuntimeFetch {
   const extracted = extractApplicationHttpPlan(onRequestHooks);
 
@@ -42,9 +43,11 @@ export function compileApplicationFetch(
 
   const httpPlan = extracted.plan;
   if (httpPlan !== undefined) {
-    if (httpRuntime === undefined) {
-      throw new Error("Missing Gelis application HTTP runtime");
+    if (resolveHttpMethods === undefined) {
+      throw new Error("Missing Gelis application HTTP method resolver");
     }
+
+    const httpRuntime = createApplicationHttpRuntime(resolveHttpMethods);
 
     fetch = compileApplicationHttpFetch(httpPlan, fetch, httpRuntime);
   }
