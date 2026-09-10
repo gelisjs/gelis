@@ -5,30 +5,23 @@ const WARMUPS = 1_000;
 const TARGET_MS = 100;
 const MIN_CALIBRATION_MS = 20;
 
-type Scenario = "buffered-under" | "streamed-under";
-type Strategy = "retain-closed-lock" | "release-closed-lock";
+const scenarios = ["buffered-under", "streamed-under"] as const;
+const strategies = ["retain-lock", "release-lock"] as const;
 
-const scenarios: readonly Scenario[] = [
-  "buffered-under",
-  "streamed-under",
-];
-const strategies: readonly Strategy[] = [
-  "retain-closed-lock",
-  "release-closed-lock",
-];
+type Scenario = (typeof scenarios)[number];
+type Strategy = (typeof strategies)[number];
 
 console.log("P11-E10 success cleanup diagnostic");
 console.log(`Bun: ${Bun.version}`);
 console.log(`Payload: ${UNDER_BYTES} bytes`);
-console.log("Diagnostic only: isolates reader.releaseLock() cost after successful full consumption.\n");
-console.log("| scenario | strategy | ns/op | body used | body locked | bytes |");
-console.log("| --- | --- | ---: | --- | --- | ---: |");
+console.log("Diagnostic only: measures releaseLock() after full consumption.\n");
+console.log("| scenario | strategy | ns/op | used | locked |");
+console.log("| --- | --- | ---: | --- | --- |");
 
 for (const scenario of scenarios) {
   for (const strategy of strategies) {
-    let bodyUsed = false;
-    let bodyLocked = false;
-    let observedBytes = 0;
+    let used = false;
+    let locked = false;
 
     const operation = async () => {
       const request = createRequest(scenario);
@@ -38,16 +31,16 @@ for (const scenario of scenarios) {
         throw new Error("Expected request body");
       }
 
-      observedBytes = await readAll(body, strategy);
+      const bytes = await readAll(body, strategy);
 
-      if (observedBytes !== UNDER_BYTES) {
+      if (bytes !== UNDER_BYTES) {
         throw new Error("Unexpected byte count");
       }
 
-      bodyUsed = request.bodyUsed;
-      bodyLocked = body.locked;
+      used = request.bodyUsed;
+      locked = body.locked;
 
-      if (!bodyUsed) {
+      if (!used) {
         throw new Error("Request body was not consumed");
       }
     };
@@ -59,15 +52,12 @@ for (const scenario of scenarios) {
     const iterations = await calibrate(operation);
     const elapsed = await measure(operation, iterations);
     const nsPerOp = (elapsed * 1_000_000) / iterations;
-    const usedText = bodyUsed ? "yes" : "no";
-    const lockedText = bodyLocked ? "yes" : "no";
     const cells = [
       scenario,
       strategy,
       nsPerOp.toFixed(1),
-      usedText,
-      lockedText,
-      String(observedBytes),
+      used ? "yes" : "no",
+      locked ? "yes" : "no",
     ];
 
     console.log(`| ${cells.join(" | ")} |`);
@@ -79,20 +69,20 @@ async function readAll(
   strategy: Strategy,
 ): Promise<number> {
   const reader = body.getReader();
-  let totalBytes = 0;
+  let total = 0;
 
   while (true) {
     const result = await reader.read();
 
     if (result.done) {
-      if (strategy === "release-closed-lock") {
+      if (strategy === "release-lock") {
         reader.releaseLock();
       }
 
-      return totalBytes;
+      return total;
     }
 
-    totalBytes += result.value.byteLength;
+    total += result.value.byteLength;
   }
 }
 
