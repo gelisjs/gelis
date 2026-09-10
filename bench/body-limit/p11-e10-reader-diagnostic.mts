@@ -12,6 +12,8 @@ type Strategy =
   | "native-arraybuffer"
   | "bun-to-bytes"
   | "standard-reader"
+  | "get-header-reader"
+  | "has-gated-reader"
   | "byob-reader"
   | "peek-reader"
   | "read-many";
@@ -31,6 +33,8 @@ const strategies: readonly Strategy[] = [
   "native-arraybuffer",
   "bun-to-bytes",
   "standard-reader",
+  "get-header-reader",
+  "has-gated-reader",
   "byob-reader",
   "peek-reader",
   "read-many",
@@ -104,6 +108,10 @@ async function readWithStrategy(
     }
     case "standard-reader":
       return readStandard(request);
+    case "get-header-reader":
+      return readWithGetHeader(request);
+    case "has-gated-reader":
+      return readWithHasGatedHeader(request);
     case "byob-reader":
       return readByob(request);
     case "peek-reader":
@@ -135,6 +143,28 @@ async function readStandard(request: Request): Promise<ReadResult> {
   } finally {
     reader.releaseLock();
   }
+}
+
+function readWithGetHeader(request: Request): Promise<ReadResult> {
+  const contentLength = request.headers.get("content-length");
+
+  if (contentLength !== null && Number(contentLength) > LIMIT_BYTES) {
+    return Promise.resolve({ ok: false, bytes: 0 });
+  }
+
+  return readStandard(request);
+}
+
+function readWithHasGatedHeader(request: Request): Promise<ReadResult> {
+  if (request.headers.has("content-length")) {
+    const contentLength = request.headers.get("content-length");
+
+    if (contentLength !== null && Number(contentLength) > LIMIT_BYTES) {
+      return Promise.resolve({ ok: false, bytes: 0 });
+    }
+  }
+
+  return readStandard(request);
 }
 
 async function readByob(request: Request): Promise<ReadResult> {
