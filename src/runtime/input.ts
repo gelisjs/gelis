@@ -437,7 +437,9 @@ function compileLimitedBodyReadError(
   fallback: RuntimeBodyReadError,
 ): RuntimeBodyReadError {
   return (error) =>
-    error === BODY_LIMIT_EXCEEDED_ERROR ? bodyTooLargeResponse() : fallback(error);
+    error === BODY_LIMIT_EXCEEDED_ERROR
+      ? bodyTooLargeResponse()
+      : fallback(error);
 }
 
 function parseLimitedJsonBody(bytes: Uint8Array): unknown {
