@@ -21,7 +21,9 @@ const strategies: readonly Strategy[] = [
 console.log("P11-E10 header path diagnostic");
 console.log(`Bun: ${Bun.version}`);
 console.log(`Limit: ${LIMIT_BYTES} bytes`);
-console.log("Scenario: streamed overflow with no Content-Length/Transfer-Encoding.\n");
+console.log(
+  "Scenario: streamed overflow with no Content-Length/Transfer-Encoding.\n",
+);
 console.log("| strategy | ns/op | result |");
 console.log("| --- | ---: | --- |");
 
@@ -46,7 +48,10 @@ for (const strategy of strategies) {
   console.log(`| ${strategy} | ${nsPerOp.toFixed(1)} | overflow |`);
 }
 
-async function read(strategy: Strategy, request: Request): Promise<boolean> {
+async function read(
+  strategy: Strategy,
+  request: Request,
+): Promise<boolean> {
   switch (strategy) {
     case "direct-reader":
       return readBody(request);
