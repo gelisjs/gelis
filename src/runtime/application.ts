@@ -20,7 +20,7 @@ export function compileApplicationFetch(
   routedFetch: RuntimeFetch,
   onRequestHooks: readonly OnRequest[] | undefined,
   onErrorHooks: readonly OnError[] | undefined,
-  httpRuntime: RuntimeApplicationHttpRuntime,
+  httpRuntime?: RuntimeApplicationHttpRuntime,
 ): RuntimeFetch {
   const extracted = extractApplicationHttpPlan(onRequestHooks);
 
@@ -42,6 +42,10 @@ export function compileApplicationFetch(
 
   const httpPlan = extracted.plan;
   if (httpPlan !== undefined) {
+    if (httpRuntime === undefined) {
+      throw new Error("Missing Gelis application HTTP runtime");
+    }
+
     fetch = compileApplicationHttpFetch(httpPlan, fetch, httpRuntime);
   }
 
