@@ -1,3 +1,5 @@
+import type { StandardSchemaV1 } from "../../src/index.ts";
+
 const LIMIT_BYTES = 1_024;
 const UNDER_BYTES = new Uint8Array(768);
 const OVER_BYTES = new Uint8Array(1_536);
@@ -87,7 +89,7 @@ async function createGelisDispatch(): Promise<
     import("../../src/body-limit/index.ts"),
   ]);
 
-  const Bytes = {
+  const Bytes: StandardSchemaV1<ArrayBuffer, ArrayBuffer> = {
     "~standard": {
       version: 1 as const,
       vendor: "gelis-bench",
