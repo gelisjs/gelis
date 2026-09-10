@@ -5,6 +5,9 @@
   "license": "MIT",
   "type": "module",
   "private": true,
+  "workspaces": [
+    "bench/http/elysia-v2-aot"
+  ],
   "exports": {
     ".": {
       "types": "./src/index.ts",
