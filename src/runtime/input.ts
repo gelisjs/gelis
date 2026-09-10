@@ -3,8 +3,10 @@ import type { RequestBodyParser, RouteOptions } from "../route";
 import type { StandardSchemaV1 } from "../schema";
 
 import {
+  assertBodyLimitMaxBytes,
   bodyTooLargeResponse,
   compileRuntimeLimitedBodyReader,
+  type RuntimeApplicationBodyLimitPolicy,
   type RuntimeLimitedBodyReader,
 } from "./body-limit";
 
@@ -23,7 +25,9 @@ export type RuntimeBodyReader = (
   request: Request,
 ) => Response | Promise<unknown>;
 
-export type RuntimeBodyReadError = (error: unknown) => Response;
+export type RuntimeBodyReadError = (
+  error: unknown,
+) => Response | PromiseLike<Response>;
 
 export interface RuntimeInputPlan {
   readonly kind: number;
@@ -73,6 +77,16 @@ interface CompiledContentTypes {
 const MEDIA_TYPE_TOKEN = /^[!#$%&'*+\-.^_`|~0-9A-Za-z]+$/;
 
 const BODY_LIMIT_EXCEEDED_ERROR = Symbol("GelisBodyLimitExceeded");
+
+interface RuntimeBodyLimitExceededError {
+  readonly [BODY_LIMIT_EXCEEDED_ERROR]: true;
+  readonly request: Request;
+}
+
+interface CompiledRuntimeBodyLimit {
+  readonly reader: RuntimeLimitedBodyReader;
+  readonly policy: RuntimeApplicationBodyLimitPolicy;
+}
 
 const bodyTextDecoder = new TextDecoder();
 
@@ -215,6 +229,7 @@ function requestContentTypeEssence(request: Request): string | undefined {
 
 export function createRuntimeInputPlan(
   options: RouteOptions | undefined,
+  applicationBodyLimit?: RuntimeApplicationBodyLimitPolicy,
 ): RuntimeInputPlan | undefined {
   const query = options?.query;
 
@@ -246,6 +261,10 @@ export function createRuntimeInputPlan(
     };
   }
 
+  if (bodyLimit !== undefined) {
+    assertBodyLimitMaxBytes(bodyLimit);
+  }
+
   const parser = bodyParser ?? "json";
 
   const compiledContentTypes =
@@ -253,16 +272,24 @@ export function createRuntimeInputPlan(
       ? undefined
       : compileContentTypes(bodyContentTypes);
 
-  const limitedBodyReader =
-    bodyLimit === undefined
+  const effectiveBodyLimit = resolveEffectiveBodyLimit(
+    bodyLimit,
+    applicationBodyLimit,
+  );
+
+  const limitedBody: CompiledRuntimeBodyLimit | undefined =
+    effectiveBodyLimit === undefined
       ? undefined
-      : compileRuntimeLimitedBodyReader(bodyLimit);
+      : {
+          reader: compileRuntimeLimitedBodyReader(effectiveBodyLimit.maxBytes),
+          policy: effectiveBodyLimit,
+        };
 
   let readBody: RuntimeBodyReader;
   let readBodyError: RuntimeBodyReadError;
 
   if (parser === "json") {
-    if (limitedBodyReader === undefined) {
+    if (limitedBody === undefined) {
       readBody =
         compiledContentTypes === undefined
           ? readDefaultJsonBody
@@ -274,14 +301,17 @@ export function createRuntimeInputPlan(
         compiledContentTypes === undefined
           ? isJsonContentType
           : compiledContentTypes.matches,
-        limitedBodyReader,
+        limitedBody.reader,
         parseLimitedJsonBody,
       );
 
-      readBodyError = compileLimitedBodyReadError(handleMalformedJsonBody);
+      readBodyError = compileLimitedBodyReadError(
+        handleMalformedJsonBody,
+        limitedBody.policy,
+      );
     }
   } else if (parser === "text") {
-    if (limitedBodyReader === undefined) {
+    if (limitedBody === undefined) {
       readBody =
         compiledContentTypes === undefined
           ? readDefaultTextBody
@@ -293,14 +323,17 @@ export function createRuntimeInputPlan(
         compiledContentTypes === undefined
           ? isTextContentType
           : compiledContentTypes.matches,
-        limitedBodyReader,
+        limitedBody.reader,
         parseLimitedTextBody,
       );
 
-      readBodyError = compileLimitedBodyReadError(handleMalformedTextBody);
+      readBodyError = compileLimitedBodyReadError(
+        handleMalformedTextBody,
+        limitedBody.policy,
+      );
     }
   } else if (parser === "arrayBuffer") {
-    if (limitedBodyReader === undefined) {
+    if (limitedBody === undefined) {
       readBody =
         compiledContentTypes === undefined
           ? readDefaultArrayBufferBody
@@ -312,16 +345,17 @@ export function createRuntimeInputPlan(
         compiledContentTypes === undefined
           ? isArrayBufferContentType
           : compiledContentTypes.matches,
-        limitedBodyReader,
+        limitedBody.reader,
         parseLimitedArrayBufferBody,
       );
 
       readBodyError = compileLimitedBodyReadError(
         handleMalformedArrayBufferBody,
+        limitedBody.policy,
       );
     }
   } else if (parser === "urlencoded") {
-    if (limitedBodyReader === undefined) {
+    if (limitedBody === undefined) {
       readBody =
         compiledContentTypes === undefined
           ? readDefaultUrlEncodedBody
@@ -333,16 +367,17 @@ export function createRuntimeInputPlan(
         compiledContentTypes === undefined
           ? isUrlEncodedContentType
           : compiledContentTypes.matches,
-        limitedBodyReader,
+        limitedBody.reader,
         parseLimitedUrlEncodedBody,
       );
 
       readBodyError = compileLimitedBodyReadError(
         handleMalformedUrlEncodedBody,
+        limitedBody.policy,
       );
     }
   } else if (parser === "multipart") {
-    if (limitedBodyReader === undefined) {
+    if (limitedBody === undefined) {
       readBody =
         compiledContentTypes === undefined
           ? readDefaultMultipartBody
@@ -354,11 +389,14 @@ export function createRuntimeInputPlan(
         compiledContentTypes === undefined
           ? isMultipartContentType
           : compiledContentTypes.matches,
-        limitedBodyReader,
+        limitedBody.reader,
         parseLimitedMultipartBody,
       );
 
-      readBodyError = compileLimitedBodyReadError(handleMalformedMultipartBody);
+      readBodyError = compileLimitedBodyReadError(
+        handleMalformedMultipartBody,
+        limitedBody.policy,
+      );
     }
   } else {
     const unsupportedParser: never = parser;
@@ -425,7 +463,12 @@ function compileLimitedManagedBodyReader(
 
     return readLimitedBody(request).then((result) => {
       if (!result.ok) {
-        throw BODY_LIMIT_EXCEEDED_ERROR;
+        const exceeded: RuntimeBodyLimitExceededError = {
+          [BODY_LIMIT_EXCEEDED_ERROR]: true,
+          request,
+        };
+
+        throw exceeded;
       }
 
       return parseBody(result.bytes, request);
@@ -435,11 +478,102 @@ function compileLimitedManagedBodyReader(
 
 function compileLimitedBodyReadError(
   fallback: RuntimeBodyReadError,
+  policy: RuntimeApplicationBodyLimitPolicy,
 ): RuntimeBodyReadError {
-  return (error) =>
-    error === BODY_LIMIT_EXCEEDED_ERROR
+  return (error) => {
+    if (!isBodyLimitExceededError(error)) {
+      return fallback(error);
+    }
+
+    const onExceeded = policy.onExceeded;
+
+    return onExceeded === undefined
       ? bodyTooLargeResponse()
-      : fallback(error);
+      : onExceeded(error.request, policy.maxBytes);
+  };
+}
+
+function isBodyLimitExceededError(
+  error: unknown,
+): error is RuntimeBodyLimitExceededError {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    BODY_LIMIT_EXCEEDED_ERROR in error &&
+    (error as Partial<RuntimeBodyLimitExceededError>)[
+      BODY_LIMIT_EXCEEDED_ERROR
+    ] === true
+  );
+}
+
+function resolveEffectiveBodyLimit(
+  routeBodyLimit: number | undefined,
+  applicationBodyLimit: RuntimeApplicationBodyLimitPolicy | undefined,
+): RuntimeApplicationBodyLimitPolicy | undefined {
+  if (applicationBodyLimit === undefined) {
+    return routeBodyLimit === undefined
+      ? undefined
+      : {
+          maxBytes: routeBodyLimit,
+        };
+  }
+
+  assertBodyLimitMaxBytes(applicationBodyLimit.maxBytes);
+
+  if (routeBodyLimit === undefined) {
+    return applicationBodyLimit;
+  }
+
+  return {
+    maxBytes: Math.min(routeBodyLimit, applicationBodyLimit.maxBytes),
+    ...(applicationBodyLimit.onExceeded === undefined
+      ? {}
+      : {
+          onExceeded: applicationBodyLimit.onExceeded,
+        }),
+  };
+}
+
+export function specializeRuntimeInputPlanBodyLimit(
+  input: RuntimeInputPlan,
+  applicationBodyLimit: RuntimeApplicationBodyLimitPolicy,
+): RuntimeInputPlan {
+  if (input.body === undefined) {
+    return input;
+  }
+
+  const specialized = createRuntimeInputPlan(
+    {
+      ...(input.query === undefined ? {} : { query: input.query }),
+
+      body: input.body,
+
+      ...(input.bodyParser === undefined
+        ? {}
+        : {
+            bodyParser: input.bodyParser,
+          }),
+
+      ...(input.bodyContentTypes === undefined
+        ? {}
+        : {
+            bodyContentTypes: input.bodyContentTypes,
+          }),
+
+      ...(input.bodyLimit === undefined
+        ? {}
+        : {
+            bodyLimit: input.bodyLimit,
+          }),
+    },
+    applicationBodyLimit,
+  );
+
+  if (specialized === undefined) {
+    throw new Error("Missing Gelis specialized runtime input plan");
+  }
+
+  return specialized;
 }
 
 function parseLimitedJsonBody(bytes: Uint8Array): unknown {

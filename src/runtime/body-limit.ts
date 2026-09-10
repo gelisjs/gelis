@@ -14,6 +14,16 @@ export type RuntimeLimitedBodyReader = (
   request: Request,
 ) => Promise<RuntimeLimitedBodyReadResult>;
 
+export type RuntimeBodyLimitExceededHandler = (
+  request: Request,
+  maxBytes: number,
+) => Response | PromiseLike<Response>;
+
+export interface RuntimeApplicationBodyLimitPolicy {
+  readonly maxBytes: number;
+  readonly onExceeded?: RuntimeBodyLimitExceededHandler;
+}
+
 const BODY_LIMIT_EXCEEDED: RuntimeLimitedBodyReadExceeded = {
   ok: false,
 };

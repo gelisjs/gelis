@@ -16,6 +16,8 @@ import type { OnError } from "./error";
 
 import type { RuntimeRouteRecord } from "./runtime/types";
 
+export type PluginRouteSpecializer = (route: RuntimeRouteRecord) => void;
+
 import {
   enqueueApplicationStartup,
   hasPendingApplicationStartup,
@@ -58,6 +60,8 @@ export type PluginRouteBuilder = Pick<RouteBuilder<"">, PluginRouteMethodName>;
 
 export interface PluginCompositionDeclaration {
   readonly routes: RuntimeRouteRecord[];
+
+  readonly routeSpecializers: PluginRouteSpecializer[];
 
   readonly onRequestHooks: OnRequest[];
 
@@ -405,6 +409,20 @@ export function definePlugin(name: string, setup: PluginSetup): Plugin {
   };
 }
 
+/**
+ * Private bridge for official Gelis capabilities that need to specialize
+ * route records at configuration time. It is intentionally not re-exported
+ * from the portable root package.
+ */
+export function declareOfficialPluginRouteSpecializer(
+  context: PluginSetupContext,
+  specializer: PluginRouteSpecializer,
+): void {
+  const frame = getActivePluginInstallFrame(context);
+
+  frame.composition.routeSpecializers.push(specializer);
+}
+
 export function installPlugin(
   application: object,
   plugin: Plugin,
@@ -441,6 +459,8 @@ export function installPlugin(
 
     composition: {
       routes: [],
+
+      routeSpecializers: [],
 
       onRequestHooks: [],
 

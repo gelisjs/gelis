@@ -8,7 +8,11 @@ import type { RequestScopeBuilder, RequestScopeDerive } from "./request-scope";
 
 import { installPlugin } from "./plugin";
 
-import type { Plugin, PluginCompositionDeclaration } from "./plugin";
+import type {
+  Plugin,
+  PluginCompositionDeclaration,
+  PluginRouteSpecializer,
+} from "./plugin";
 
 import { mountModuleRuntimeRoutes } from "./module";
 
@@ -245,6 +249,8 @@ interface AppRuntimeState {
    */
   routes: RuntimeRouteRecord[];
 
+  routeSpecializers: PluginRouteSpecializer[] | undefined;
+
   routeIdentityKeys: Set<string> | undefined;
 
   localBeforeHooks: (RuntimeBeforeHandle | undefined)[] | undefined;
@@ -339,6 +345,10 @@ export class Gelis extends RouteBuilder<""> {
 
     validatePluginCompositionRoutes(state, composition.routes);
 
+    if (composition.routeSpecializers.length !== 0) {
+      installRouteSpecializers(state, composition.routeSpecializers);
+    }
+
     for (const route of composition.routes) {
       registerAppRuntimeRoute(state, route);
     }
@@ -397,6 +407,8 @@ export class Gelis extends RouteBuilder<""> {
       router,
 
       routes: [],
+
+      routeSpecializers: undefined,
 
       routeIdentityKeys: undefined,
 
@@ -514,6 +526,8 @@ export class Gelis extends RouteBuilder<""> {
             "Cannot install Gelis plain prebuilt runtime after lifecycle registration",
           );
         }
+
+        applyRouteSpecializersToRoutes(state, routes);
 
         state.router = router;
 
@@ -1010,6 +1024,11 @@ function commitModuleRuntimeRoutesAtomic(
     return;
   }
 
+  if (state.routeSpecializers !== undefined) {
+    validatePluginCompositionRoutes(state, routes);
+    applyRouteSpecializersToRoutes(state, routes);
+  }
+
   const localBeforeHooks = state.localBeforeHooks;
 
   const localAfterHooks = state.localAfterHooks;
@@ -1176,6 +1195,8 @@ function registerAppRuntimeRoute(
 
   route: RuntimeRouteRecord,
 ): void {
+  applyRouteSpecializers(state, route);
+
   /*
    * Router registration happens before mutating
    * application bookkeeping.
@@ -1224,6 +1245,57 @@ function registerAppRuntimeRoute(
   applyLifecyclePlan(state, route, localBeforeHandle, localAfterHandle);
 
   state.routes.push(route);
+}
+
+function installRouteSpecializers(
+  state: AppRuntimeState,
+  specializers: readonly PluginRouteSpecializer[],
+): void {
+  const routes = state.routes;
+
+  for (let routeIndex = 0; routeIndex < routes.length; routeIndex++) {
+    const route = routes[routeIndex]!;
+
+    for (let index = 0; index < specializers.length; index++) {
+      specializers[index]!(route);
+    }
+  }
+
+  const installed = state.routeSpecializers;
+
+  if (installed === undefined) {
+    state.routeSpecializers = [...specializers];
+  } else {
+    installed.push(...specializers);
+  }
+}
+
+function applyRouteSpecializers(
+  state: AppRuntimeState,
+  route: RuntimeRouteRecord,
+): void {
+  const specializers = state.routeSpecializers;
+
+  if (specializers === undefined) {
+    return;
+  }
+
+  for (let index = 0; index < specializers.length; index++) {
+    specializers[index]!(route);
+  }
+}
+
+function applyRouteSpecializersToRoutes(
+  state: AppRuntimeState,
+  routes: readonly RuntimeRouteRecord[],
+): void {
+  if (state.routeSpecializers === undefined) {
+    return;
+  }
+
+  for (let index = 0; index < routes.length; index++) {
+    applyRouteSpecializers(state, routes[index]!);
+  }
 }
 
 function ensureLocalLifecycleSidecar(state: AppRuntimeState): void {

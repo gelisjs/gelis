@@ -256,7 +256,13 @@ export interface RuntimeRouteRecord {
    */
   flags: number;
 
-  readonly input: RuntimeInputPlan | undefined;
+  /*
+   * Input execution is mutable deliberately.
+   *
+   * Application body-limit policy recompiles effective managed readers at
+   * configuration time while retaining the same route record identity.
+   */
+  input: RuntimeInputPlan | undefined;
 
   /*
    * Present only when at least one declared response
