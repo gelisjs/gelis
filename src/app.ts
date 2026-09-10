@@ -322,6 +322,7 @@ export class Gelis extends RouteBuilder<""> {
           routedFetch,
           state.onRequestHooks,
           state.onErrorHooks,
+          (pathname) => state.router.matchingMethods(pathname),
         );
 
     Object.defineProperty(this, "fetch", {

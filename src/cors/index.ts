@@ -1,21 +1,10 @@
-import {
-  defineCapability,
-  definePlugin,
-} from "../plugin";
+import { defineCapability, definePlugin } from "../plugin";
 
-import type {
-  Capability,
-  Plugin,
-} from "../plugin";
+import type { Capability, Plugin } from "../plugin";
 
-import {
-  ALL_ROUTE_METHOD,
-  assertHttpMethodToken,
-} from "../http-method";
+import { ALL_ROUTE_METHOD, assertHttpMethodToken } from "../http-method";
 
-import {
-  createOfficialApplicationHttpMarker,
-} from "../runtime/application-http";
+import { createOfficialApplicationHttpMarker } from "../runtime/application-http";
 
 import type {
   RuntimeApplicationHttpPolicy,
@@ -27,11 +16,7 @@ export type CorsOriginResolver = (
   request: Request,
 ) => boolean | PromiseLike<boolean>;
 
-export type CorsOrigin =
-  | "*"
-  | string
-  | readonly string[]
-  | CorsOriginResolver;
+export type CorsOrigin = "*" | string | readonly string[] | CorsOriginResolver;
 
 export interface CorsOptions {
   readonly origin?: CorsOrigin;
@@ -42,14 +27,15 @@ export interface CorsOptions {
   readonly maxAge?: number;
 }
 
-type ValidCorsOptions<Options extends CorsOptions> =
-  Options extends { readonly credentials: true }
-    ? Options extends { readonly origin: infer Origin }
-      ? Origin extends "*"
-        ? never
-        : Options
+type ValidCorsOptions<Options extends CorsOptions> = Options extends {
+  readonly credentials: true;
+}
+  ? Options extends { readonly origin: "*" }
+    ? never
+    : Options extends { readonly origin: CorsOrigin }
+      ? unknown
       : never
-    : Options;
+  : unknown;
 
 interface NormalizedCorsOptions {
   readonly origin:
@@ -80,7 +66,7 @@ const corsCapability = defineCapability(
 
 export function cors(): Plugin;
 export function cors<const Options extends CorsOptions>(
-  options: ValidCorsOptions<Options>,
+  options: Options & ValidCorsOptions<Options>,
 ): Plugin;
 export function cors(options?: CorsOptions): Plugin {
   const normalized = normalizeCorsOptions(options);
@@ -163,10 +149,7 @@ function prepareActualRequest(
 
   if (isPromiseLike(decision)) {
     return Promise.resolve(decision).then((allowed) => {
-      states.set(
-        request,
-        createRequestState(options, origin, allowed),
-      );
+      states.set(request, createRequestState(options, origin, allowed));
     });
   }
 
@@ -368,10 +351,7 @@ function applyActualCorsResponse(
     }
 
     if (options.exposeHeadersValue !== undefined) {
-      headers.set(
-        "Access-Control-Expose-Headers",
-        options.exposeHeadersValue,
-      );
+      headers.set("Access-Control-Expose-Headers", options.exposeHeadersValue);
     }
   });
 }
@@ -475,9 +455,7 @@ function normalizeCorsOptions(options?: CorsOptions): NormalizedCorsOptions {
     allowHeaders: allowHeaders.values,
     allowHeadersValue: allowHeaders.headerValue,
     exposeHeadersValue:
-      exposeHeaders.length === 0
-        ? undefined
-        : exposeHeaders.join(", "),
+      exposeHeaders.length === 0 ? undefined : exposeHeaders.join(", "),
     credentials,
     maxAgeValue,
   };
@@ -551,9 +529,7 @@ function normalizeMethods(
   return values;
 }
 
-function normalizeAllowHeaders(
-  value: CorsOptions["allowHeaders"],
-): {
+function normalizeAllowHeaders(value: CorsOptions["allowHeaders"]): {
   readonly values: "request" | readonly string[];
   readonly headerValue: string | undefined;
 } {
@@ -611,7 +587,9 @@ function normalizeMaxAge(value: number | undefined): string | undefined {
   }
 
   if (!Number.isFinite(value) || !Number.isInteger(value) || value < 0) {
-    throw new TypeError("Gelis CORS maxAge must be a finite non-negative integer");
+    throw new TypeError(
+      "Gelis CORS maxAge must be a finite non-negative integer",
+    );
   }
 
   return String(value);
@@ -657,7 +635,9 @@ function isValidRequestedMethod(method: string): boolean {
 
 function assertConfiguredOrigin(origin: string): void {
   if (!isSerializedOrigin(origin)) {
-    throw new TypeError(`Invalid serialized CORS origin: ${JSON.stringify(origin)}`);
+    throw new TypeError(
+      `Invalid serialized CORS origin: ${JSON.stringify(origin)}`,
+    );
   }
 }
 

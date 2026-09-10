@@ -83,7 +83,9 @@ async function runZeroUnused(args: ParsedArgs): Promise<WorkerResult> {
     const response = app.fetch(request);
 
     if (isPromiseLike(response)) {
-      throw new Error(`Zero-unused ${scenario} unexpectedly became asynchronous`);
+      throw new Error(
+        `Zero-unused ${scenario} unexpectedly became asynchronous`,
+      );
     }
 
     if (!(response instanceof Response) || response.status !== 200) {
@@ -177,10 +179,7 @@ async function runEnabled(args: ParsedArgs): Promise<WorkerResult> {
         app.use("*", cors({ origin: [ORIGIN, OTHER] }));
         break;
       case "actual-credentialed":
-        app.use(
-          "*",
-          cors({ origin: [ORIGIN, OTHER], credentials: true }),
-        );
+        app.use("*", cors({ origin: [ORIGIN, OTHER], credentials: true }));
         break;
       case "preflight-static-methods":
         app.use(
@@ -237,9 +236,10 @@ async function runEnabled(args: ParsedArgs): Promise<WorkerResult> {
     }
 
     const allowOrigin = response.headers.get("access-control-allow-origin");
-    const expectedOrigin = scenario === "actual-wildcard" || scenario === "preflight-static-methods"
-      ? "*"
-      : ORIGIN;
+    const expectedOrigin =
+      scenario === "actual-wildcard" || scenario === "preflight-static-methods"
+        ? "*"
+        : ORIGIN;
 
     if (allowOrigin !== expectedOrigin) {
       throw new Error(
@@ -256,8 +256,16 @@ async function runEnabled(args: ParsedArgs): Promise<WorkerResult> {
 
     if (scenario === "preflight-static-methods") {
       const methods = response.headers.get("access-control-allow-methods");
-      if (methods === null || !methods.split(",").map((value) => value.trim()).includes("POST")) {
-        throw new Error(`${framework}/${scenario} POST preflight grant missing`);
+      if (
+        methods === null ||
+        !methods
+          .split(",")
+          .map((value) => value.trim())
+          .includes("POST")
+      ) {
+        throw new Error(
+          `${framework}/${scenario} POST preflight grant missing`,
+        );
       }
     }
 
@@ -286,7 +294,9 @@ async function runScaling(args: ParsedArgs): Promise<WorkerResult> {
   const routes = Number(required(args.routes, "--routes"));
 
   if (routes !== 1_000 && routes !== 5_000) {
-    throw new Error("P11-D scaling worker expects --routes=1000 or --routes=5000");
+    throw new Error(
+      "P11-D scaling worker expects --routes=1000 or --routes=5000",
+    );
   }
 
   const [{ Gelis }, { cors }] = await Promise.all([
@@ -351,10 +361,10 @@ async function runScaling(args: ParsedArgs): Promise<WorkerResult> {
 
 interface ParsedArgs {
   readonly mode: Mode;
-  readonly framework?: string;
-  readonly scenario?: string;
-  readonly root?: string;
-  readonly routes?: string;
+  readonly framework?: string | undefined;
+  readonly scenario?: string | undefined;
+  readonly root?: string | undefined;
+  readonly routes?: string | undefined;
 }
 
 function readArgs(values: readonly string[]): ParsedArgs {
@@ -412,7 +422,9 @@ function assertZeroScenario(value: string): asserts value is ZeroScenario {
   }
 }
 
-function assertEnabledScenario(value: string): asserts value is EnabledScenario {
+function assertEnabledScenario(
+  value: string,
+): asserts value is EnabledScenario {
   if (
     value !== "actual-wildcard" &&
     value !== "actual-allowlist" &&

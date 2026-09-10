@@ -59,11 +59,17 @@ generateCookie("__Host-session", "value");
 // @ts-expect-error __Host-* requires secure: true
 generateCookie("__Host-session", "value", {});
 
-// @ts-expect-error __Host-* forbids Domain
-generateCookie("__Host-session", "value", { secure: true, domain: "example.com" });
+generateCookie("__Host-session", "value", {
+  secure: true,
+  // @ts-expect-error __Host-* forbids Domain
+  domain: "example.com",
+});
 
-// @ts-expect-error __Host-* accepts only Path=/ when Path is specified
-generateCookie("__Host-session", "value", { secure: true, path: "/nested" });
+generateCookie("__Host-session", "value", {
+  secure: true,
+  // @ts-expect-error __Host-* accepts only Path=/ when Path is specified
+  path: "/nested",
+});
 
 // @ts-expect-error SameSite=None requires Secure
 generateCookie("session", "value", { sameSite: "None" });
