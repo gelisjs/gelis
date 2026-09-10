@@ -1,7 +1,7 @@
 # Gelis Engineering Roadmap — Current Status
 
 **Status:** Active roadmap status overlay  
-**Date:** 2026-09-09  
+**Date:** 2026-09-10  
 **Master roadmap repository:** `gelisjs/gelis`
 
 This file records the current milestone state while the longer historical `roadmap.md` remains in place.
@@ -29,8 +29,8 @@ P10  OpenAPI & Contract Integration        COMPLETE
 
 P11  Industrial HTTP Essentials            ACTIVE
 ├── A  competitor semantics + API audit    COMPLETE
-├── B  ownership + execution architecture  ACTIVE
-├── C  cookie capability                   PLANNED
+├── B  ownership + execution architecture  FROZEN
+├── C  cookie capability                   ACTIVE
 ├── D  CORS capability                     PLANNED
 ├── E  request/body limit capability       PLANNED
 ├── F  secure headers capability           PLANNED
@@ -134,33 +134,61 @@ timeout/abort
    cancellation must be explicitly cooperative through AbortSignal
 ```
 
-## Active P11-B objective
+## P11-B result
 
-P11-B now decides **ownership + execution architecture** before any production capability implementation.
-
-It must answer:
+P11-B is frozen in:
 
 ```text
-core vs gelis/* vs @gelis/* placement for each capability
-
-pure helper vs installed application capability vs route input plan
-
-how CORS composes with automatic OPTIONS/Allow
-
-how request/body limits specialize managed body readers
-
-how request ID is exposed without inflating every RouteContext generic
-
-how framework timeout signal composes with incoming Request.signal
-
-which Bun adapter options remain transport-only hints/ceilings
-
-how every unused capability avoids permanent request branches
+docs/architecture/p11-b-ownership-execution-architecture-freeze.md
 ```
 
-P11-B may design shared internal primitives only when they reduce real cost/duplication. It must not introduce a universal middleware chain merely to make the six capabilities look uniform.
+P11 official capability ownership is frozen to core-repository subpaths rather than six separate packages:
 
-No production API/package name is frozen until P11-B completes.
+```text
+gelis/cookie
+gelis/cors
+gelis/body-limit
+gelis/secure-headers
+gelis/request-id
+gelis/timeout
+```
+
+The root `gelis` entrypoint remains minimal. Capabilities must use pay-for-use execution shapes rather than a universal middleware chain.
+
+## Active P11-C objective
+
+P11-C cookie architecture/API/performance gates are frozen in:
+
+```text
+docs/architecture/p11-c-cookie-capability-freeze.md
+```
+
+Current implementation scope:
+
+```text
+portable pure `gelis/cookie` subpath
+cookie parsing with duplicate preservation
+Set-Cookie generation/mutation helpers
+secure prefix validation
+SameSite=None / Partitioned Secure constraints
+400-day persistence limits
+WebCrypto HMAC-SHA256 signed cookies
+secret rotation with discriminated verification results
+portable package export/type checks
+security regression tests
+Hono comparison acceptance harness
+```
+
+The public parser deliberately trims only RFC optional whitespace (`SP` / `HTAB`) and does not use JavaScript Unicode `trim()` for cookie-name normalization. This protects against same-name confusion from non-ASCII whitespace.
+
+P11-C may move to acceptance only after:
+
+```text
+bun run check                       PASS
+frozen P11-C cookie benchmark       PASS
+no root Gelis runtime integration   verified
+public documentation                frozen
+```
 
 ## Post-P11 waves
 
