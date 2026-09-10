@@ -172,7 +172,9 @@ function readLimitedBodyPeek(
       const pending = reader.read();
 
       if (promisePeek.status(pending) === "fulfilled") {
-        const result = promisePeek(pending) as ReadableStreamReadResult<Uint8Array>;
+        const result = promisePeek(
+          pending,
+        ) as ReadableStreamReadResult<Uint8Array>;
         const consumed = consume(result);
 
         if (consumed !== undefined) {
