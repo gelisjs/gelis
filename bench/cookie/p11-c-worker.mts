@@ -40,20 +40,9 @@ const warmups = readNumberArg("warmups", signed ? 200 : 20_000);
 
 const operation = await createOperation(framework, scenario);
 
-let sink = 0;
-
-for (let index = 0; index < warmups; index++) {
-  sink ^= consume(await operation());
-}
-
-const started = Bun.nanoseconds();
-
-for (let index = 0; index < iterations; index++) {
-  sink ^= consume(await operation());
-}
-
-const elapsed = Bun.nanoseconds() - started;
-const nsPerOp = elapsed / iterations;
+const result = signed
+  ? await measureAsync(operation, warmups, iterations)
+  : measureSync(operation, warmups, iterations);
 
 console.log(
   JSON.stringify({
@@ -61,10 +50,69 @@ console.log(
     scenario,
     iterations,
     warmups,
-    nsPerOp,
-    sink,
+    nsPerOp: result.nsPerOp,
+    sink: result.sink,
   }),
 );
+
+interface Measurement {
+  readonly nsPerOp: number;
+  readonly sink: number;
+}
+
+function measureSync(
+  operation: () => unknown | Promise<unknown>,
+  warmupCount: number,
+  iterationCount: number,
+): Measurement {
+  let sink = 0;
+
+  for (let index = 0; index < warmupCount; index++) {
+    const value = operation();
+    if (isPromiseLike(value)) {
+      throw new Error("Unsigned cookie benchmark unexpectedly returned a Promise");
+    }
+    sink ^= consume(value);
+  }
+
+  const started = Bun.nanoseconds();
+
+  for (let index = 0; index < iterationCount; index++) {
+    const value = operation();
+    if (isPromiseLike(value)) {
+      throw new Error("Unsigned cookie benchmark unexpectedly returned a Promise");
+    }
+    sink ^= consume(value);
+  }
+
+  return {
+    nsPerOp: (Bun.nanoseconds() - started) / iterationCount,
+    sink,
+  };
+}
+
+async function measureAsync(
+  operation: () => unknown | Promise<unknown>,
+  warmupCount: number,
+  iterationCount: number,
+): Promise<Measurement> {
+  let sink = 0;
+
+  for (let index = 0; index < warmupCount; index++) {
+    sink ^= consume(await operation());
+  }
+
+  const started = Bun.nanoseconds();
+
+  for (let index = 0; index < iterationCount; index++) {
+    sink ^= consume(await operation());
+  }
+
+  return {
+    nsPerOp: (Bun.nanoseconds() - started) / iterationCount,
+    sink,
+  };
+}
 
 async function createOperation(
   selectedFramework: Framework,
@@ -258,6 +306,14 @@ function consume(value: unknown): number {
   }
 
   return 1;
+}
+
+function isPromiseLike(value: unknown): value is PromiseLike<unknown> {
+  return (
+    value !== null &&
+    (typeof value === "object" || typeof value === "function") &&
+    typeof (value as { readonly then?: unknown }).then === "function"
+  );
 }
 
 function readNumberArg(name: string, fallback: number): number {
