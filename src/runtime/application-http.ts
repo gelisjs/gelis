@@ -63,7 +63,7 @@ export function createOfficialApplicationHttpMarker(
     throw new Error(
       "Gelis official application HTTP marker escaped compile-time extraction",
     );
-  }) as MarkedOnRequest;
+  }) as unknown as MarkedOnRequest;
 
   Object.defineProperty(hook, GELIS_APPLICATION_HTTP_MARKER, {
     configurable: false,
