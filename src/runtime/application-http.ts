@@ -1,7 +1,13 @@
 import type { OnError } from "../error";
 import type { OnRequest } from "../request";
+import { ALL_ROUTE_METHOD } from "../http-method";
 import type { RuntimeFetch } from "./fetch";
 import { normalizeResponseForRequest } from "./response";
+import { pathnameFromUrl } from "./url";
+
+export type RuntimeApplicationHttpMethodResolver = (
+  pathname: string,
+) => readonly string[];
 
 export interface RuntimeApplicationHttpRuntime {
   matchingMethods(request: Request): readonly string[];
@@ -134,6 +140,18 @@ export function extractApplicationHttpPlan(
   };
 }
 
+export function createApplicationHttpRuntime(
+  resolveMethods: RuntimeApplicationHttpMethodResolver,
+): RuntimeApplicationHttpRuntime {
+  return {
+    matchingMethods(request) {
+      return resolveAdvertisedMethods(
+        resolveMethods(pathnameFromUrl(request.url)),
+      );
+    },
+  };
+}
+
 export function compileApplicationHttpFetch(
   plan: RuntimeApplicationHttpPlan,
   innerFetch: RuntimeFetch,
@@ -166,6 +184,60 @@ export function compileApplicationHttpErrorHooks(
   }
 
   return compiled;
+}
+
+function resolveAdvertisedMethods(methods: readonly string[]): readonly string[] {
+  let hasHead = false;
+  let hasOptions = false;
+  let hasAll = false;
+  let advertisedMethods = 0;
+
+  for (let index = 0; index < methods.length; index++) {
+    const method = methods[index]!;
+
+    if (method === ALL_ROUTE_METHOD) {
+      hasAll = true;
+      continue;
+    }
+
+    advertisedMethods++;
+
+    if (method === "HEAD") {
+      hasHead = true;
+    } else if (method === "OPTIONS") {
+      hasOptions = true;
+    }
+  }
+
+  if (advertisedMethods === 0) {
+    return hasAll ? [ALL_ROUTE_METHOD] : [];
+  }
+
+  const resolved: string[] = [];
+
+  for (let index = 0; index < methods.length; index++) {
+    const method = methods[index]!;
+
+    if (method === ALL_ROUTE_METHOD) {
+      continue;
+    }
+
+    resolved.push(method);
+
+    if (method === "GET" && !hasHead) {
+      resolved.push("HEAD");
+    }
+  }
+
+  if (!hasOptions) {
+    resolved.push("OPTIONS");
+  }
+
+  if (hasAll) {
+    resolved.push(ALL_ROUTE_METHOD);
+  }
+
+  return resolved;
 }
 
 function compilePolicyFetch(
