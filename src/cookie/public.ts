@@ -37,13 +37,13 @@ type RequiresSecurePrefixOptions<Name extends string> =
 
 type CookieOptionArguments<Name extends string> =
   RequiresSecurePrefixOptions<Name> extends true
-    ? readonly [options: CookieOptions<Name>]
-    : readonly [options?: CookieOptions<Name>];
+    ? [options: CookieOptions<Name>]
+    : [options?: CookieOptions<Name>];
 
 type CookieDeleteOptionArguments<Name extends string> =
   RequiresSecurePrefixOptions<Name> extends true
-    ? readonly [options: CookieDeleteOptions<Name>]
-    : readonly [options?: CookieDeleteOptions<Name>];
+    ? [options: CookieDeleteOptions<Name>]
+    : [options?: CookieDeleteOptions<Name>];
 
 export function generateCookie<const Name extends string>(
   name: Name,
