@@ -1,8 +1,14 @@
 const LIMIT_BYTES = 1_024;
 const UNDER_BYTES = new Uint8Array(768);
 const OVER_BYTES = new Uint8Array(1_536);
-const UNDER_STREAM_CHUNKS = [new Uint8Array(384), new Uint8Array(384)] as const;
-const OVER_STREAM_CHUNKS = [new Uint8Array(768), new Uint8Array(768)] as const;
+const UNDER_STREAM_CHUNKS = [
+  new Uint8Array(384),
+  new Uint8Array(384),
+] as const;
+const OVER_STREAM_CHUNKS = [
+  new Uint8Array(768),
+  new Uint8Array(768),
+] as const;
 
 const WARMUP_ASYNC = 2_000;
 const TARGET_MS = 120;
@@ -36,7 +42,9 @@ async function run(args: ParsedArgs): Promise<WorkerResult> {
   assertScenario(scenario);
 
   const dispatch =
-    framework === "gelis" ? await createGelisDispatch() : await createHonoDispatch();
+    framework === "gelis"
+      ? await createGelisDispatch()
+      : await createHonoDispatch();
   const expectedStatus = isUnderLimitScenario(scenario) ? 204 : 413;
   const expectedBodyUsed = scenario !== "header-fast-reject";
   let sink = 0;
