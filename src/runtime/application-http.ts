@@ -27,10 +27,11 @@ export interface RuntimeApplicationHttpPolicy {
 
 export interface RuntimeApplicationHttpPlan {
   readonly cors?: RuntimeApplicationHttpPolicy;
+  readonly secureHeaders?: RuntimeApplicationHttpPolicy;
 }
 
 interface RuntimeApplicationHttpMarker {
-  readonly kind: "cors";
+  readonly kind: "cors" | "secure-headers";
   readonly policy: RuntimeApplicationHttpPolicy;
 }
 
@@ -83,6 +84,7 @@ export function extractApplicationHttpPlan(
   }
 
   let cors: RuntimeApplicationHttpPolicy | undefined;
+  let secureHeaders: RuntimeApplicationHttpPolicy | undefined;
   let ordinaryCount = 0;
 
   for (let index = 0; index < hooks.length; index++) {
@@ -102,10 +104,19 @@ export function extractApplicationHttpPlan(
       }
 
       cors = marker.policy;
+      continue;
     }
+
+    if (secureHeaders !== undefined) {
+      throw new Error(
+        "Multiple Gelis secure-header application policies were compiled",
+      );
+    }
+
+    secureHeaders = marker.policy;
   }
 
-  if (cors === undefined) {
+  if (cors === undefined && secureHeaders === undefined) {
     return {
       onRequestHooks: hooks,
       plan: undefined,
@@ -133,9 +144,25 @@ export function extractApplicationHttpPlan(
 
   return {
     onRequestHooks: ordinaryHooks,
-    plan: {
-      cors,
-    },
+    plan: createApplicationHttpPlan(cors, secureHeaders),
+  };
+}
+
+function createApplicationHttpPlan(
+  cors: RuntimeApplicationHttpPolicy | undefined,
+  secureHeaders: RuntimeApplicationHttpPolicy | undefined,
+): RuntimeApplicationHttpPlan {
+  if (cors === undefined) {
+    return { secureHeaders: secureHeaders! };
+  }
+
+  if (secureHeaders === undefined) {
+    return { cors };
+  }
+
+  return {
+    cors,
+    secureHeaders,
   };
 }
 
@@ -163,6 +190,11 @@ export function compileApplicationHttpFetch(
     fetch = compilePolicyFetch(cors, fetch, runtime);
   }
 
+  const secureHeaders = plan.secureHeaders;
+  if (secureHeaders !== undefined) {
+    fetch = compilePolicyFetch(secureHeaders, fetch, runtime);
+  }
+
   return fetch;
 }
 
@@ -171,15 +203,29 @@ export function compileApplicationHttpErrorHooks(
   hooks: readonly OnError[],
 ): readonly OnError[] {
   const cors = plan.cors;
+  const secureHeaders = plan.secureHeaders;
 
-  if (cors === undefined || hooks.length === 0) {
+  if (
+    (cors === undefined && secureHeaders === undefined) ||
+    hooks.length === 0
+  ) {
     return hooks;
   }
 
   const compiled = new Array<OnError>(hooks.length);
 
   for (let index = 0; index < hooks.length; index++) {
-    compiled[index] = compilePolicyErrorHook(cors, hooks[index]!);
+    let hook = hooks[index]!;
+
+    if (cors !== undefined) {
+      hook = compilePolicyErrorHook(cors, hook);
+    }
+
+    if (secureHeaders !== undefined) {
+      hook = compilePolicyErrorHook(secureHeaders, hook);
+    }
+
+    compiled[index] = hook;
   }
 
   return compiled;
