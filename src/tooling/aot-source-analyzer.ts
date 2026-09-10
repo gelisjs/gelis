@@ -7,6 +7,7 @@ const MANAGED_BODY_OPTION_KEYS = new Set([
   "body",
   "bodyParser",
   "bodyContentTypes",
+  "bodyLimit",
   "openapi",
 ]);
 
