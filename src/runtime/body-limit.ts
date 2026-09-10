@@ -24,6 +24,19 @@ export interface RuntimeApplicationBodyLimitPolicy {
   readonly onExceeded?: RuntimeBodyLimitExceededHandler;
 }
 
+interface RuntimeReadManyResult {
+  readonly done: boolean;
+  readonly value: readonly Uint8Array[];
+}
+
+type RuntimeReadMany = (
+  this: ReadableStreamDefaultReader<Uint8Array>,
+) => RuntimeReadManyResult | PromiseLike<RuntimeReadManyResult>;
+
+type RuntimeReaderWithReadMany = ReadableStreamDefaultReader<Uint8Array> & {
+  readonly readMany?: RuntimeReadMany;
+};
+
 const BODY_LIMIT_EXCEEDED: RuntimeLimitedBodyReadExceeded = {
   ok: false,
 };
@@ -62,7 +75,7 @@ export function bodyTooLargeResponse(): Response {
   );
 }
 
-async function readLimitedBody(
+function readLimitedBody(
   request: Request,
   maxBytes: number,
   maxBytesText: string,
@@ -73,19 +86,95 @@ async function readLimitedBody(
     contentLength !== null &&
     contentLengthExceedsLimit(contentLength, maxBytesText)
   ) {
-    return BODY_LIMIT_EXCEEDED;
+    return Promise.resolve(BODY_LIMIT_EXCEEDED);
   }
 
   const body = request.body;
 
   if (body === null) {
-    return {
+    return Promise.resolve({
       ok: true,
       bytes: EMPTY_BODY,
-    };
+    });
   }
 
   const reader = body.getReader();
+  const readMany = (reader as RuntimeReaderWithReadMany).readMany;
+
+  return typeof readMany === "function"
+    ? readLimitedBodyMany(reader, readMany, maxBytes)
+    : readLimitedBodyStandard(reader, maxBytes);
+}
+
+function readLimitedBodyMany(
+  reader: ReadableStreamDefaultReader<Uint8Array>,
+  readMany: RuntimeReadMany,
+  maxBytes: number,
+): Promise<RuntimeLimitedBodyReadResult> {
+  const chunks: Uint8Array[] = [];
+  let totalBytes = 0;
+
+  const consume = (
+    result: RuntimeReadManyResult,
+  ): RuntimeLimitedBodyReadResult | undefined => {
+    for (const chunk of result.value) {
+      if (chunk.byteLength > maxBytes - totalBytes) {
+        cancelBodyReader(reader);
+        return BODY_LIMIT_EXCEEDED;
+      }
+
+      totalBytes += chunk.byteLength;
+      chunks.push(chunk);
+    }
+
+    return result.done
+      ? {
+          ok: true,
+          bytes: concatenateChunks(chunks, totalBytes),
+        }
+      : undefined;
+  };
+
+  const readNext = (): RuntimeLimitedBodyReadResult | PromiseLike<RuntimeLimitedBodyReadResult> => {
+    while (true) {
+      const next = readMany.call(reader);
+
+      if (isPromiseLike(next)) {
+        return Promise.resolve(next).then((result) => {
+          const consumed = consume(result);
+          return consumed ?? readNext();
+        });
+      }
+
+      const consumed = consume(next);
+
+      if (consumed !== undefined) {
+        return consumed;
+      }
+    }
+  };
+
+  try {
+    const result = readNext();
+
+    if (isPromiseLike(result)) {
+      return Promise.resolve(result).finally(() => {
+        reader.releaseLock();
+      });
+    }
+
+    reader.releaseLock();
+    return Promise.resolve(result);
+  } catch (error) {
+    reader.releaseLock();
+    return Promise.reject(error);
+  }
+}
+
+async function readLimitedBodyStandard(
+  reader: ReadableStreamDefaultReader<Uint8Array>,
+  maxBytes: number,
+): Promise<RuntimeLimitedBodyReadResult> {
   const chunks: Uint8Array[] = [];
   let totalBytes = 0;
 
@@ -100,12 +189,7 @@ async function readLimitedBody(
       const chunk = result.value;
 
       if (chunk.byteLength > maxBytes - totalBytes) {
-        try {
-          await reader.cancel();
-        } catch {
-          // A confirmed overflow remains authoritative even if cancellation fails.
-        }
-
+        cancelBodyReader(reader);
         return BODY_LIMIT_EXCEEDED;
       }
 
@@ -120,6 +204,24 @@ async function readLimitedBody(
     ok: true,
     bytes: concatenateChunks(chunks, totalBytes),
   };
+}
+
+function cancelBodyReader(
+  reader: ReadableStreamDefaultReader<Uint8Array>,
+): void {
+  try {
+    void reader.cancel().catch(() => undefined);
+  } catch {
+    // A confirmed overflow remains authoritative even if cancellation fails.
+  }
+}
+
+function isPromiseLike<T>(value: T | PromiseLike<T>): value is PromiseLike<T> {
+  return (
+    value !== null &&
+    (typeof value === "object" || typeof value === "function") &&
+    typeof (value as { readonly then?: unknown }).then === "function"
+  );
 }
 
 function concatenateChunks(
