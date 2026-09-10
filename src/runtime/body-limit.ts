@@ -101,7 +101,7 @@ async function readLimitedBody(
 
       if (chunk.byteLength > maxBytes - totalBytes) {
         try {
-          await reader.cancel();
+          void reader.cancel().catch(() => undefined);
         } catch {
           // A confirmed overflow remains authoritative even if cancellation fails.
         }
