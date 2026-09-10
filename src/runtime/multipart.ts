@@ -25,25 +25,34 @@ export function readMultipartBody(
   request: Request,
   parserContentType: string,
 ): Promise<RuntimeMultipartBody> {
+  return request
+    .arrayBuffer()
+    .then((body) =>
+      parseMultipartBody(new Uint8Array(body), parserContentType),
+    );
+}
+
+export function parseMultipartBody(
+  bytes: Uint8Array<ArrayBuffer>,
+  parserContentType: string,
+): Promise<RuntimeMultipartBody> {
   /*
    * Boundary parsing intentionally happens inside the body-consumption
    * continuation. Any malformed accepted representation therefore rejects
    * the reader Promise and is normalized by RuntimeBodyReadError to 400.
    */
-  return request.arrayBuffer().then((body) => {
-    const boundary = readMultipartBoundary(parserContentType);
-    const prepared = prepareMultipartBody(new Uint8Array(body), boundary);
+  const boundary = readMultipartBoundary(parserContentType);
+  const prepared = prepareMultipartBody(bytes, boundary);
 
-    return new Response(prepared.bytes, {
-      headers: {
-        "content-type": parserContentType,
-      },
-    })
-      .formData()
-      .then((formData) =>
-        normalizeMultipartFormData(formData, prepared.emptyNameSentinel),
-      );
-  });
+  return new Response(prepared.bytes, {
+    headers: {
+      "content-type": parserContentType,
+    },
+  })
+    .formData()
+    .then((formData) =>
+      normalizeMultipartFormData(formData, prepared.emptyNameSentinel),
+    );
 }
 
 export function normalizeMultipartFormData(

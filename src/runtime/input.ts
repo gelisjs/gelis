@@ -10,7 +10,7 @@ import {
   type RuntimeLimitedBodyReader,
 } from "./body-limit";
 
-import { normalizeMultipartFormData, readMultipartBody } from "./multipart";
+import { parseMultipartBody, readMultipartBody } from "./multipart";
 
 export const RUNTIME_INPUT_QUERY = 1;
 
@@ -606,13 +606,7 @@ function parseLimitedMultipartBody(
 
   const parserContentType = multipartParserContentType(contentType);
 
-  return new Response(Uint8Array.from(bytes), {
-    headers: {
-      "content-type": parserContentType,
-    },
-  })
-    .formData()
-    .then((formData) => normalizeMultipartFormData(formData));
+  return parseMultipartBody(Uint8Array.from(bytes), parserContentType);
 }
 
 function readDefaultJsonBody(request: Request): Response | Promise<unknown> {
