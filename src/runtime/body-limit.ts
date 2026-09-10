@@ -135,7 +135,9 @@ function readLimitedBodyMany(
       : undefined;
   };
 
-  const readNext = (): RuntimeLimitedBodyReadResult | PromiseLike<RuntimeLimitedBodyReadResult> => {
+  const readNext = ():
+    | RuntimeLimitedBodyReadResult
+    | PromiseLike<RuntimeLimitedBodyReadResult> => {
     while (true) {
       const next = readMany.call(reader);
 
