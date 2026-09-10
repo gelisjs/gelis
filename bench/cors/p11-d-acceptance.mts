@@ -11,10 +11,10 @@ const SAMPLE_COUNT = 11;
 
 const ZERO_CASE_GATE = 1.03;
 const ZERO_GEOMEAN_GATE = 1.015;
-const STATIC_CASE_GATE = 1.10;
+const STATIC_CASE_GATE = 1.1;
 const STATIC_GEOMEAN_GATE = 1.05;
 const DYNAMIC_CASE_GATE = 1.15;
-const SCALING_GATE = 1.50;
+const SCALING_GATE = 1.5;
 
 type ZeroScenario =
   | "static-raw"
@@ -152,12 +152,8 @@ const scaling = await runMirroredScaling();
 const scalingPass = scaling.ratio <= SCALING_GATE;
 accepted &&= scalingPass;
 
-console.log(
-  `1,000 routes: ${formatNs(scaling.leftNs)} ns/op`,
-);
-console.log(
-  `5,000 routes: ${formatNs(scaling.rightNs)} ns/op`,
-);
+console.log(`1,000 routes: ${formatNs(scaling.leftNs)} ns/op`);
+console.log(`5,000 routes: ${formatNs(scaling.rightNs)} ns/op`);
 console.log(
   `5000/1000: ${formatRatio(scaling.ratio)} <= ${SCALING_GATE.toFixed(2)}x => ${scalingPass ? "PASS" : "FAIL"}`,
 );
@@ -238,7 +234,7 @@ async function runMirroredFrameworks(
     });
   }
 
-  return summarizePairs(pairs);
+  return summarizePairs(pairs, "left-over-right");
 }
 
 async function runMirroredScaling(): Promise<PairedResult> {
@@ -278,14 +274,18 @@ function summarizePairs(
     readonly right: WorkerResult;
     readonly leftFirst: boolean;
   }[],
+  ratioDirection: "right-over-left" | "left-over-right" = "right-over-left",
 ): PairedResult {
-  const ratios = pairs.map((pair) => pair.right.nsPerOp / pair.left.nsPerOp);
-  const leftFirstRatios = pairs
-    .filter((pair) => pair.leftFirst)
-    .map((pair) => pair.right.nsPerOp / pair.left.nsPerOp);
+  const ratioFor = (pair: (typeof pairs)[number]): number =>
+    ratioDirection === "right-over-left"
+      ? pair.right.nsPerOp / pair.left.nsPerOp
+      : pair.left.nsPerOp / pair.right.nsPerOp;
+
+  const ratios = pairs.map(ratioFor);
+  const leftFirstRatios = pairs.filter((pair) => pair.leftFirst).map(ratioFor);
   const rightFirstRatios = pairs
     .filter((pair) => !pair.leftFirst)
-    .map((pair) => pair.right.nsPerOp / pair.left.nsPerOp);
+    .map(ratioFor);
 
   return {
     leftNs: median(pairs.map((pair) => pair.left.nsPerOp)),
@@ -337,7 +337,9 @@ function isWorkerResult(value: unknown): value is WorkerResult {
     value !== null &&
     typeof value === "object" &&
     "mode" in value &&
-    (value.mode === "zero-unused" || value.mode === "enabled" || value.mode === "scaling") &&
+    (value.mode === "zero-unused" ||
+      value.mode === "enabled" ||
+      value.mode === "scaling") &&
     "framework" in value &&
     (value.framework === "gelis" || value.framework === "hono") &&
     "scenario" in value &&
@@ -421,8 +423,7 @@ function geometricMean(values: readonly number[]): number {
   }
 
   return Math.exp(
-    values.reduce((total, value) => total + Math.log(value), 0) /
-      values.length,
+    values.reduce((total, value) => total + Math.log(value), 0) / values.length,
   );
 }
 
