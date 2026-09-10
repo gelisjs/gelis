@@ -195,16 +195,12 @@ const httpPairwiseRatio = median(
 const httpHonoFirstRatio = median(
   httpPairs
     .filter((pair) => pair.honoFirst)
-    .map(
-      (pair) => pair.gelis.requestsPerSecond / pair.hono.requestsPerSecond,
-    ),
+    .map((pair) => pair.gelis.requestsPerSecond / pair.hono.requestsPerSecond),
 );
 const httpGelisFirstRatio = median(
   httpPairs
     .filter((pair) => !pair.honoFirst)
-    .map(
-      (pair) => pair.gelis.requestsPerSecond / pair.hono.requestsPerSecond,
-    ),
+    .map((pair) => pair.gelis.requestsPerSecond / pair.hono.requestsPerSecond),
 );
 const httpPass = httpMedianRatio >= HTTP_GATE;
 accepted &&= httpPass;
@@ -405,7 +401,9 @@ async function verifyHttpPolicy(
   const response = await fetch(url);
 
   if (response.status !== 204) {
-    throw new Error(`${framework} HTTP verification returned ${response.status}`);
+    throw new Error(
+      `${framework} HTTP verification returned ${response.status}`,
+    );
   }
 
   const expected = new Map<string, string>([
