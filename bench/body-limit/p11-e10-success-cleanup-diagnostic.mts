@@ -1,3 +1,5 @@
+// prettier-ignore
+{
 const UNDER_BYTES = 768;
 const STREAM_CHUNKS = [new Uint8Array(384), new Uint8Array(384)] as const;
 
@@ -150,4 +152,5 @@ async function measure(
   }
 
   return performance.now() - start;
+}
 }
