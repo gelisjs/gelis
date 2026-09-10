@@ -1,8 +1,5 @@
 const LIMIT_BYTES = 1_024;
-const OVER_STREAM_CHUNKS = [
-  new Uint8Array(768),
-  new Uint8Array(768),
-] as const;
+const OVER_STREAM_CHUNKS = [new Uint8Array(768), new Uint8Array(768)] as const;
 
 const WARMUPS = 1_000;
 const TARGET_MS = 100;
