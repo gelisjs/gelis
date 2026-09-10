@@ -7,10 +7,9 @@ import type { RuntimeFetch } from "./fetch";
 import {
   compileApplicationHttpErrorHooks,
   compileApplicationHttpFetch,
+  createApplicationHttpRuntime,
   extractApplicationHttpPlan,
 } from "./application-http";
-
-import type { RuntimeApplicationHttpRuntime } from "./application-http";
 
 import { compileOnErrorFetch } from "./on-error";
 
@@ -20,7 +19,6 @@ export function compileApplicationFetch(
   routedFetch: RuntimeFetch,
   onRequestHooks: readonly OnRequest[] | undefined,
   onErrorHooks: readonly OnError[] | undefined,
-  httpRuntime: RuntimeApplicationHttpRuntime,
 ): RuntimeFetch {
   const extracted = extractApplicationHttpPlan(onRequestHooks);
 
@@ -42,6 +40,13 @@ export function compileApplicationFetch(
 
   const httpPlan = extracted.plan;
   if (httpPlan !== undefined) {
+    /*
+     * No official HTTP capability -> no runtime object, wrapper, or request
+     * branch. The topology-discovery runtime exists only for applications
+     * that actually install a P11 Lane-B capability.
+     */
+    const httpRuntime = createApplicationHttpRuntime(routedFetch);
+
     fetch = compileApplicationHttpFetch(httpPlan, fetch, httpRuntime);
   }
 
