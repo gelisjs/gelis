@@ -88,6 +88,7 @@ async function readLimitedBody(
   const reader = body.getReader();
   const chunks: Uint8Array[] = [];
   let totalBytes = 0;
+  let releaseReader = true;
 
   try {
     while (true) {
@@ -100,10 +101,8 @@ async function readLimitedBody(
       const chunk = result.value;
 
       if (chunk.byteLength > maxBytes - totalBytes) {
-        try {
-          await reader.cancel();
-        } catch {
-          // A confirmed overflow remains authoritative even if cancellation fails.
+        if (cancelReaderAfterOverflow(reader)) {
+          releaseReader = false;
         }
 
         return BODY_LIMIT_EXCEEDED;
@@ -113,13 +112,27 @@ async function readLimitedBody(
       chunks.push(chunk);
     }
   } finally {
-    reader.releaseLock();
+    if (releaseReader) {
+      reader.releaseLock();
+    }
   }
 
   return {
     ok: true,
     bytes: concatenateChunks(chunks, totalBytes),
   };
+}
+
+function cancelReaderAfterOverflow(
+  reader: ReadableStreamDefaultReader<Uint8Array>,
+): boolean {
+  try {
+    void reader.cancel().catch(() => undefined);
+    return true;
+  } catch {
+    // A confirmed overflow remains authoritative even if cancellation fails.
+    return false;
+  }
 }
 
 function concatenateChunks(
