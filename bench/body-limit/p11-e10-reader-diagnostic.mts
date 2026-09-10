@@ -133,7 +133,7 @@ function readPeek(request: Request): Promise<ReadResult> {
   let total = 0;
 
   const consume = (
-    result: ReadableStreamReadResult<Uint8Array>,
+    result: Awaited<ReturnType<typeof reader.read>>,
   ): ReadResult | undefined => {
     if (result.done) return { ok: true, bytes: total };
 
@@ -151,7 +151,8 @@ function readPeek(request: Request): Promise<ReadResult> {
       const promise = reader.read();
 
       if (Bun.peek.status(promise) === "fulfilled") {
-        const consumed = consume(Bun.peek(promise));
+        const result = Bun.peek(promise) as Awaited<ReturnType<typeof reader.read>>;
+        const consumed = consume(result);
         if (consumed !== undefined) return consumed;
         continue;
       }
