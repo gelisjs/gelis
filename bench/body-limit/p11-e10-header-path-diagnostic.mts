@@ -45,13 +45,12 @@ for (const strategy of strategies) {
   const elapsed = await measure(operation, iterations);
   const nsPerOp = (elapsed * 1_000_000) / iterations;
 
-  console.log(`| ${strategy} | ${nsPerOp.toFixed(1)} | overflow |`);
+  console.log(
+    `| ${strategy} | ${nsPerOp.toFixed(1)} | overflow |`,
+  );
 }
 
-async function read(
-  strategy: Strategy,
-  request: Request,
-): Promise<boolean> {
+async function read(strategy: Strategy, request: Request): Promise<boolean> {
   switch (strategy) {
     case "direct-reader":
       return readBody(request);
