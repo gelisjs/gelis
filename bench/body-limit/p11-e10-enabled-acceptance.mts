@@ -127,7 +127,9 @@ async function runMirroredFrameworks(
     });
   }
 
-  const pairRatios = pairs.map((pair) => pair.gelis.nsPerOp / pair.hono.nsPerOp);
+  const pairRatios = pairs.map(
+    (pair) => pair.gelis.nsPerOp / pair.hono.nsPerOp,
+  );
   const honoFirstRatios = pairs
     .filter((pair) => pair.honoFirst)
     .map((pair) => pair.gelis.nsPerOp / pair.hono.nsPerOp);
