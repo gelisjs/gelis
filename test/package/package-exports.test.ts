@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 
 import { Gelis } from "gelis";
 import { serve, serveReady } from "gelis/bun";
+import { bodyLimit } from "gelis/body-limit";
 import { generateCookie, getCookie, setCookie } from "gelis/cookie";
 import { cors } from "gelis/cors";
 
@@ -39,6 +40,20 @@ describe("Gelis package exports", () => {
     expect(app).toBeInstanceOf(Gelis);
   });
 
+  test("resolves the portable body-limit subpath", () => {
+    expect(typeof bodyLimit).toBe("function");
+
+    const app = new Gelis();
+    const limit = bodyLimit({ maxBytes: 1024 });
+
+    app.use(limit);
+    app.post("/", () => "ok");
+
+    expect(limit.maxBytes).toBe(1024);
+    expect(typeof limit.readBody).toBe("function");
+    expect(app).toBeInstanceOf(Gelis);
+  });
+
   test("does not expose Bun adapter APIs from the portable root", async () => {
     const root = await import("gelis");
 
@@ -58,5 +73,11 @@ describe("Gelis package exports", () => {
     const root = await import("gelis");
 
     expect("cors" in root).toBe(false);
+  });
+
+  test("does not re-export body-limit helpers from the portable root", async () => {
+    const root = await import("gelis");
+
+    expect("bodyLimit" in root).toBe(false);
   });
 });

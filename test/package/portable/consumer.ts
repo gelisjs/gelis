@@ -1,4 +1,10 @@
 import { Gelis } from "gelis";
+import {
+  bodyLimit,
+  type BodyLimitCapability,
+  type BodyLimitOptions,
+  type BodyLimitReadResult,
+} from "gelis/body-limit";
 import { generateCookie, getCookie, setCookie } from "gelis/cookie";
 import { cors } from "gelis/cors";
 
@@ -10,6 +16,26 @@ app.use(
     credentials: true,
   }),
 );
+
+const bodyLimitOptions: BodyLimitOptions = {
+  maxBytes: 1024,
+  onExceeded(request, maxBytes) {
+    request.headers.get("content-length");
+
+    return Response.json(
+      {
+        error: "too large",
+        maxBytes,
+      },
+      {
+        status: 413,
+      },
+    );
+  },
+};
+
+const bodyLimitCapability: BodyLimitCapability = bodyLimit(bodyLimitOptions);
+app.use(bodyLimitCapability);
 
 app.get("/", () => "portable");
 
@@ -30,10 +56,22 @@ generateCookie("__Host-session", "value", {
   secure: true,
 });
 
+async function inspectLimitedBody(request: Request): Promise<void> {
+  const result: BodyLimitReadResult =
+    await bodyLimitCapability.readBody(request);
+
+  if (result.ok) {
+    result.bytes.byteLength;
+  } else {
+    result.response.status;
+  }
+}
+
 // Portable consumers must not receive Bun globals through `gelis`,
-// `gelis/cookie`, or `gelis/cors`.
+// `gelis/cookie`, `gelis/cors`, or `gelis/body-limit`.
 // @ts-expect-error Bun must not exist in the portable consumer graph.
 Bun.serve;
 
 void app;
 void headers;
+void inspectLimitedBody;

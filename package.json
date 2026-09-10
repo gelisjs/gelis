@@ -28,6 +28,11 @@
       "types": "./src/cors/index.ts",
       "import": "./src/cors/index.ts",
       "default": "./src/cors/index.ts"
+    },
+    "./body-limit": {
+      "types": "./src/body-limit/index.ts",
+      "import": "./src/body-limit/index.ts",
+      "default": "./src/body-limit/index.ts"
     }
   },
   "packageManager": "bun@1.4.0",
