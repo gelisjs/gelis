@@ -8,8 +8,7 @@ export interface RuntimeLimitedBodyReadExceeded {
 }
 
 export type RuntimeLimitedBodyReadResult =
-  | RuntimeLimitedBodyReadSuccess
-  | RuntimeLimitedBodyReadExceeded;
+  RuntimeLimitedBodyReadSuccess | RuntimeLimitedBodyReadExceeded;
 
 export type RuntimeLimitedBodyReader = (
   request: Request,

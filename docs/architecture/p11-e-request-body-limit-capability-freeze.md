@@ -420,7 +420,7 @@ AOT source analysis must recognize `bodyLimit` as accepted managed-body route me
 An otherwise eligible managed-input AOT route must not become silently ineligible because it declares:
 
 ```ts
-bodyLimit: 1024
+bodyLimit: 1024;
 ```
 
 The managed AOT path already reuses `createRuntimeInputPlan(options)`; P11-E preserves that single input compiler rather than introducing a second AOT body-limit implementation.

@@ -9,9 +9,9 @@ describe("Gelis body-limit runtime primitive", () => {
   test("validates maxBytes at compilation time", () => {
     expect(typeof compileRuntimeLimitedBodyReader(0)).toBe("function");
     expect(typeof compileRuntimeLimitedBodyReader(1)).toBe("function");
-    expect(typeof compileRuntimeLimitedBodyReader(Number.MAX_SAFE_INTEGER)).toBe(
-      "function",
-    );
+    expect(
+      typeof compileRuntimeLimitedBodyReader(Number.MAX_SAFE_INTEGER),
+    ).toBe("function");
 
     for (const value of [
       -1,
@@ -65,10 +65,10 @@ describe("Gelis body-limit runtime primitive", () => {
     const forgedSmall = createRequest(["ab", "cd"], "1");
 
     expect((await reader(equalHeader.request)).ok).toBe(false);
-    expect(equalHeader.wasCancelled()).toBe(true);
+    expect(equalHeader.request.bodyUsed).toBe(true);
 
     expect((await reader(forgedSmall.request)).ok).toBe(false);
-    expect(forgedSmall.wasCancelled()).toBe(true);
+    expect(forgedSmall.request.bodyUsed).toBe(true);
   });
 
   test("falls back to actual-byte enforcement for malformed or ambiguous Content-Length", async () => {
@@ -176,7 +176,9 @@ function createRequest(
 }
 
 function readText(
-  result: Awaited<ReturnType<ReturnType<typeof compileRuntimeLimitedBodyReader>>>,
+  result: Awaited<
+    ReturnType<ReturnType<typeof compileRuntimeLimitedBodyReader>>
+  >,
 ): string {
   if (!result.ok) {
     throw new Error("Expected body-limit read success");
