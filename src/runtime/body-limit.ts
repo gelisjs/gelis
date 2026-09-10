@@ -32,6 +32,10 @@ type RuntimePromisePeek = {
 type RuntimeLimitedBodyReadMaybePromise =
   RuntimeLimitedBodyReadResult | Promise<RuntimeLimitedBodyReadResult>;
 
+type RuntimeStreamReadResult = Awaited<
+  ReturnType<ReadableStreamDefaultReader<Uint8Array>["read"]>
+>;
+
 const BODY_LIMIT_EXCEEDED: RuntimeLimitedBodyReadExceeded = {
   ok: false,
 };
@@ -148,7 +152,7 @@ function readLimitedBodyPeek(
   let totalBytes = 0;
 
   const consume = (
-    result: ReadableStreamReadResult<Uint8Array>,
+    result: RuntimeStreamReadResult,
   ): RuntimeLimitedBodyReadResult | undefined => {
     if (result.done) {
       return {
@@ -175,7 +179,7 @@ function readLimitedBodyPeek(
 
       if (promisePeek.status(pending) === "fulfilled") {
         const peeked = promisePeek(pending);
-        const result = peeked as ReadableStreamReadResult<Uint8Array>;
+        const result = peeked as RuntimeStreamReadResult;
         const consumed = consume(result);
 
         if (consumed !== undefined) {
