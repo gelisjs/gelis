@@ -172,7 +172,7 @@ function createRequest(scenario: Scenario): Request {
   switch (scenario) {
     case "valid-header-under":
       headers.set("content-length", String(UNDER_BYTES.byteLength));
-      body = UNDER_BYTES;
+      body = createBodyStream(UNDER_STREAM_CHUNKS);
       break;
     case "streamed-under":
       body = createBodyStream(UNDER_STREAM_CHUNKS);
