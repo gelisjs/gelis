@@ -12,6 +12,7 @@ type Strategy =
   | "native-arraybuffer"
   | "bun-to-bytes"
   | "standard-reader"
+  | "byob-reader"
   | "peek-reader"
   | "read-many";
 
@@ -30,6 +31,7 @@ const strategies: readonly Strategy[] = [
   "native-arraybuffer",
   "bun-to-bytes",
   "standard-reader",
+  "byob-reader",
   "peek-reader",
   "read-many",
 ];
@@ -45,6 +47,11 @@ console.log("| --- | --- | ---: | --- |");
 
 for (const scenario of scenarios) {
   for (const strategy of strategies) {
+    if (strategy === "byob-reader" && !supportsByobReader(createRequest(scenario))) {
+      console.log(`| ${scenario} | ${strategy} | n/a | unsupported |`);
+      continue;
+    }
+
     const operation = async () => {
       const request = createRequest(scenario);
       const result = await readWithStrategy(request, strategy);
@@ -94,6 +101,8 @@ async function readWithStrategy(
     }
     case "standard-reader":
       return readStandard(request);
+    case "byob-reader":
+      return readByob(request);
     case "peek-reader":
       return readPeek(request);
     case "read-many":
@@ -122,6 +131,47 @@ async function readStandard(request: Request): Promise<ReadResult> {
     }
   } finally {
     reader.releaseLock();
+  }
+}
+
+async function readByob(request: Request): Promise<ReadResult> {
+  const body = request.body;
+  if (body === null) return { ok: true, bytes: 0 };
+
+  const reader = body.getReader({ mode: "byob" });
+  let total = 0;
+
+  try {
+    while (true) {
+      const remaining = LIMIT_BYTES + 1 - total;
+      const result = await reader.read(new Uint8Array(remaining));
+
+      if (result.done) {
+        return { ok: true, bytes: total };
+      }
+
+      total += result.value.byteLength;
+
+      if (total > LIMIT_BYTES) {
+        void reader.cancel().catch(() => undefined);
+        return { ok: false, bytes: total };
+      }
+    }
+  } finally {
+    reader.releaseLock();
+  }
+}
+
+function supportsByobReader(request: Request): boolean {
+  const body = request.body;
+  if (body === null) return true;
+
+  try {
+    const reader = body.getReader({ mode: "byob" });
+    reader.releaseLock();
+    return true;
+  } catch {
+    return false;
   }
 }
 
