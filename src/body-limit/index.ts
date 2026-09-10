@@ -8,6 +8,8 @@ import type { Capability, Plugin } from "../plugin";
 
 import {
   assertBodyLimitMaxBytes,
+  bodyTooLargeResponse,
+  compileRuntimeLimitedBodyReader,
   type RuntimeApplicationBodyLimitPolicy,
   type RuntimeBodyLimitExceededHandler,
 } from "../runtime/body-limit";
@@ -21,8 +23,19 @@ export interface BodyLimitOptions {
   readonly onExceeded?: BodyLimitExceededHandler;
 }
 
+export type BodyLimitReadResult =
+  | {
+      readonly ok: true;
+      readonly bytes: Uint8Array;
+    }
+  | {
+      readonly ok: false;
+      readonly response: Response;
+    };
+
 export interface BodyLimitCapability extends Plugin {
   readonly maxBytes: number;
+  readBody(request: Request): Promise<BodyLimitReadResult>;
 }
 
 const applicationBodyLimitCapability = defineCapability(
@@ -48,6 +61,26 @@ export function bodyLimit(options: BodyLimitOptions): BodyLimitCapability {
         }),
   };
 
+  const readLimitedBody = compileRuntimeLimitedBodyReader(options.maxBytes);
+
+  const readBody = async (request: Request): Promise<BodyLimitReadResult> => {
+    const result = await readLimitedBody(request);
+
+    if (result.ok) {
+      return result;
+    }
+
+    const onExceeded = policy.onExceeded;
+
+    return {
+      ok: false,
+      response:
+        onExceeded === undefined
+          ? bodyTooLargeResponse()
+          : await onExceeded(request, policy.maxBytes),
+    };
+  };
+
   const plugin = definePlugin("gelis/body-limit", (context) => {
     applicationBodyLimitCapability.provide(context, true);
 
@@ -62,11 +95,19 @@ export function bodyLimit(options: BodyLimitOptions): BodyLimitCapability {
     });
   }) as BodyLimitCapability;
 
-  Object.defineProperty(plugin, "maxBytes", {
-    configurable: false,
-    enumerable: true,
-    writable: false,
-    value: options.maxBytes,
+  Object.defineProperties(plugin, {
+    maxBytes: {
+      configurable: false,
+      enumerable: true,
+      writable: false,
+      value: options.maxBytes,
+    },
+    readBody: {
+      configurable: false,
+      enumerable: true,
+      writable: false,
+      value: readBody,
+    },
   });
 
   return plugin;
