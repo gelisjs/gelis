@@ -120,9 +120,16 @@ function createCorsPolicy(
       const state = requestStates.get(request);
 
       if (state !== undefined) {
+        const finalized = applyActualCorsResponse(response, options, state);
+
+        /*
+         * Keep the resolved decision available until mutation/reconstruction
+         * succeeds. If finalization throws, onError can still finalize its
+         * handled response from the same once-per-request origin decision.
+         */
         requestStates.delete(request);
 
-        return applyActualCorsResponse(response, options, state);
+        return finalized;
       }
 
       /*
@@ -179,17 +186,16 @@ function preparePreflight(
   }
 
   let requestedHeaders: readonly string[] = [];
+  const rawHeaders = request.headers.get("access-control-request-headers");
 
-  if (options.allowHeaders === "request") {
-    const rawHeaders = request.headers.get("access-control-request-headers");
+  if (rawHeaders !== null) {
+    const parsed = parseRequestedHeaders(rawHeaders);
 
-    if (rawHeaders !== null) {
-      const parsed = parseRequestedHeaders(rawHeaders);
+    if (parsed === undefined) {
+      return invalidPreflightResponse(options);
+    }
 
-      if (parsed === undefined) {
-        return invalidPreflightResponse(options);
-      }
-
+    if (options.allowHeaders === "request") {
       requestedHeaders = parsed;
     }
   }
