@@ -1,0 +1,43 @@
+name: P11-H8 Acceptance Prettier
+
+on:
+  push:
+    branches:
+      - diag/p11-h8-prettier
+
+permissions:
+  contents: write
+
+jobs:
+  format:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout target branch
+        uses: actions/checkout@v7
+        with:
+          ref: work/p11-h8-cumulative-acceptance
+          fetch-depth: 0
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.0
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Format H8 acceptance document
+        run: bunx prettier docs/architecture/p11-h-cumulative-acceptance.md --write
+
+      - name: Commit formatted document
+        shell: bash
+        run: |
+          if git diff --quiet -- docs/architecture/p11-h-cumulative-acceptance.md; then
+            echo "No formatting changes needed"
+            exit 0
+          fi
+          git config user.name "Rigent"
+          git config user.email "127601320+rigenttio@users.noreply.github.com"
+          git add docs/architecture/p11-h-cumulative-acceptance.md
+          git commit -m "style(p11-h): format cumulative acceptance"
+          git push origin HEAD:work/p11-h8-cumulative-acceptance
