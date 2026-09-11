@@ -21,6 +21,7 @@ interface TimeoutRequestState {
   cooperativeAbortRecorded: boolean;
   cooperativeAbortReason: unknown;
   applicationDeadline: number | undefined;
+  activeFrameworkDeadlines: number;
 }
 
 export function createTimeoutState(
@@ -35,6 +36,7 @@ export function createTimeoutState(
         cooperativeAbortRecorded: false,
         cooperativeAbortReason: undefined,
         applicationDeadline: undefined,
+        activeFrameworkDeadlines: 0,
       });
     },
 
@@ -48,6 +50,13 @@ export function createTimeoutState(
       const existing = state.cooperativeController;
       if (existing !== undefined) {
         return existing.signal;
+      }
+
+      if (
+        state.activeFrameworkDeadlines === 0 &&
+        !state.cooperativeAbortRecorded
+      ) {
+        return request.signal;
       }
 
       const controller = new AbortController();
@@ -132,12 +141,19 @@ function executeWithDeadline(
   let settled = false;
   let rejectTimeout: ((error: TimeoutError) => void) | undefined;
 
+  state.activeFrameworkDeadlines++;
+
+  const settleDeadline = () => {
+    state.activeFrameworkDeadlines--;
+  };
+
   const timer = setTimeout(() => {
     if (settled) {
       return;
     }
 
     settled = true;
+    settleDeadline();
     const error = new TimeoutError(duration, scope);
 
     if (!state.cooperativeAbortRecorded) {
@@ -156,12 +172,14 @@ function executeWithDeadline(
     result = run();
   } catch (error) {
     settled = true;
+    settleDeadline();
     clearTimeout(timer);
     throw error;
   }
 
   if (result instanceof Response) {
     settled = true;
+    settleDeadline();
     clearTimeout(timer);
     return result;
   }
@@ -176,6 +194,7 @@ function executeWithDeadline(
         }
 
         settled = true;
+        settleDeadline();
         clearTimeout(timer);
         resolve(response);
       },
@@ -185,6 +204,7 @@ function executeWithDeadline(
         }
 
         settled = true;
+        settleDeadline();
         clearTimeout(timer);
         reject(error);
       },
