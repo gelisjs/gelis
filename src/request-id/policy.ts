@@ -24,7 +24,9 @@ export function compileRequestIdPolicy(
   assertOptionsObject(options);
 
   const headerName =
-    options?.headerName === undefined ? DEFAULT_HEADER_NAME : options.headerName;
+    options?.headerName === undefined
+      ? DEFAULT_HEADER_NAME
+      : options.headerName;
   assertHeaderName(headerName);
 
   const maxLength =
