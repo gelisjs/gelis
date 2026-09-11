@@ -46,9 +46,7 @@ async function startGelis(root: string, serverPort: number): Promise<void> {
   const requestIdUrl = pathToFileURL(
     resolve(root, "src/request-id/index.ts"),
   ).href;
-  const timeoutUrl = pathToFileURL(
-    resolve(root, "src/timeout/index.ts"),
-  ).href;
+  const timeoutUrl = pathToFileURL(resolve(root, "src/timeout/index.ts")).href;
   const bunAdapterUrl = pathToFileURL(
     resolve(root, "src/adapter/bun/index.ts"),
   ).href;

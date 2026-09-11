@@ -132,9 +132,7 @@ if (honoVersion !== HONO_VERSION) {
 await ensureOha();
 const ohaVersion = await getOhaVersion();
 if (!ohaVersion.includes(OHA_VERSION)) {
-  throw new Error(
-    `P11-H6 requires oha ${OHA_VERSION}, received ${ohaVersion}`,
-  );
+  throw new Error(`P11-H6 requires oha ${OHA_VERSION}, received ${ohaVersion}`);
 }
 
 console.log("P11-H6 Representative Enabled Composition Performance Acceptance");

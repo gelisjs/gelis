@@ -46,7 +46,9 @@ interface BenchmarkGelisApp {
   post(
     path: string,
     options: Record<string, unknown>,
-    handler: (context: { readonly body: { readonly value: string } }) => unknown,
+    handler: (context: {
+      readonly body: { readonly value: string };
+    }) => unknown,
   ): unknown;
   fetch(request: Request): Response | Promise<Response>;
 }
@@ -102,7 +104,8 @@ async function runDirect(args: ParsedArgs): Promise<DirectWorkerResult> {
       );
     }
 
-    sink ^= response.status + (response.headers.get("x-request-id")?.length ?? 0);
+    sink ^=
+      response.status + (response.headers.get("x-request-id")?.length ?? 0);
   };
 
   const warmupRequests = createDirectRequests(WARMUP_ASYNC);
@@ -130,7 +133,9 @@ async function createGelisDirectBenchmark(
   scenario: DirectScenario,
 ): Promise<BenchmarkDispatch> {
   const coreUrl = pathToFileURL(resolve(candidateRoot, "src/index.ts")).href;
-  const corsUrl = pathToFileURL(resolve(candidateRoot, "src/cors/index.ts")).href;
+  const corsUrl = pathToFileURL(
+    resolve(candidateRoot, "src/cors/index.ts"),
+  ).href;
   const secureHeadersUrl = pathToFileURL(
     resolve(candidateRoot, "src/secure-headers/index.ts"),
   ).href;
@@ -141,22 +146,27 @@ async function createGelisDirectBenchmark(
     resolve(candidateRoot, "src/timeout/index.ts"),
   ).href;
 
-  const [coreModule, corsModule, secureHeadersModule, requestIdModule, timeoutModule] =
-    await Promise.all([
-      import(coreUrl) as Promise<{ Gelis: new () => BenchmarkGelisApp }>,
-      import(corsUrl) as Promise<{
-        cors: (options?: Record<string, unknown>) => unknown;
-      }>,
-      import(secureHeadersUrl) as Promise<{
-        secureHeaders: (options?: Record<string, unknown>) => unknown;
-      }>,
-      import(requestIdUrl) as Promise<{
-        requestId: (options?: Record<string, unknown>) => unknown;
-      }>,
-      import(timeoutUrl) as Promise<{
-        timeout: (options?: { readonly duration?: number }) => unknown;
-      }>,
-    ]);
+  const [
+    coreModule,
+    corsModule,
+    secureHeadersModule,
+    requestIdModule,
+    timeoutModule,
+  ] = await Promise.all([
+    import(coreUrl) as Promise<{ Gelis: new () => BenchmarkGelisApp }>,
+    import(corsUrl) as Promise<{
+      cors: (options?: Record<string, unknown>) => unknown;
+    }>,
+    import(secureHeadersUrl) as Promise<{
+      secureHeaders: (options?: Record<string, unknown>) => unknown;
+    }>,
+    import(requestIdUrl) as Promise<{
+      requestId: (options?: Record<string, unknown>) => unknown;
+    }>,
+    import(timeoutUrl) as Promise<{
+      timeout: (options?: { readonly duration?: number }) => unknown;
+    }>,
+  ]);
 
   const app = new coreModule.Gelis();
 
@@ -294,10 +304,7 @@ async function runRouteScale(
     await operation(warmupRequests[index]!);
   }
 
-  const iterations = await calibrateAsync(
-    operation,
-    createRouteScaleRequests,
-  );
+  const iterations = await calibrateAsync(operation, createRouteScaleRequests);
   const measuredRequests = createRouteScaleRequests(iterations);
   const elapsed = await measureAsync(operation, measuredRequests);
 
@@ -572,9 +579,7 @@ function assertFramework(value: string): asserts value is Framework {
   }
 }
 
-function assertDirectScenario(
-  value: string,
-): asserts value is DirectScenario {
+function assertDirectScenario(value: string): asserts value is DirectScenario {
   if (
     value !== "actual-cors-static-204" &&
     value !== "actual-cors-static-json"
