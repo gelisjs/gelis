@@ -95,12 +95,8 @@ function startHono(serverPort: number): void {
   app.get("/resource", (context) => {
     const observed = context.get("requestId");
 
-    return new Response(null, {
-      status: 204,
-      headers: {
-        "X-Observed-Request-Id": observed,
-      },
-    });
+    context.header("X-Observed-Request-Id", observed);
+    return context.body(null, 204);
   });
 
   Bun.serve({

@@ -156,7 +156,7 @@ function createHonoBenchmark(scenario: RequestIdScenario): BenchmarkDispatch {
   app.use("*", honoRequestId(honoOptionsFor(scenario)));
   app.get("/resource", (context) => {
     observed = context.get("requestId");
-    return new Response(null, { status: 204 });
+    return context.body(null, 204);
   });
 
   return {
