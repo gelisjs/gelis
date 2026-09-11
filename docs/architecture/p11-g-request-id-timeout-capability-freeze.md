@@ -83,8 +83,7 @@ Conceptual public surface:
 import { requestId } from "gelis/request-id";
 
 export type RequestIdTrustIncoming =
-  | boolean
-  | ((value: string, request: Request) => boolean);
+  boolean | ((value: string, request: Request) => boolean);
 
 export interface RequestIdOptions {
   readonly headerName?: string;
