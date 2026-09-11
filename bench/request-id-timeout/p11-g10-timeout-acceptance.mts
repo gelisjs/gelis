@@ -7,7 +7,7 @@ const ROOT = resolve(HERE, "../..");
 const WORKER = resolve(HERE, "p11-g10-timeout-worker.mts");
 const HTTP_SERVER = resolve(HERE, "p11-g10-timeout-http-server.mts");
 
-const CANDIDATE_SHA = "4b9053d7efaec35e71d35b3fbb0cb5b97cba7b61";
+const CANDIDATE_SHA = "1dd5f94cf0e9ad884ca44e537ee287587cd8baab";
 const HONO_VERSION = "4.13.5";
 
 const DIRECT_SAMPLE_COUNT = 11;
