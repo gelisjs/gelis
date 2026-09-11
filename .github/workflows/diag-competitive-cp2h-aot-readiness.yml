@@ -1,0 +1,61 @@
+name: Competitive CP2-H AOT Readiness Diagnostic
+
+on:
+  push:
+    branches:
+      - diag/competitive-cp2h-aot-readiness
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout target
+        uses: actions/checkout@v7
+        with:
+          ref: work/competitive-cp2-core-crown
+          fetch-depth: 0
+
+      - name: Setup Bun 1.4.2
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+
+      - name: Install frozen Elysia AOT island
+        run: bun install --cwd bench/competitive/elysia-v2-aot --frozen-lockfile
+
+      - name: Build CP2-H AOT artifacts
+        working-directory: bench/competitive/elysia-v2-aot
+        run: bun http-aot-build.mts
+
+      - name: Inspect static-raw 5k artifact readiness
+        shell: bash
+        working-directory: bench/competitive/elysia-v2-aot
+        run: |
+          set +e
+          PORT=3112 bun generated/cp2-http/static-raw/server.js >/tmp/cp2h-aot.out 2>/tmp/cp2h-aot.err &
+          pid=$!
+          echo "pid=$pid"
+          for delay in 1 4 10 20; do
+            sleep "$delay"
+            echo "--- after incremental ${delay}s ---"
+            ps -p "$pid" -o pid,stat,etime,cmd
+            echo "listeners:"
+            ss -ltnp | grep -E '(:3112|:3100)' || true
+            echo "probe 3112:"
+            curl -sS -D - --max-time 2 http://127.0.0.1:3112/r/4999 -o /tmp/cp2h-body-3112 || true
+            cat /tmp/cp2h-body-3112 2>/dev/null || true
+            echo
+            echo "probe 3100:"
+            curl -sS -D - --max-time 2 http://127.0.0.1:3100/r/4999 -o /tmp/cp2h-body-3100 || true
+            cat /tmp/cp2h-body-3100 2>/dev/null || true
+            echo
+          done
+          echo "stdout:"
+          cat /tmp/cp2h-aot.out || true
+          echo "stderr:"
+          cat /tmp/cp2h-aot.err || true
+          kill "$pid" 2>/dev/null || true
+          wait "$pid" 2>/dev/null || true
