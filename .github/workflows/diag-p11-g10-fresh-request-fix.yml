@@ -1,0 +1,388 @@
+name: P11-G10 Fresh Request Fix
+
+on:
+  push:
+    branches:
+      - diag/p11-g10-fresh-request-fix
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.0
+      - name: Checkout target branch
+        run: |
+          git fetch origin work/p11-g10-timeout-competitor
+          git checkout -B work/p11-g10-timeout-competitor origin/work/p11-g10-timeout-competitor
+      - run: bun install --frozen-lockfile
+      - name: Patch timeout direct workload to unique Request identities
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path("bench/request-id-timeout/p11-g10-timeout-worker.mts")
+          text = path.read_text()
+
+          old_direct = '''async function runDirect(args: ParsedArgs): Promise<DirectWorkerResult> {
+            const framework = required(args.framework, "--framework") as Framework;
+            const scenario = required(args.scenario, "--scenario") as DirectScenario;
+            const candidateRoot = required(args.candidateRoot, "--candidate-root");
+
+            assertFramework(framework);
+            assertDirectScenario(scenario);
+
+            const benchmark =
+              framework === "gelis"
+                ? await createGelisDirectBenchmark(candidateRoot, scenario)
+                : createHonoDirectBenchmark(scenario);
+            const request = new Request("http://gelis.test/resource");
+
+            await verifyDispatch(benchmark, request, `${framework}/${scenario}`);
+
+            let sink = 0;
+            const operation = async () => {
+              const result = benchmark.dispatch(request);
+              const response = result instanceof Response ? result : await result;
+
+              if (response.status !== 204) {
+                throw new Error(`${framework}/${scenario} returned ${response.status}`);
+              }
+
+              sink ^= response.status;
+            };
+
+            for (let index = 0; index < WARMUP_ASYNC; index++) {
+              await operation();
+            }
+
+            const iterations = await calibrateAsync(operation);
+            const elapsed = await measureAsync(operation, iterations);
+
+            return {
+              mode: "direct",
+              framework,
+              scenario,
+              iterations,
+              warmups: WARMUP_ASYNC,
+              nsPerOp: (elapsed * 1_000_000) / iterations,
+              sink,
+            };
+          }'''.replace("          ", "")
+
+          new_direct = '''async function runDirect(args: ParsedArgs): Promise<DirectWorkerResult> {
+            const framework = required(args.framework, "--framework") as Framework;
+            const scenario = required(args.scenario, "--scenario") as DirectScenario;
+            const candidateRoot = required(args.candidateRoot, "--candidate-root");
+
+            assertFramework(framework);
+            assertDirectScenario(scenario);
+
+            const benchmark =
+              framework === "gelis"
+                ? await createGelisDirectBenchmark(candidateRoot, scenario)
+                : createHonoDirectBenchmark(scenario);
+            const requestUrl = "http://gelis.test/resource";
+
+            await verifyDispatch(
+              benchmark,
+              new Request(requestUrl),
+              `${framework}/${scenario}`,
+            );
+
+            let sink = 0;
+            const operation = async (request: Request) => {
+              const result = benchmark.dispatch(request);
+              const response = result instanceof Response ? result : await result;
+
+              if (response.status !== 204) {
+                throw new Error(`${framework}/${scenario} returned ${response.status}`);
+              }
+
+              sink ^= response.status;
+            };
+
+            const warmupRequests = createRequests(requestUrl, WARMUP_ASYNC);
+            for (let index = 0; index < warmupRequests.length; index++) {
+              await operation(warmupRequests[index]!);
+            }
+
+            const iterations = await calibrateAsync(operation, requestUrl);
+            const measuredRequests = createRequests(requestUrl, iterations);
+            const elapsed = await measureAsync(operation, measuredRequests);
+
+            return {
+              mode: "direct",
+              framework,
+              scenario,
+              iterations,
+              warmups: WARMUP_ASYNC,
+              nsPerOp: (elapsed * 1_000_000) / iterations,
+              sink,
+            };
+          }'''.replace("          ", "")
+
+          old_scale = '''async function runRouteScale(
+            args: ParsedArgs,
+          ): Promise<RouteScaleWorkerResult> {
+            const candidateRoot = required(args.candidateRoot, "--candidate-root");
+            const routes = Number(required(args.routes, "--routes"));
+
+            if (routes !== 1_000 && routes !== 5_000) {
+              throw new Error(
+                `P11-G10 route-scale requires 1000 or 5000 routes, got ${routes}`,
+              );
+            }
+
+            const benchmark = await createGelisRouteScaleBenchmark(candidateRoot, routes);
+            const request = new Request("http://gelis.test/route/0");
+
+            const verification = benchmark.dispatch(request);
+            if (!(verification instanceof Response) || verification.status !== 204) {
+              throw new Error("P11-G10 route-scale synchronous verification failed");
+            }
+
+            let sink = 0;
+            const operation = () => {
+              const response = benchmark.dispatch(request);
+
+              if (!(response instanceof Response) || response.status !== 204) {
+                throw new Error("P11-G10 route-scale synchronous operation mismatch");
+              }
+
+              sink ^= response.status;
+            };
+
+            for (let index = 0; index < WARMUP_SYNC; index++) {
+              operation();
+            }
+
+            const iterations = calibrateSync(operation);
+            const elapsed = measureSync(operation, iterations);
+
+            return {
+              mode: "route-scale",
+              routes,
+              iterations,
+              warmups: WARMUP_SYNC,
+              nsPerOp: (elapsed * 1_000_000) / iterations,
+              sink,
+            };
+          }'''.replace("          ", "")
+
+          new_scale = '''async function runRouteScale(
+            args: ParsedArgs,
+          ): Promise<RouteScaleWorkerResult> {
+            const candidateRoot = required(args.candidateRoot, "--candidate-root");
+            const routes = Number(required(args.routes, "--routes"));
+
+            if (routes !== 1_000 && routes !== 5_000) {
+              throw new Error(
+                `P11-G10 route-scale requires 1000 or 5000 routes, got ${routes}`,
+              );
+            }
+
+            const benchmark = await createGelisRouteScaleBenchmark(candidateRoot, routes);
+            const requestUrl = "http://gelis.test/route/0";
+
+            const verification = benchmark.dispatch(new Request(requestUrl));
+            if (!(verification instanceof Response) || verification.status !== 204) {
+              throw new Error("P11-G10 route-scale synchronous verification failed");
+            }
+
+            let sink = 0;
+            const operation = (request: Request) => {
+              const response = benchmark.dispatch(request);
+
+              if (!(response instanceof Response) || response.status !== 204) {
+                throw new Error("P11-G10 route-scale synchronous operation mismatch");
+              }
+
+              sink ^= response.status;
+            };
+
+            const warmupRequests = createRequests(requestUrl, WARMUP_SYNC);
+            for (let index = 0; index < warmupRequests.length; index++) {
+              operation(warmupRequests[index]!);
+            }
+
+            const iterations = calibrateSync(operation, requestUrl);
+            const measuredRequests = createRequests(requestUrl, iterations);
+            const elapsed = measureSync(operation, measuredRequests);
+
+            return {
+              mode: "route-scale",
+              routes,
+              iterations,
+              warmups: WARMUP_SYNC,
+              nsPerOp: (elapsed * 1_000_000) / iterations,
+              sink,
+            };
+          }'''.replace("          ", "")
+
+          old_helpers = '''async function calibrateAsync(operation: () => Promise<void>): Promise<number> {
+            let iterations = 100;
+
+            while (true) {
+              const elapsed = await measureAsync(operation, iterations);
+
+              if (elapsed >= MIN_CALIBRATION_MS) {
+                return Math.max(
+                  1,
+                  Math.round((iterations * TARGET_MS) / Math.max(elapsed, 0.001)),
+                );
+              }
+
+              iterations *= 2;
+            }
+          }
+
+          async function measureAsync(
+            operation: () => Promise<void>,
+            iterations: number,
+          ): Promise<number> {
+            const start = performance.now();
+
+            for (let index = 0; index < iterations; index++) {
+              await operation();
+            }
+
+            return performance.now() - start;
+          }
+
+          function calibrateSync(operation: () => void): number {
+            let iterations = 1_000;
+
+            while (true) {
+              const elapsed = measureSync(operation, iterations);
+
+              if (elapsed >= MIN_CALIBRATION_MS) {
+                return Math.max(
+                  1,
+                  Math.round((iterations * TARGET_MS) / Math.max(elapsed, 0.001)),
+                );
+              }
+
+              iterations *= 2;
+            }
+          }
+
+          function measureSync(operation: () => void, iterations: number): number {
+            const start = performance.now();
+
+            for (let index = 0; index < iterations; index++) {
+              operation();
+            }
+
+            return performance.now() - start;
+          }'''.replace("          ", "")
+
+          new_helpers = '''async function calibrateAsync(
+            operation: (request: Request) => Promise<void>,
+            requestUrl: string,
+          ): Promise<number> {
+            let iterations = 100;
+
+            while (true) {
+              const requests = createRequests(requestUrl, iterations);
+              const elapsed = await measureAsync(operation, requests);
+
+              if (elapsed >= MIN_CALIBRATION_MS) {
+                return Math.max(
+                  1,
+                  Math.round((iterations * TARGET_MS) / Math.max(elapsed, 0.001)),
+                );
+              }
+
+              iterations *= 2;
+            }
+          }
+
+          async function measureAsync(
+            operation: (request: Request) => Promise<void>,
+            requests: readonly Request[],
+          ): Promise<number> {
+            const start = performance.now();
+
+            for (let index = 0; index < requests.length; index++) {
+              await operation(requests[index]!);
+            }
+
+            return performance.now() - start;
+          }
+
+          function calibrateSync(
+            operation: (request: Request) => void,
+            requestUrl: string,
+          ): number {
+            let iterations = 1_000;
+
+            while (true) {
+              const requests = createRequests(requestUrl, iterations);
+              const elapsed = measureSync(operation, requests);
+
+              if (elapsed >= MIN_CALIBRATION_MS) {
+                return Math.max(
+                  1,
+                  Math.round((iterations * TARGET_MS) / Math.max(elapsed, 0.001)),
+                );
+              }
+
+              iterations *= 2;
+            }
+          }
+
+          function measureSync(
+            operation: (request: Request) => void,
+            requests: readonly Request[],
+          ): number {
+            const start = performance.now();
+
+            for (let index = 0; index < requests.length; index++) {
+              operation(requests[index]!);
+            }
+
+            return performance.now() - start;
+          }
+
+          function createRequests(requestUrl: string, count: number): Request[] {
+            const requests = new Array<Request>(count);
+
+            for (let index = 0; index < count; index++) {
+              requests[index] = new Request(requestUrl);
+            }
+
+            return requests;
+          }'''.replace("          ", "")
+
+          for label, old, new in (
+              ("runDirect", old_direct, new_direct),
+              ("runRouteScale", old_scale, new_scale),
+              ("helpers", old_helpers, new_helpers),
+          ):
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f"{label}: expected one match, got {count}")
+              text = text.replace(old, new, 1)
+
+          path.write_text(text)
+          PY
+
+          bunx prettier bench/request-id-timeout/p11-g10-timeout-worker.mts --write
+          git diff --check
+          bun run typecheck:bench
+      - name: Commit target branch
+        run: |
+          git config user.name "Rigent"
+          git config user.email "127601320+rigenttio@users.noreply.github.com"
+          git add bench/request-id-timeout/p11-g10-timeout-worker.mts
+          git commit -m "fix(bench): use unique requests in P11-G10 direct workloads"
+          git push origin HEAD:work/p11-g10-timeout-competitor
