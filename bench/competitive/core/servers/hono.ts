@@ -30,7 +30,10 @@ if (ROUTE_KIND === "static") {
     }
 
     app.get(path, (context) =>
-      context.json({ method: context.req.raw.method, id: context.req.param("id") }),
+      context.json({
+        method: context.req.raw.method,
+        id: context.req.param("id"),
+      }),
     );
   }
 }

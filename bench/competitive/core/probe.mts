@@ -199,8 +199,16 @@ async function probeFramework(
     const contentType = response.headers.get("content-type");
     const mediaType = contentType?.split(";", 1)[0]?.trim().toLowerCase() ?? "";
 
-    assertEqual(response.status, 200, `${framework.name}/${routeCase.name} status`);
-    assertEqual(body, routeCase.expectedBody, `${framework.name}/${routeCase.name} body`);
+    assertEqual(
+      response.status,
+      200,
+      `${framework.name}/${routeCase.name} status`,
+    );
+    assertEqual(
+      body,
+      routeCase.expectedBody,
+      `${framework.name}/${routeCase.name} body`,
+    );
     assertEqual(
       mediaType,
       routeCase.expectedMediaType,
@@ -250,7 +258,9 @@ async function waitForResponse(
     }
   }
 
-  throw new Error(`Server did not become ready for ${url}: ${String(lastError)}`);
+  throw new Error(
+    `Server did not become ready for ${url}: ${String(lastError)}`,
+  );
 }
 
 async function streamText(
