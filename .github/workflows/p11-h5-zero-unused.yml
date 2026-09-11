@@ -1,0 +1,48 @@
+name: P11-H5 Zero-Unused Supplemental Evidence
+
+on:
+  push:
+    branches:
+      - work/p11-h5-zero-unused
+
+permissions:
+  contents: read
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout H5 harness
+        uses: actions/checkout@v7
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.0
+
+      - name: Install harness dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Checkout P11-B control
+        uses: actions/checkout@v7
+        with:
+          ref: 0df4f1e20bef3e9fa7c9a554be022bc241536424
+          path: p11-h5-control
+
+      - name: Checkout final P11 runtime candidate
+        uses: actions/checkout@v7
+        with:
+          ref: 1dd5f94cf0e9ad884ca44e537ee287587cd8baab
+          path: p11-h5-candidate
+
+      - name: Install control dependencies
+        run: bun install --cwd p11-h5-control --frozen-lockfile
+
+      - name: Install candidate dependencies
+        run: bun install --cwd p11-h5-candidate --frozen-lockfile
+
+      - name: Run frozen H5 zero-unused acceptance
+        run: >-
+          bun bench/runtime/p11-h5-zero-unused-acceptance.mts
+          --control-root=./p11-h5-control
+          --candidate-root=./p11-h5-candidate
