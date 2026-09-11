@@ -76,8 +76,9 @@ async function run(
   const request = new Request(`http://gelis.test${path}`);
 
   const first = fetch(request);
-  const completion: CompletionMode = isPromiseLike(first) ? "async" : "sync";
-  const firstResponse = completion === "async" ? await first : first;
+  const firstIsAsync = isPromiseLike(first);
+  const completion: CompletionMode = firstIsAsync ? "async" : "sync";
+  const firstResponse = firstIsAsync ? await first : first;
 
   await assertResponse(firstResponse, scenario, last);
 
@@ -388,10 +389,10 @@ async function measureAsync(
 }
 
 interface ParsedArgs {
-  readonly framework?: string;
-  readonly scenario?: string;
-  readonly routes?: string;
-  readonly probeOnly?: string;
+  readonly framework: string | undefined;
+  readonly scenario: string | undefined;
+  readonly routes: string | undefined;
+  readonly probeOnly: string | undefined;
 }
 
 function readArgs(values: readonly string[]): ParsedArgs {
