@@ -59,7 +59,7 @@ const args = readArgs(process.argv.slice(2));
 const requestedCell = required(args.cell, "--cell");
 assertCell(requestedCell);
 const cell = requestedCell;
-const probeOnly = args.probeOnly === "true";
+const probeOnly = args["probe-only"] === "true";
 
 const prepared = prepareCell(cell);
 await prepared.assertCorrectness();
