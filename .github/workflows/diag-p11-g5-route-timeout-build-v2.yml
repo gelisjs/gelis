@@ -1,0 +1,66 @@
+name: P11-G5 Route Timeout Build V2
+
+on:
+  push:
+    branches:
+      - diag/p11-g5-route-timeout-build
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.0
+      - name: Extract corrected patch program
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          workflow = Path('.github/workflows/diag-p11-g5-route-timeout-build.yml').read_text().splitlines()
+          start = next(i for i, line in enumerate(workflow) if line.strip() == "python3 - <<'PY'") + 1
+          end = next(i for i in range(start, len(workflow)) if workflow[i].strip() == 'PY')
+          lines = workflow[start:end]
+          source = '\n'.join(line[10:] if line.startswith('          ') else line for line in lines) + '\n'
+          marker = "timed_helper = r'''\\nfunction invokeTimedRuntimeRoute("
+          if source.count(marker) != 1:
+              raise SystemExit(f'expected one raw helper marker, found {source.count(marker)}')
+          source = source.replace(marker, "timed_helper = '''\\nfunction invokeTimedRuntimeRoute(", 1)
+          Path('/tmp/apply-g5.py').write_text(source)
+          PY
+      - name: Checkout target branch
+        run: |
+          git fetch origin work/p11-g5-route-timeout
+          git checkout -B work/p11-g5-route-timeout origin/work/p11-g5-route-timeout
+      - run: bun install --frozen-lockfile
+      - name: Apply and verify G5 route-timeout specialization
+        shell: bash
+        run: |
+          python3 /tmp/apply-g5.py
+          bunx prettier \
+            src/route.ts \
+            src/runtime/types.ts \
+            src/route-builder.ts \
+            src/timeout/state.ts \
+            src/timeout/index.ts \
+            src/app.ts \
+            test/runtime/timeout-route.test.ts \
+            --write
+          git diff --check
+          bun run typecheck
+          bun run typecheck:runtime-tests
+          bun test test/runtime/timeout-application.test.ts test/runtime/timeout-route.test.ts
+      - name: Commit target branch
+        run: |
+          git config user.name "Rigent"
+          git config user.email "127601320+rigenttio@users.noreply.github.com"
+          git add src/route.ts src/runtime/types.ts src/route-builder.ts src/timeout/state.ts src/timeout/index.ts src/app.ts test/runtime/timeout-route.test.ts
+          git commit -m "feat(timeout): specialize route deadlines"
+          git push origin HEAD:work/p11-g5-route-timeout
