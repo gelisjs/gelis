@@ -1,0 +1,41 @@
+name: P11-G9 Candidate SHA Update V2
+
+on:
+  push:
+    branches:
+      - diag/p11-g9-candidate-sha-update-v2
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Checkout target branch
+        run: git switch work/p11-g9-revalidate-optimized-timeout-v2
+      - name: Update frozen candidate identity
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('bench/request-id-timeout/p11-g9-request-id-acceptance.mts')
+          text = path.read_text()
+          old = '4b9053d7efaec35e71d35b3fbb0cb5b97cba7b61'
+          new = '1dd5f94cf0e9ad884ca44e537ee287587cd8baab'
+          if text.count(old) != 1:
+              raise SystemExit(f'expected exactly one old candidate SHA, found {text.count(old)}')
+          path.write_text(text.replace(old, new))
+          PY
+          git diff --check
+      - name: Commit target branch
+        shell: bash
+        run: |
+          git config user.name "Rigent"
+          git config user.email "127601320+rigenttio@users.noreply.github.com"
+          git add bench/request-id-timeout/p11-g9-request-id-acceptance.mts
+          git commit -m "bench(g9): revalidate accepted harness on optimized timeout candidate"
+          git push origin HEAD:work/p11-g9-revalidate-optimized-timeout-v2
