@@ -342,7 +342,9 @@ function dispatchCell(
       throw new Error("dispatch route miss");
     }
 
-    const result = match.route.handler(createContext(dynamicRequest, match.params));
+    const result = match.route.handler(
+      createContext(dynamicRequest, match.params),
+    );
     assertSync(result, "dispatch handler");
     return result;
   };
