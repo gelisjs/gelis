@@ -62,7 +62,9 @@ const cells = PAYLOAD_KINDS.flatMap((payloadKind) =>
 
 preflight();
 
-console.log("Competitive Performance v0.1 — CP3-B JSON normalization decomposition");
+console.log(
+  "Competitive Performance v0.1 — CP3-B JSON normalization decomposition",
+);
 console.log(`Bun:         ${Bun.version}`);
 console.log(`CPU:         ${cpu}`);
 console.log(`Harness SHA: ${harnessSha}`);
