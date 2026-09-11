@@ -1,9 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import {
-  pathnameFromRequestUrl,
-  pathnameFromUrl,
-} from "../../src/runtime/url";
+import { pathnameFromRequestUrl, pathnameFromUrl } from "../../src/runtime/url";
 
 describe("runtime URL pathname extraction", () => {
   test("preserves generic absolute URL semantics", () => {
