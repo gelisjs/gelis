@@ -1,0 +1,37 @@
+name: Fix P11-G5 Build Generator
+
+on:
+  push:
+    branches:
+      - diag/p11-g5-route-timeout-build
+    paths:
+      - .github/workflows/fix-p11-g5-build-generator.yml
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - name: Fix helper source escaping
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('.github/workflows/diag-p11-g5-route-timeout-build.yml')
+          text = path.read_text()
+          old = "timed_helper = r'''\\nfunction invokeTimedRuntimeRoute("
+          new = "timed_helper = '''\\nfunction invokeTimedRuntimeRoute("
+          if text.count(old) != 1:
+              raise SystemExit(f'expected one raw helper marker, found {text.count(old)}')
+          path.write_text(text.replace(old, new, 1))
+          PY
+      - name: Commit corrected generator
+        run: |
+          git config user.name "Rigent"
+          git config user.email "127601320+rigenttio@users.noreply.github.com"
+          git add .github/workflows/diag-p11-g5-route-timeout-build.yml
+          git commit -m "fix(diag): decode G5 helper newlines"
+          git push
