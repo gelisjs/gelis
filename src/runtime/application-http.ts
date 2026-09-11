@@ -293,9 +293,8 @@ export function compileApplicationHttpErrorHooks(
   }
 
   if (timeout !== undefined) {
-    compiled[hooks.length] = compileResponsePolicyErrorHook(
-      plan,
-      ({ error }) => timeout.handleError(error),
+    compiled[hooks.length] = compileResponsePolicyErrorHook(plan, ({ error }) =>
+      timeout.handleError(error),
     );
   }
 
