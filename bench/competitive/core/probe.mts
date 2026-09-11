@@ -253,8 +253,10 @@ async function waitForResponse(
   throw new Error(`Server did not become ready for ${url}: ${String(lastError)}`);
 }
 
-async function streamText(stream: ReadableStream<Uint8Array> | null): Promise<string> {
-  if (stream === null) {
+async function streamText(
+  stream: number | ReadableStream<Uint8Array> | undefined,
+): Promise<string> {
+  if (!(stream instanceof ReadableStream)) {
     return "";
   }
 
