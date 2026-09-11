@@ -25,16 +25,35 @@ export interface RuntimeApplicationHttpPolicy {
   ): Response | PromiseLike<Response>;
 }
 
+export interface RuntimeApplicationTimeoutPolicy {
+  readonly hasApplicationDeadline: boolean;
+
+  prepare(request: Request): void;
+
+  execute(
+    request: Request,
+    run: () => Response | Promise<Response>,
+  ): Response | Promise<Response>;
+
+  handleError(error: unknown): Response | undefined;
+}
+
 export interface RuntimeApplicationHttpPlan {
   readonly cors?: RuntimeApplicationHttpPolicy;
   readonly secureHeaders?: RuntimeApplicationHttpPolicy;
   readonly requestId?: RuntimeApplicationHttpPolicy;
+  readonly timeout?: RuntimeApplicationTimeoutPolicy;
 }
 
-interface RuntimeApplicationHttpMarker {
-  readonly kind: "cors" | "secure-headers" | "request-id";
-  readonly policy: RuntimeApplicationHttpPolicy;
-}
+type RuntimeApplicationHttpMarker =
+  | {
+      readonly kind: "cors" | "secure-headers" | "request-id";
+      readonly policy: RuntimeApplicationHttpPolicy;
+    }
+  | {
+      readonly kind: "timeout";
+      readonly policy: RuntimeApplicationTimeoutPolicy;
+    };
 
 const GELIS_APPLICATION_HTTP_MARKER = Symbol(
   "gelis.internal.application-http.marker",
@@ -87,6 +106,7 @@ export function extractApplicationHttpPlan(
   let cors: RuntimeApplicationHttpPolicy | undefined;
   let secureHeaders: RuntimeApplicationHttpPolicy | undefined;
   let requestId: RuntimeApplicationHttpPolicy | undefined;
+  let timeout: RuntimeApplicationTimeoutPolicy | undefined;
   let ordinaryCount = 0;
 
   for (let index = 0; index < hooks.length; index++) {
@@ -120,19 +140,31 @@ export function extractApplicationHttpPlan(
       continue;
     }
 
-    if (requestId !== undefined) {
+    if (marker.kind === "request-id") {
+      if (requestId !== undefined) {
+        throw new Error(
+          "Multiple Gelis request-ID application policies were compiled",
+        );
+      }
+
+      requestId = marker.policy;
+      continue;
+    }
+
+    if (timeout !== undefined) {
       throw new Error(
-        "Multiple Gelis request-ID application policies were compiled",
+        "Multiple Gelis timeout application policies were compiled",
       );
     }
 
-    requestId = marker.policy;
+    timeout = marker.policy;
   }
 
   if (
     cors === undefined &&
     secureHeaders === undefined &&
-    requestId === undefined
+    requestId === undefined &&
+    timeout === undefined
   ) {
     return {
       onRequestHooks: hooks,
@@ -161,7 +193,7 @@ export function extractApplicationHttpPlan(
 
   return {
     onRequestHooks: ordinaryHooks,
-    plan: createApplicationHttpPlan(cors, secureHeaders, requestId),
+    plan: createApplicationHttpPlan(cors, secureHeaders, requestId, timeout),
   };
 }
 
@@ -169,11 +201,13 @@ function createApplicationHttpPlan(
   cors: RuntimeApplicationHttpPolicy | undefined,
   secureHeaders: RuntimeApplicationHttpPolicy | undefined,
   requestId: RuntimeApplicationHttpPolicy | undefined,
+  timeout: RuntimeApplicationTimeoutPolicy | undefined,
 ): RuntimeApplicationHttpPlan {
   const plan: {
     cors?: RuntimeApplicationHttpPolicy;
     secureHeaders?: RuntimeApplicationHttpPolicy;
     requestId?: RuntimeApplicationHttpPolicy;
+    timeout?: RuntimeApplicationTimeoutPolicy;
   } = {};
 
   if (cors !== undefined) {
@@ -186,6 +220,10 @@ function createApplicationHttpPlan(
 
   if (requestId !== undefined) {
     plan.requestId = requestId;
+  }
+
+  if (timeout !== undefined) {
+    plan.timeout = timeout;
   }
 
   return plan;
@@ -210,6 +248,11 @@ export function compileApplicationHttpFetch(
 ): RuntimeFetch {
   let fetch = innerFetch;
 
+  const timeout = plan.timeout;
+  if (timeout !== undefined && timeout.hasApplicationDeadline) {
+    fetch = compileTimeoutExecutionFetch(timeout, fetch);
+  }
+
   const cors = plan.cors;
   if (cors !== undefined) {
     fetch = compilePolicyFetch(cors, fetch, runtime);
@@ -218,6 +261,10 @@ export function compileApplicationHttpFetch(
   const secureHeaders = plan.secureHeaders;
   if (secureHeaders !== undefined) {
     fetch = compilePolicyFetch(secureHeaders, fetch, runtime);
+  }
+
+  if (timeout !== undefined) {
+    fetch = compileTimeoutPreparationFetch(timeout, fetch);
   }
 
   const requestId = plan.requestId;
@@ -232,40 +279,51 @@ export function compileApplicationHttpErrorHooks(
   plan: RuntimeApplicationHttpPlan,
   hooks: readonly OnError[],
 ): readonly OnError[] {
-  const cors = plan.cors;
-  const secureHeaders = plan.secureHeaders;
-  const requestId = plan.requestId;
+  const timeout = plan.timeout;
+  const extra = timeout === undefined ? 0 : 1;
 
-  if (
-    (cors === undefined &&
-      secureHeaders === undefined &&
-      requestId === undefined) ||
-    hooks.length === 0
-  ) {
+  if (hooks.length === 0 && extra === 0) {
     return hooks;
   }
 
-  const compiled = new Array<OnError>(hooks.length);
+  const compiled = new Array<OnError>(hooks.length + extra);
 
   for (let index = 0; index < hooks.length; index++) {
-    let hook = hooks[index]!;
+    compiled[index] = compileResponsePolicyErrorHook(plan, hooks[index]!);
+  }
 
-    if (cors !== undefined) {
-      hook = compilePolicyErrorHook(cors, hook);
-    }
-
-    if (secureHeaders !== undefined) {
-      hook = compilePolicyErrorHook(secureHeaders, hook);
-    }
-
-    if (requestId !== undefined) {
-      hook = compilePolicyErrorHook(requestId, hook);
-    }
-
-    compiled[index] = hook;
+  if (timeout !== undefined) {
+    compiled[hooks.length] = compileResponsePolicyErrorHook(
+      plan,
+      ({ error }) => timeout.handleError(error),
+    );
   }
 
   return compiled;
+}
+
+function compileResponsePolicyErrorHook(
+  plan: RuntimeApplicationHttpPlan,
+  sourceHook: OnError,
+): OnError {
+  let hook = sourceHook;
+
+  const cors = plan.cors;
+  if (cors !== undefined) {
+    hook = compilePolicyErrorHook(cors, hook);
+  }
+
+  const secureHeaders = plan.secureHeaders;
+  if (secureHeaders !== undefined) {
+    hook = compilePolicyErrorHook(secureHeaders, hook);
+  }
+
+  const requestId = plan.requestId;
+  if (requestId !== undefined) {
+    hook = compilePolicyErrorHook(requestId, hook);
+  }
+
+  return hook;
 }
 
 function resolveAdvertisedMethods(
@@ -322,6 +380,23 @@ function resolveAdvertisedMethods(
   }
 
   return resolved;
+}
+
+function compileTimeoutPreparationFetch(
+  policy: RuntimeApplicationTimeoutPolicy,
+  innerFetch: RuntimeFetch,
+): RuntimeFetch {
+  return (request) => {
+    policy.prepare(request);
+    return innerFetch(request);
+  };
+}
+
+function compileTimeoutExecutionFetch(
+  policy: RuntimeApplicationTimeoutPolicy,
+  innerFetch: RuntimeFetch,
+): RuntimeFetch {
+  return (request) => policy.execute(request, () => innerFetch(request));
 }
 
 function compilePolicyFetch(
