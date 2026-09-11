@@ -1,0 +1,76 @@
+name: P11-G10 Direct Probe
+
+on:
+  push:
+    branches:
+      - diag/p11-g10-direct-probe
+
+jobs:
+  probe:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.0
+      - run: bun install --frozen-lockfile
+      - name: Prepare optimized candidate
+        run: |
+          git worktree add --detach ../p11-g10-optimized 1dd5f94cf0e9ad884ca44e537ee287587cd8baab
+          test -z "$(git -C ../p11-g10-optimized status --porcelain)"
+      - name: Run 3-pair direct diagnostic
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import json
+          import statistics
+          import subprocess
+
+          worker = "bench/request-id-timeout/p11-g10-timeout-worker.mts"
+          candidate = "../p11-g10-optimized"
+          scenarios = [
+              "application-sync-static-204",
+              "application-async-static-204",
+              "route-sync-static-204",
+              "route-async-static-204",
+          ]
+
+          def run(framework, scenario):
+              result = subprocess.run(
+                  [
+                      "bun",
+                      worker,
+                      "--mode=direct",
+                      f"--framework={framework}",
+                      f"--scenario={scenario}",
+                      f"--candidate-root={candidate}",
+                  ],
+                  check=True,
+                  capture_output=True,
+                  text=True,
+              )
+              return json.loads(result.stdout.strip().splitlines()[-1])
+
+          print("P11-G10 optimized direct diagnostic (3 mirrored pairs; diagnostic only)")
+          for scenario in scenarios:
+              ratios = []
+              gelis = []
+              hono = []
+              for sample in range(3):
+                  order = ["hono", "gelis"] if sample % 2 == 0 else ["gelis", "hono"]
+                  first = run(order[0], scenario)
+                  second = run(order[1], scenario)
+                  values = {first["framework"]: first, second["framework"]: second}
+                  g = values["gelis"]["nsPerOp"]
+                  h = values["hono"]["nsPerOp"]
+                  gelis.append(g)
+                  hono.append(h)
+                  ratios.append(g / h)
+              print(
+                  f"{scenario}: Gelis {statistics.median(gelis):.1f} ns/op | "
+                  f"Hono {statistics.median(hono):.1f} ns/op | "
+                  f"median ratio {statistics.median(ratios):.4f}x"
+              )
+          PY
