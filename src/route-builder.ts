@@ -22,6 +22,8 @@ import {
   RUNTIME_ROUTE_BEFORE_HANDLE,
   RUNTIME_ROUTE_INPUT,
   RUNTIME_ROUTE_RESPONSE,
+  RUNTIME_ROUTE_TIMEOUT,
+  RUNTIME_ROUTE_TIMEOUT_PLAN,
 } from "./runtime/types";
 
 import type { InferPathParams, ValidRoutePath } from "./types/path";
@@ -1411,6 +1413,12 @@ export class RouteBuilder<Prefix extends string = ""> {
   ): unknown {
     const fullPath = this.resolve(path);
 
+    const timeout = options?.timeout;
+
+    if (timeout !== undefined) {
+      assertRouteTimeoutDuration(timeout);
+    }
+
     const input = createRuntimeInputPlan(options);
 
     const responses = options?.responses;
@@ -1446,6 +1454,10 @@ export class RouteBuilder<Prefix extends string = ""> {
       flags |= RUNTIME_ROUTE_RESPONSE;
     }
 
+    if (timeout !== undefined) {
+      flags |= RUNTIME_ROUTE_TIMEOUT;
+    }
+
     const runtimeRoute: RuntimeRouteRecord = {
       method,
       path: fullPath,
@@ -1462,6 +1474,12 @@ export class RouteBuilder<Prefix extends string = ""> {
 
       responses,
     };
+
+    if (timeout !== undefined) {
+      runtimeRoute[RUNTIME_ROUTE_TIMEOUT_PLAN] = {
+        duration: timeout,
+      };
+    }
 
     if (contractMetadata !== undefined) {
       Object.defineProperty(runtimeRoute, RUNTIME_ROUTE_CONTRACT_METADATA, {
@@ -1497,5 +1515,13 @@ export class RouteBuilder<Prefix extends string = ""> {
     }
 
     return `${this.#prefix}${path}`;
+  }
+}
+
+function assertRouteTimeoutDuration(value: number): void {
+  if (!Number.isSafeInteger(value) || value < 1 || value > 2_147_483_647) {
+    throw new TypeError(
+      "Gelis route timeout must be an integer between 1 and 2147483647 milliseconds",
+    );
   }
 }

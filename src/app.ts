@@ -97,6 +97,8 @@ import {
   RUNTIME_ROUTE_PLAIN,
   RUNTIME_ROUTE_REQUEST_SCOPE,
   RUNTIME_ROUTE_RESPONSE,
+  RUNTIME_ROUTE_TIMEOUT,
+  RUNTIME_ROUTE_TIMEOUT_PLAN,
 } from "./runtime/types";
 
 import type { ModuleRef, ModuleRoutes } from "./module";
@@ -872,6 +874,22 @@ export class Gelis extends RouteBuilder<""> {
       }
 
       default: {
+        if ((route.flags & RUNTIME_ROUTE_TIMEOUT) !== 0) {
+          const timeoutPlan = route[RUNTIME_ROUTE_TIMEOUT_PLAN];
+
+          if (timeoutPlan === undefined || timeoutPlan.execute === undefined) {
+            throw new Error(
+              `Timed route requires gelis/timeout: ${route.method} ${route.path}`,
+            );
+          }
+
+          const baseFlags = route.flags & ~RUNTIME_ROUTE_TIMEOUT;
+
+          return timeoutPlan.execute(request, () =>
+            invokeTimedRuntimeRoute(route, request, params, baseFlags),
+          );
+        }
+
         /*
          * Module request scope gets a dedicated compiled execution path.
          *
@@ -991,6 +1009,217 @@ export class Gelis extends RouteBuilder<""> {
         throw new Error("Invalid Gelis runtime route flags");
       }
     }
+  }
+}
+
+function invokeTimedRuntimeRoute(
+  route: RuntimeRouteRecord,
+  request: Request,
+  params: Record<string, string>,
+  flags: number,
+): Response | Promise<Response> {
+  if (flags === RUNTIME_ROUTE_PLAIN) {
+    const result = route.handler({
+      request,
+      params,
+      query: undefined,
+      body: undefined,
+      reply: runtimeReply,
+    });
+
+    if (isPromiseLike(result)) {
+      return Promise.resolve(result).then(normalizeResponse);
+    }
+
+    return normalizeResponse(result);
+  }
+
+  if (flags === RUNTIME_ROUTE_RESPONSE) {
+    const result = route.handler({
+      request,
+      params,
+      query: undefined,
+      body: undefined,
+      reply: runtimeReply,
+    });
+
+    const finalize = route.responsePlan!.finalize;
+
+    if (isPromiseLike(result)) {
+      return Promise.resolve(result).then(finalize);
+    }
+
+    return finalize(result);
+  }
+
+  switch (flags) {
+    case RUNTIME_ROUTE_INPUT:
+      return runInputPlan(route, request, params, invokeHandlerRoute);
+
+    case RUNTIME_ROUTE_BEFORE_HANDLE:
+      return invokeBeforeHandleRoute(
+        route,
+        request,
+        params,
+        undefined,
+        undefined,
+      );
+
+    case RUNTIME_ROUTE_INPUT_BEFORE_HANDLE:
+      return runInputPlan(route, request, params, invokeBeforeHandleRoute);
+
+    case RUNTIME_ROUTE_AFTER_HANDLE:
+      return invokeAfterHandleRoute(
+        route,
+        request,
+        params,
+        undefined,
+        undefined,
+      );
+
+    case RUNTIME_ROUTE_INPUT_AFTER_HANDLE:
+      return runInputPlan(route, request, params, invokeAfterHandleRoute);
+
+    case RUNTIME_ROUTE_BEFORE_AFTER_HANDLE:
+      return invokeBeforeAfterHandleRoute(
+        route,
+        request,
+        params,
+        undefined,
+        undefined,
+      );
+
+    case RUNTIME_ROUTE_INPUT_BEFORE_AFTER_HANDLE:
+      return runInputPlan(route, request, params, invokeBeforeAfterHandleRoute);
+
+    case RUNTIME_ROUTE_INPUT_RESPONSE:
+      return runInputPlan(route, request, params, invokeResponseRoute);
+
+    case RUNTIME_ROUTE_BEFORE_HANDLE_RESPONSE:
+      return invokeBeforeHandleResponseRoute(
+        route,
+        request,
+        params,
+        undefined,
+        undefined,
+      );
+
+    case RUNTIME_ROUTE_INPUT_BEFORE_HANDLE_RESPONSE:
+      return runInputPlan(
+        route,
+        request,
+        params,
+        invokeBeforeHandleResponseRoute,
+      );
+
+    case RUNTIME_ROUTE_AFTER_HANDLE_RESPONSE:
+      return invokeAfterHandleResponseRoute(
+        route,
+        request,
+        params,
+        undefined,
+        undefined,
+      );
+
+    case RUNTIME_ROUTE_INPUT_AFTER_HANDLE_RESPONSE:
+      return runInputPlan(
+        route,
+        request,
+        params,
+        invokeAfterHandleResponseRoute,
+      );
+
+    case RUNTIME_ROUTE_BEFORE_AFTER_HANDLE_RESPONSE:
+      return invokeBeforeAfterHandleResponseRoute(
+        route,
+        request,
+        params,
+        undefined,
+        undefined,
+      );
+
+    case RUNTIME_ROUTE_INPUT_BEFORE_AFTER_HANDLE_RESPONSE:
+      return runInputPlan(
+        route,
+        request,
+        params,
+        invokeBeforeAfterHandleResponseRoute,
+      );
+
+    default:
+      if (flags === RUNTIME_ROUTE_MODULE_REQUEST_SCOPE) {
+        return invokePlainModuleRequestScopeRoute(route, request, params);
+      }
+
+      if (
+        flags ===
+          (RUNTIME_ROUTE_MODULE_REQUEST_SCOPE |
+            RUNTIME_ROUTE_BEFORE_HANDLE |
+            RUNTIME_ROUTE_AFTER_HANDLE) &&
+        route.beforeHandle === undefined &&
+        route.afterHandle === undefined
+      ) {
+        return invokeLocalModuleRequestScopeBeforeAfterRoute(
+          route,
+          request,
+          params,
+        );
+      }
+
+      if ((flags & RUNTIME_ROUTE_MODULE_REQUEST_SCOPE) !== 0) {
+        if ((flags & RUNTIME_ROUTE_INPUT) !== 0) {
+          return runInputPlan(
+            route,
+            request,
+            params,
+            invokeModuleRequestScopeValidatedRoute,
+          );
+        }
+
+        return invokeModuleRequestScopeValidatedRoute(
+          route,
+          request,
+          params,
+          undefined,
+          undefined,
+        );
+      }
+
+      if (flags === RUNTIME_ROUTE_REQUEST_SCOPE) {
+        return invokePlainRequestScopeRoute(route, request, params);
+      }
+
+      if (
+        flags ===
+          (RUNTIME_ROUTE_REQUEST_SCOPE |
+            RUNTIME_ROUTE_BEFORE_HANDLE |
+            RUNTIME_ROUTE_AFTER_HANDLE) &&
+        route.beforeHandle === undefined &&
+        route.afterHandle === undefined
+      ) {
+        return invokeLocalRequestScopeBeforeAfterRoute(route, request, params);
+      }
+
+      if ((flags & RUNTIME_ROUTE_REQUEST_SCOPE) !== 0) {
+        if ((flags & RUNTIME_ROUTE_INPUT) !== 0) {
+          return runInputPlan(
+            route,
+            request,
+            params,
+            invokeRequestScopeValidatedRoute,
+          );
+        }
+
+        return invokeRequestScopeValidatedRoute(
+          route,
+          request,
+          params,
+          undefined,
+          undefined,
+        );
+      }
+
+      throw new Error("Invalid Gelis timed runtime route flags");
   }
 }
 
@@ -1440,6 +1669,10 @@ function applyLifecyclePlan(
    */
   if (route.responsePlan !== undefined) {
     flags |= RUNTIME_ROUTE_RESPONSE;
+  }
+
+  if (route[RUNTIME_ROUTE_TIMEOUT_PLAN] !== undefined) {
+    flags |= RUNTIME_ROUTE_TIMEOUT;
   }
 
   route.flags = flags;

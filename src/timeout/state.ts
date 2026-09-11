@@ -1,5 +1,7 @@
 import { TimeoutError } from "./error";
 
+import type { TimeoutScope } from "./error";
+
 export interface TimeoutState {
   prepare(request: Request): void;
   signal(request: Request): AbortSignal;
@@ -7,11 +9,17 @@ export interface TimeoutState {
     request: Request,
     run: () => Response | Promise<Response>,
   ): Response | Promise<Response>;
+  executeRoute(
+    request: Request,
+    duration: number,
+    run: () => Response | Promise<Response>,
+  ): Response | Promise<Response>;
 }
 
 interface TimeoutRequestState {
-  readonly signal: AbortSignal;
+  signal: AbortSignal;
   readonly applicationController: AbortController | undefined;
+  applicationDeadline: number | undefined;
 }
 
 export function createTimeoutState(
@@ -25,6 +33,7 @@ export function createTimeoutState(
         requests.set(request, {
           signal: request.signal,
           applicationController: undefined,
+          applicationDeadline: undefined,
         });
         return;
       }
@@ -35,6 +44,7 @@ export function createTimeoutState(
       requests.set(request, {
         signal: applicationController.signal,
         applicationController,
+        applicationDeadline: undefined,
       });
     },
 
@@ -52,17 +62,50 @@ export function createTimeoutState(
         throw new Error("Missing Gelis timeout request state");
       }
 
+      state.applicationDeadline = Date.now() + applicationDuration;
+
       return executeWithDeadline(
         applicationDuration,
+        "application",
         state.applicationController,
         run,
       );
+    },
+
+    executeRoute(request, duration, run) {
+      const state = requests.get(request);
+
+      if (state === undefined) {
+        throw new Error("Missing Gelis timeout request state");
+      }
+
+      const routeDeadline = Date.now() + duration;
+      const applicationDeadline = state.applicationDeadline;
+
+      /*
+       * The application deadline started earlier. If its absolute deadline
+       * is already earlier than or equal to this route deadline, adding a
+       * route timer cannot win and would only add overhead.
+       */
+      if (
+        applicationDeadline !== undefined &&
+        applicationDeadline <= routeDeadline
+      ) {
+        return run();
+      }
+
+      const routeController = new AbortController();
+      forwardAbort(state.signal, routeController);
+      state.signal = routeController.signal;
+
+      return executeWithDeadline(duration, "route", routeController, run);
     },
   };
 }
 
 function executeWithDeadline(
   duration: number,
+  scope: TimeoutScope,
   controller: AbortController,
   run: () => Response | Promise<Response>,
 ): Response | Promise<Response> {
@@ -75,7 +118,7 @@ function executeWithDeadline(
     }
 
     settled = true;
-    const error = new TimeoutError(duration, "application");
+    const error = new TimeoutError(duration, scope);
     controller.abort(error);
     rejectTimeout?.(error);
   }, duration);

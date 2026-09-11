@@ -22,6 +22,22 @@ export const RUNTIME_ROUTE_REQUEST_SCOPE = 16;
 
 export const RUNTIME_ROUTE_MODULE_REQUEST_SCOPE = 32;
 
+export const RUNTIME_ROUTE_TIMEOUT = 64;
+
+export const RUNTIME_ROUTE_TIMEOUT_PLAN = Symbol(
+  "gelis.runtime.route.timeout-plan",
+);
+
+export type RuntimeRouteTimeoutExecutor = (
+  request: Request,
+  run: () => Response | Promise<Response>,
+) => Response | Promise<Response>;
+
+export interface RuntimeRouteTimeoutPlan {
+  readonly duration: number;
+  readonly execute?: RuntimeRouteTimeoutExecutor;
+}
+
 export const RUNTIME_ROUTE_INPUT_BEFORE_HANDLE =
   RUNTIME_ROUTE_INPUT | RUNTIME_ROUTE_BEFORE_HANDLE;
 
@@ -243,6 +259,13 @@ export interface RuntimeRouteRecord {
    * templates preserve it through object spread.
    */
   readonly [RUNTIME_ROUTE_CONTRACT_METADATA]?: RuntimeRouteContractMetadata;
+
+  /*
+   * Present only on routes that explicitly declare RouteOptions.timeout.
+   * The timeout capability replaces the unbound declaration-time plan with
+   * an application-bound executor during Lane C specialization.
+   */
+  [RUNTIME_ROUTE_TIMEOUT_PLAN]?: RuntimeRouteTimeoutPlan;
 
   readonly handler: RuntimeRouteHandler;
 

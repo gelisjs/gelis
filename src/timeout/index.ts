@@ -1,10 +1,16 @@
-import { defineCapability, definePlugin } from "../plugin";
+import {
+  declareOfficialPluginRouteSpecializer,
+  defineCapability,
+  definePlugin,
+} from "../plugin";
 
 import type { Capability, Plugin } from "../plugin";
 
 import { createOfficialApplicationHttpMarker } from "../runtime/application-http";
 
 import type { RuntimeApplicationTimeoutPolicy } from "../runtime/application-http";
+
+import { RUNTIME_ROUTE_TIMEOUT_PLAN } from "../runtime/types";
 
 import { TimeoutError } from "./error";
 import { compileTimeoutPolicy } from "./policy";
@@ -31,6 +37,23 @@ export function timeout(options?: TimeoutOptions): TimeoutCapability {
 
   const plugin = definePlugin("gelis/timeout", (context) => {
     timeoutCapability.provide(context, true);
+
+    declareOfficialPluginRouteSpecializer(context, (route) => {
+      const declared = route[RUNTIME_ROUTE_TIMEOUT_PLAN];
+
+      if (declared === undefined) {
+        return;
+      }
+
+      const duration = declared.duration;
+
+      route[RUNTIME_ROUTE_TIMEOUT_PLAN] = {
+        duration,
+        execute(request, run) {
+          return state.executeRoute(request, duration, run);
+        },
+      };
+    });
 
     context.onRequest(
       createOfficialApplicationHttpMarker({
