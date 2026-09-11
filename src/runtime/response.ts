@@ -48,7 +48,24 @@ export function normalizeResponse(value: unknown): Response {
     });
   }
 
-  return normalizeResponseWithStatus(200, value);
+  /*
+   * Ordinary successful responses do not need an
+   * explicit ResponseInit status. Bun's Response.json
+   * has a materially cheaper default-success path.
+   *
+   * Keep string semantics identical to the explicit
+   * status serializer while letting JSON use the
+   * native default status-200 fast path.
+   */
+  if (typeof value === "string") {
+    return new Response(value, {
+      status: 200,
+
+      headers: TEXT_HEADERS,
+    });
+  }
+
+  return Response.json(value);
 }
 
 export function normalizeResponseForRequest(
