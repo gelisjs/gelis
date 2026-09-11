@@ -1,0 +1,25 @@
+name: P11-G10 Prettier Diagnostic
+
+on:
+  push:
+    branches:
+      - diag/p11-g10-prettier
+
+jobs:
+  prettier:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.0
+      - run: bun install --frozen-lockfile
+      - name: Show authoritative Prettier diff
+        run: |
+          bunx prettier \
+            bench/request-id-timeout/p11-g10-timeout-acceptance.mts \
+            bench/request-id-timeout/p11-g10-timeout-worker.mts \
+            --write
+          git diff -- \
+            bench/request-id-timeout/p11-g10-timeout-acceptance.mts \
+            bench/request-id-timeout/p11-g10-timeout-worker.mts
