@@ -23,9 +23,7 @@ export function compileTimeoutPolicy(
   return { duration };
 }
 
-export function assertTimeoutDuration(
-  value: unknown,
-): asserts value is number {
+export function assertTimeoutDuration(value: unknown): asserts value is number {
   if (
     !Number.isSafeInteger(value) ||
     (value as number) < 1 ||
