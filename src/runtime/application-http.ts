@@ -47,7 +47,15 @@ export interface RuntimeApplicationHttpPlan {
 
 type RuntimeApplicationHttpMarker =
   | {
-      readonly kind: "cors" | "secure-headers" | "request-id";
+      readonly kind: "cors";
+      readonly policy: RuntimeApplicationHttpPolicy;
+    }
+  | {
+      readonly kind: "secure-headers";
+      readonly policy: RuntimeApplicationHttpPolicy;
+    }
+  | {
+      readonly kind: "request-id";
       readonly policy: RuntimeApplicationHttpPolicy;
     }
   | {
