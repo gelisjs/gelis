@@ -30,7 +30,7 @@ jobs:
         working-directory: bench/competitive/elysia-v2-aot
         run: bun http-aot-build.mts
 
-      - name: Inspect static-raw 5k artifact readiness
+      - name: Inspect static-raw 5k artifact route table
         shell: bash
         working-directory: bench/competitive/elysia-v2-aot
         run: |
@@ -38,21 +38,19 @@ jobs:
           PORT=3112 bun generated/cp2-http/static-raw/server.js >/tmp/cp2h-aot.out 2>/tmp/cp2h-aot.err &
           pid=$!
           echo "pid=$pid"
-          for delay in 1 4 10 20; do
-            sleep "$delay"
-            echo "--- after incremental ${delay}s ---"
-            ps -p "$pid" -o pid,stat,etime,cmd
-            echo "listeners:"
-            ss -ltnp | grep -E '(:3112|:3100)' || true
-            echo "probe 3112:"
-            curl -sS -D - --max-time 2 http://127.0.0.1:3112/r/4999 -o /tmp/cp2h-body-3112 || true
-            cat /tmp/cp2h-body-3112 2>/dev/null || true
-            echo
-            echo "probe 3100:"
-            curl -sS -D - --max-time 2 http://127.0.0.1:3100/r/4999 -o /tmp/cp2h-body-3100 || true
-            cat /tmp/cp2h-body-3100 2>/dev/null || true
+          sleep 1
+          ps -p "$pid" -o pid,stat,etime,cmd
+          ss -ltnp | grep -E '(:3112|:3100)' || true
+          for path in /r/0 /r/1 /r/2 /r/3 /r/4 /r/99 /r/999 /r/4999; do
+            echo "--- ${path} ---"
+            curl -sS -D - --max-time 2 "http://127.0.0.1:3112${path}" -o /tmp/cp2h-body || true
+            cat /tmp/cp2h-body 2>/dev/null || true
             echo
           done
+          echo "artifact route/string diagnostics:"
+          grep -aoE '/r/(0|1|2|3|4|99|999|4999)' generated/cp2-http/static-raw/server.js | sort | uniq -c || true
+          echo "artifact size:"
+          wc -c generated/cp2-http/static-raw/server.js
           echo "stdout:"
           cat /tmp/cp2h-aot.out || true
           echo "stderr:"
