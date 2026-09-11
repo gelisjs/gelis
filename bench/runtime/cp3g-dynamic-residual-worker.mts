@@ -57,6 +57,27 @@ export type Cell =
   | "pipeline-static-json"
   | "pipeline-dynamic-json";
 
+const CELLS = new Set<Cell>([
+  "pathname-dynamic",
+  "last-index",
+  "prefix-slice",
+  "value-slice",
+  "percent-scan",
+  "params-computed-consume",
+  "params-literal-consume",
+  "params-factory-consume",
+  "params-computed-escape",
+  "handler-prebuilt-params",
+  "handler-computed-params",
+  "handler-literal-params",
+  "router-static-consume",
+  "router-dynamic-consume",
+  "route-handler-static",
+  "route-handler-dynamic",
+  "pipeline-static-json",
+  "pipeline-dynamic-json",
+]);
+
 interface WorkerResult {
   readonly cell: Cell;
   readonly probeOnly: boolean;
@@ -524,27 +545,6 @@ function required(value: string | undefined, flag: string): string {
   }
   return value;
 }
-
-const CELLS = new Set<Cell>([
-  "pathname-dynamic",
-  "last-index",
-  "prefix-slice",
-  "value-slice",
-  "percent-scan",
-  "params-computed-consume",
-  "params-literal-consume",
-  "params-factory-consume",
-  "params-computed-escape",
-  "handler-prebuilt-params",
-  "handler-computed-params",
-  "handler-literal-params",
-  "router-static-consume",
-  "router-dynamic-consume",
-  "route-handler-static",
-  "route-handler-dynamic",
-  "pipeline-static-json",
-  "pipeline-dynamic-json",
-]);
 
 function assertCell(value: string): asserts value is Cell {
   if (!CELLS.has(value as Cell)) {
