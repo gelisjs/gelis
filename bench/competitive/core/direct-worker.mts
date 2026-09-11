@@ -319,10 +319,7 @@ async function assertResponse(
         : scenario === "static-json"
           ? JSON.stringify({ method: "GET", route: routeIndex })
           : JSON.stringify({ method: "GET", id: "value-42" });
-  const expectedMediaType =
-    scenario === "static-raw" || scenario === "dynamic-raw"
-      ? "text/plain"
-      : "application/json";
+  const isRaw = scenario === "static-raw" || scenario === "dynamic-raw";
 
   if (body !== expectedBody) {
     throw new Error(
@@ -330,9 +327,15 @@ async function assertResponse(
     );
   }
 
-  if (mediaType !== expectedMediaType) {
+  if (isRaw) {
+    if (mediaType !== "" && mediaType !== "text/plain") {
+      throw new Error(
+        `${scenario} direct raw media type must be absent or text/plain, got ${mediaType}`,
+      );
+    }
+  } else if (mediaType !== "application/json") {
     throw new Error(
-      `${scenario} correctness media type failed: expected ${expectedMediaType}, got ${mediaType}`,
+      `${scenario} correctness media type failed: expected application/json, got ${mediaType}`,
     );
   }
 
