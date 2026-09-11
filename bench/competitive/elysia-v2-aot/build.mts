@@ -46,7 +46,9 @@ if (selectedCase === undefined) {
   process.exit(0);
 }
 
-const benchmarkCase = cases.find((candidate) => candidate.name === selectedCase);
+const benchmarkCase = cases.find(
+  (candidate) => candidate.name === selectedCase,
+);
 if (benchmarkCase === undefined) {
   throw new Error(`Unknown ELYSIA_AOT_CASE: ${selectedCase}`);
 }

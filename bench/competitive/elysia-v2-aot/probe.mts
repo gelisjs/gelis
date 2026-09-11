@@ -43,7 +43,9 @@ for (const benchmarkCase of cases) {
       ...process.env,
       PORT: String(port),
       ROUTES: "3",
-      ROUTE_KIND: benchmarkCase.name.startsWith("static") ? "static" : "dynamic",
+      ROUTE_KIND: benchmarkCase.name.startsWith("static")
+        ? "static"
+        : "dynamic",
       BODY_KIND: benchmarkCase.name.endsWith("raw") ? "raw" : "json",
     },
     stdout: "pipe",
@@ -72,7 +74,9 @@ for (const benchmarkCase of cases) {
     );
 
     if (response.headers.get("content-encoding") !== null) {
-      throw new Error(`${benchmarkCase.name} unexpectedly applied content encoding`);
+      throw new Error(
+        `${benchmarkCase.name} unexpectedly applied content encoding`,
+      );
     }
 
     rows.push({
@@ -114,7 +118,9 @@ async function waitForResponse(
     }
   }
 
-  throw new Error(`AOT server did not become ready for ${url}: ${String(lastError)}`);
+  throw new Error(
+    `AOT server did not become ready for ${url}: ${String(lastError)}`,
+  );
 }
 
 async function streamText(

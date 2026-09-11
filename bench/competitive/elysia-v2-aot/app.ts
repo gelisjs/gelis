@@ -31,7 +31,10 @@ if (ROUTE_KIND === "static") {
     const path = `/r/${index}/:id`;
 
     if (BODY_KIND === "raw") {
-      app.get(path, ({ params }) => new Response((params as BenchmarkParams).id));
+      app.get(
+        path,
+        ({ params }) => new Response((params as BenchmarkParams).id),
+      );
       continue;
     }
 
