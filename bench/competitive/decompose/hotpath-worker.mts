@@ -63,7 +63,6 @@ type PrimitiveCell =
   | "normalize-existing-response";
 
 type Cell = PrimitiveCell | `${Scenario}::${Stage}`;
-
 type Operation = () => number;
 
 interface WorkerResult {
@@ -75,11 +74,50 @@ interface WorkerResult {
   readonly sink: number;
 }
 
-const args = readArgs(process.argv.slice(2));
-const cell = required(args.cell, "--cell") as Cell;
-const probeOnly = args.probeOnly === "true";
+interface ResponseSnapshot {
+  readonly status: number;
+  readonly body: string;
+  readonly mediaType: string;
+}
 
-assertCell(cell);
+const PRIMITIVE_CELLS = new Set<PrimitiveCell>([
+  "pathname",
+  "router-static",
+  "router-dynamic",
+  "handler-static-json",
+  "handler-dynamic-json",
+  "json-stringify-static",
+  "json-stringify-dynamic",
+  "response-json-static",
+  "response-json-dynamic",
+  "response-preserialized-static",
+  "response-preserialized-dynamic",
+  "normalize-static-json",
+  "normalize-dynamic-json",
+  "response-raw-static",
+  "response-raw-dynamic",
+  "normalize-existing-response",
+]);
+
+const SCENARIOS = new Set<Scenario>([
+  "static-raw",
+  "dynamic-raw",
+  "static-json",
+  "dynamic-json",
+]);
+
+const STAGES = new Set<Stage>([
+  "url-router",
+  "url-router-handler",
+  "url-router-handler-normalize",
+  "app-fetch",
+]);
+
+const args = readArgs(process.argv.slice(2));
+const requestedCell = required(args.cell, "--cell");
+assertCell(requestedCell);
+const cell = requestedCell;
+const probeOnly = args.probeOnly === "true";
 
 const prepared = prepareCell(cell);
 await prepared.assertCorrectness();
@@ -127,25 +165,25 @@ function prepareCell(cell: Cell): {
   }
 
   switch (cell) {
-    case "pathname": {
+    case "pathname":
       return {
         operation: () => pathnameFromUrl(DYNAMIC_URL).length,
         assertCorrectness: () => {
-          const path = pathnameFromUrl(DYNAMIC_URL);
-          if (path !== DYNAMIC_PATH) {
-            throw new Error(`pathname mismatch: ${path}`);
+          const pathname = pathnameFromUrl(DYNAMIC_URL);
+          if (pathname !== DYNAMIC_PATH) {
+            throw new Error(`pathname mismatch: ${pathname}`);
           }
         },
       };
-    }
 
     case "router-static": {
       const router = buildRouter("static-json");
       return {
         operation: () => {
           const match = router.match("GET", STATIC_PATH);
-          if (match === undefined) return 0;
-          return match.route.path.length + Object.keys(match.params).length;
+          return match === undefined
+            ? 0
+            : match.route.path.length + Object.keys(match.params).length;
         },
         assertCorrectness: () => assertRouterMatch(router, "static-json"),
       };
@@ -156,8 +194,9 @@ function prepareCell(cell: Cell): {
       return {
         operation: () => {
           const match = router.match("GET", DYNAMIC_PATH);
-          if (match === undefined) return 0;
-          return match.route.path.length + (match.params.id?.length ?? 0);
+          return match === undefined
+            ? 0
+            : match.route.path.length + (match.params.id?.length ?? 0);
         },
         assertCorrectness: () => assertRouterMatch(router, "dynamic-json"),
       };
@@ -172,12 +211,12 @@ function prepareCell(cell: Cell): {
       return {
         operation: () => {
           const value = handler(createContext(request, EMPTY_PARAMS));
-          if (isPromiseLike(value)) throw new Error("unexpected async handler");
+          assertSync(value, "handler-static-json");
           return (value as { route: number }).route;
         },
         assertCorrectness: () => {
           const value = handler(createContext(request, EMPTY_PARAMS));
-          if (isPromiseLike(value)) throw new Error("unexpected async handler");
+          assertSync(value, "handler-static-json");
           assertJsonPayload(value, "static-json");
         },
       };
@@ -192,12 +231,12 @@ function prepareCell(cell: Cell): {
       return {
         operation: () => {
           const value = handler(createContext(request, DYNAMIC_PARAMS));
-          if (isPromiseLike(value)) throw new Error("unexpected async handler");
+          assertSync(value, "handler-dynamic-json");
           return (value as { id: string }).id.length;
         },
         assertCorrectness: () => {
           const value = handler(createContext(request, DYNAMIC_PARAMS));
-          if (isPromiseLike(value)) throw new Error("unexpected async handler");
+          assertSync(value, "handler-dynamic-json");
           assertJsonPayload(value, "dynamic-json");
         },
       };
@@ -292,90 +331,66 @@ function prepareIntegrated(
   readonly operation: Operation;
   readonly assertCorrectness: () => Promise<void>;
 } {
-  const request = new Request(
-    scenario === "static-raw" || scenario === "static-json"
-      ? STATIC_URL
-      : DYNAMIC_URL,
-  );
+  const request = new Request(isStatic(scenario) ? STATIC_URL : DYNAMIC_URL);
   const router = buildRouter(scenario);
   const app = buildApp(scenario);
 
-  const manualFinal = () => {
+  const matchRoute = () => {
     const pathname = pathnameFromUrl(request.url);
     const match = router.match("GET", pathname);
     if (match === undefined) throw new Error("manual pipeline route miss");
-    const result = match.route.handler(createContext(request, match.params));
-    if (isPromiseLike(result)) throw new Error("unexpected async manual handler");
-    return normalizeResponse(result);
+    return match;
   };
+
+  const invokeHandler = () => {
+    const match = matchRoute();
+    const result = match.route.handler(createContext(request, match.params));
+    assertSync(result, "manual pipeline handler");
+    return result;
+  };
+
+  const manualFinal = () => normalizeResponse(invokeHandler());
 
   const operation: Operation =
     stage === "url-router"
       ? () => {
-          const pathname = pathnameFromUrl(request.url);
-          const match = router.match("GET", pathname);
-          if (match === undefined) return 0;
+          const match = matchRoute();
           return match.route.path.length + (match.params.id?.length ?? 0);
         }
       : stage === "url-router-handler"
-        ? () => {
-            const pathname = pathnameFromUrl(request.url);
-            const match = router.match("GET", pathname);
-            if (match === undefined) return 0;
-            const result = match.route.handler(
-              createContext(request, match.params),
-            );
-            if (isPromiseLike(result)) {
-              throw new Error("unexpected async manual handler");
-            }
-            return consumeHandlerResult(result, scenario);
-          }
+        ? () => consumeHandlerResult(invokeHandler(), scenario)
         : stage === "url-router-handler-normalize"
-          ? () => {
-              const response = manualFinal();
-              return response.status;
-            }
+          ? () => manualFinal().status
           : () => {
               const response = app.fetch(request);
-              if (isPromiseLike(response)) {
-                throw new Error("unexpected async app.fetch");
-              }
+              assertSync(response, "app.fetch");
               return response.status;
             };
 
   return {
     operation,
     assertCorrectness: async () => {
-      await assertRouterMatch(router, scenario);
+      assertRouterMatch(router, scenario);
 
       const manualResponse = manualFinal();
       const appResponse = app.fetch(request);
-      if (isPromiseLike(appResponse)) {
-        throw new Error("unexpected async app.fetch correctness path");
-      }
+      assertSync(appResponse, "app.fetch correctness path");
 
       const manualSnapshot = await responseSnapshot(manualResponse);
       const appSnapshot = await responseSnapshot(appResponse);
-      const expected = expectedSnapshot(scenario);
 
-      if (JSON.stringify(manualSnapshot) !== JSON.stringify(expected)) {
-        throw new Error(
-          `manual pipeline mismatch: ${JSON.stringify(manualSnapshot)}`,
-        );
-      }
-      if (JSON.stringify(appSnapshot) !== JSON.stringify(expected)) {
-        throw new Error(`app.fetch mismatch: ${JSON.stringify(appSnapshot)}`);
-      }
-      if (JSON.stringify(manualSnapshot) !== JSON.stringify(appSnapshot)) {
+      assertScenarioResponse(manualSnapshot, scenario, "manual pipeline");
+      assertScenarioResponse(appSnapshot, scenario, "app.fetch");
+
+      if (
+        manualSnapshot.status !== appSnapshot.status ||
+        manualSnapshot.body !== appSnapshot.body
+      ) {
         throw new Error("manual pipeline and app.fetch are not byte-equivalent");
       }
 
       if (stage === "url-router-handler") {
-        const pathname = pathnameFromUrl(request.url);
-        const match = router.match("GET", pathname)!;
-        const result = match.route.handler(createContext(request, match.params));
-        if (isPromiseLike(result)) throw new Error("unexpected async handler");
-        await assertHandlerResult(result, scenario);
+        await assertHandlerResult(invokeHandler(), scenario);
       }
     },
   };
@@ -393,7 +408,7 @@ function buildApp(scenario: Scenario): Gelis {
   const app = new Gelis();
 
   for (let index = 0; index < ROUTES; index++) {
-    if (scenario === "static-raw" || scenario === "static-json") {
+    if (isStatic(scenario)) {
       const path = `/r/${index}` as `/r/${number}`;
       app.get(path, ({ request }) =>
         scenario === "static-raw"
@@ -414,9 +429,7 @@ function buildApp(scenario: Scenario): Gelis {
 }
 
 function createRoute(scenario: Scenario, index: number): RuntimeRouteRecord {
-  const isStatic = scenario === "static-raw" || scenario === "static-json";
-  const path = isStatic ? `/r/${index}` : `/r/${index}/:id`;
-
+  const path = isStatic(scenario) ? `/r/${index}` : `/r/${index}/:id`;
   const handler: RuntimeRouteHandler =
     scenario === "static-raw"
       ? ({ request }) => new Response(request.method)
@@ -468,24 +481,25 @@ function responseFactoryCell(
     },
     assertCorrectness: async () => {
       const snapshot = await responseSnapshot(factory());
-      const expected = expectedSnapshot(scenario);
-      if (JSON.stringify(snapshot) !== JSON.stringify(expected)) {
-        throw new Error(`response cell mismatch: ${JSON.stringify(snapshot)}`);
-      }
+      assertScenarioResponse(snapshot, scenario, "response primitive");
     },
   };
 }
 
 function assertRouterMatch(router: Router, scenario: Scenario): void {
-  const dynamic = scenario === "dynamic-raw" || scenario === "dynamic-json";
+  const dynamic = !isStatic(scenario);
   const match = router.match("GET", dynamic ? DYNAMIC_PATH : STATIC_PATH);
   if (match === undefined) throw new Error("router correctness miss");
-  if (match.route.path !== (dynamic ? `/r/${LAST}/:id` : STATIC_PATH)) {
+
+  const expectedPath = dynamic ? `/r/${LAST}/:id` : STATIC_PATH;
+  if (match.route.path !== expectedPath) {
     throw new Error(`router resolved wrong route: ${match.route.path}`);
   }
+
   if (dynamic && match.params.id !== "value-42") {
     throw new Error(`router param mismatch: ${match.params.id}`);
   }
+
   if (!dynamic && Object.keys(match.params).length !== 0) {
     throw new Error("static router unexpectedly produced params");
   }
@@ -493,69 +507,85 @@ function assertRouterMatch(router: Router, scenario: Scenario): void {
 
 function consumeHandlerResult(result: unknown, scenario: Scenario): number {
   if (result instanceof Response) return result.status;
-  if (scenario === "static-json") return (result as { route: number }).route;
-  if (scenario === "dynamic-json") return (result as { id: string }).id.length;
-  return 0;
+  return scenario === "static-json"
+    ? (result as { route: number }).route
+    : (result as { id: string }).id.length;
 }
 
 async function assertHandlerResult(
   result: unknown,
   scenario: Scenario,
 ): Promise<void> {
-  if (scenario === "static-raw" || scenario === "dynamic-raw") {
+  if (isRaw(scenario)) {
     if (!(result instanceof Response)) {
       throw new Error("raw handler did not return Response");
     }
-    const body = await result.text();
-    const expected = scenario === "static-raw" ? "GET" : "value-42";
-    if (body !== expected) throw new Error(`raw handler body mismatch: ${body}`);
+    assertScenarioResponse(
+      await responseSnapshot(result),
+      scenario,
+      "raw handler",
+    );
     return;
   }
+
   assertJsonPayload(result, scenario);
 }
 
 function assertJsonPayload(value: unknown, scenario: Scenario): void {
   const expected = scenario === "static-json" ? staticJson : dynamicJson;
-  if (JSON.stringify(value) !== expected) {
-    throw new Error(
-      `handler payload mismatch: expected ${expected}, got ${JSON.stringify(value)}`,
-    );
+  const actual = JSON.stringify(value);
+  if (actual !== expected) {
+    throw new Error(`handler payload mismatch: expected ${expected}, got ${actual}`);
   }
-}
-
-interface ResponseSnapshot {
-  readonly status: number;
-  readonly body: string;
-  readonly mediaType: string;
 }
 
 async function responseSnapshot(response: Response): Promise<ResponseSnapshot> {
   return {
     status: response.status,
     body: await response.text(),
-    mediaType:
-      response.headers
-        .get("content-type")
-        ?.split(";", 1)[0]
-        ?.trim()
-        .toLowerCase() ?? "",
+    mediaType: mediaType(response),
   };
 }
 
-function expectedSnapshot(scenario: Scenario): ResponseSnapshot {
-  const raw = scenario === "static-raw" || scenario === "dynamic-raw";
-  return {
-    status: 200,
-    body:
-      scenario === "static-raw"
-        ? "GET"
-        : scenario === "dynamic-raw"
-          ? "value-42"
-          : scenario === "static-json"
-            ? staticJson
-            : dynamicJson,
-    mediaType: raw ? "text/plain" : "application/json",
-  };
+function assertScenarioResponse(
+  snapshot: ResponseSnapshot,
+  scenario: Scenario,
+  label: string,
+): void {
+  if (snapshot.status !== 200) {
+    throw new Error(`${label} status mismatch: ${snapshot.status}`);
+  }
+
+  const expectedBody =
+    scenario === "static-raw"
+      ? "GET"
+      : scenario === "dynamic-raw"
+        ? "value-42"
+        : scenario === "static-json"
+          ? staticJson
+          : dynamicJson;
+
+  if (snapshot.body !== expectedBody) {
+    throw new Error(`${label} body mismatch: ${snapshot.body}`);
+  }
+
+  if (isRaw(scenario)) {
+    if (snapshot.mediaType !== "" && snapshot.mediaType !== "text/plain") {
+      throw new Error(`${label} raw media type mismatch: ${snapshot.mediaType}`);
+    }
+  } else if (snapshot.mediaType !== "application/json") {
+    throw new Error(`${label} JSON media type mismatch: ${snapshot.mediaType}`);
+  }
+}
+
+function mediaType(response: Response): string {
+  return (
+    response.headers
+      .get("content-type")
+      ?.split(";", 1)[0]
+      ?.trim()
+      .toLowerCase() ?? ""
+  );
 }
 
 function calibrate(operation: () => void): number {
@@ -578,55 +608,32 @@ function measure(operation: () => void, iterations: number): number {
   return performance.now() - start;
 }
 
+function isStatic(scenario: Scenario): boolean {
+  return scenario === "static-raw" || scenario === "static-json";
+}
+
+function isRaw(scenario: Scenario): boolean {
+  return scenario === "static-raw" || scenario === "dynamic-raw";
+}
+
 function isIntegratedCell(value: string): value is `${Scenario}::${Stage}` {
   return value.includes("::");
 }
 
 function assertCell(value: string): asserts value is Cell {
-  if (PRIMITIVE_CELLS.includes(value as PrimitiveCell)) return;
+  if (PRIMITIVE_CELLS.has(value as PrimitiveCell)) return;
+
   const [scenario, stage, extra] = value.split("::");
   if (
     extra === undefined &&
-    SCENARIOS.includes(scenario as Scenario) &&
-    STAGES.includes(stage as Stage)
+    SCENARIOS.has(scenario as Scenario) &&
+    STAGES.has(stage as Stage)
   ) {
     return;
   }
+
   throw new Error(`Unknown CP3-A cell: ${value}`);
 }
-
-const PRIMITIVE_CELLS: readonly PrimitiveCell[] = [
-  "pathname",
-  "router-static",
-  "router-dynamic",
-  "handler-static-json",
-  "handler-dynamic-json",
-  "json-stringify-static",
-  "json-stringify-dynamic",
-  "response-json-static",
-  "response-json-dynamic",
-  "response-preserialized-static",
-  "response-preserialized-dynamic",
-  "normalize-static-json",
-  "normalize-dynamic-json",
-  "response-raw-static",
-  "response-raw-dynamic",
-  "normalize-existing-response",
-];
-
-const SCENARIOS: readonly Scenario[] = [
-  "static-raw",
-  "dynamic-raw",
-  "static-json",
-  "dynamic-json",
-];
-
-const STAGES: readonly Stage[] = [
-  "url-router",
-  "url-router-handler",
-  "url-router-handler-normalize",
-  "app-fetch",
-];
 
 interface ParsedArgs {
   readonly cell: string | undefined;
@@ -652,6 +659,15 @@ function required(value: string | undefined, flag: string): string {
     throw new Error(`Missing ${flag}`);
   }
   return value;
+}
+
+function assertSync<T>(
+  value: T | PromiseLike<T>,
+  label: string,
+): asserts value is T {
+  if (isPromiseLike(value)) {
+    throw new Error(`unexpected async ${label}`);
+  }
 }
 
 function isPromiseLike<T>(value: T | PromiseLike<T>): value is PromiseLike<T> {
