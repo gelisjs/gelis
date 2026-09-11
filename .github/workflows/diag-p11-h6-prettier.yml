@@ -1,0 +1,42 @@
+name: P11-H6 Harness Prettier
+
+on:
+  push:
+    branches:
+      - diag/p11-h6-prettier
+
+permissions:
+  contents: write
+
+jobs:
+  format:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.0
+      - name: Checkout target branch
+        run: git switch work/p11-h6-enabled-composition
+      - run: bun install --frozen-lockfile
+      - name: Apply repository Prettier
+        run: >-
+          bunx prettier
+          bench/runtime/p11-h6-enabled-composition-worker.mts
+          bench/runtime/p11-h6-http-server.mts
+          bench/runtime/p11-h6-enabled-composition-acceptance.mts
+          --write
+      - name: Commit formatted harness
+        shell: bash
+        run: |
+          git diff --check
+          git config user.name "Rigent"
+          git config user.email "127601320+rigenttio@users.noreply.github.com"
+          git add \
+            bench/runtime/p11-h6-enabled-composition-worker.mts \
+            bench/runtime/p11-h6-http-server.mts \
+            bench/runtime/p11-h6-enabled-composition-acceptance.mts
+          git commit -m "style(p11-h): format H6 harness"
+          git push origin HEAD:work/p11-h6-enabled-composition
