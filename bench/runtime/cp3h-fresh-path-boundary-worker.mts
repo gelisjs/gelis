@@ -227,7 +227,13 @@ function prepareCell(cell: Cell): PreparedCell {
       return routerRequestCell(dynamicRouter, dynamicRequest, true);
 
     case "dispatch-prepath-static":
-      return dispatchCell(staticRouter, staticRequest, STATIC_PATH, false, false);
+      return dispatchCell(
+        staticRouter,
+        staticRequest,
+        STATIC_PATH,
+        false,
+        false,
+      );
 
     case "dispatch-prepath-dynamic":
       return dispatchCell(
@@ -239,10 +245,22 @@ function prepareCell(cell: Cell): PreparedCell {
       );
 
     case "dispatch-request-static":
-      return dispatchCell(staticRouter, staticRequest, STATIC_PATH, false, true);
+      return dispatchCell(
+        staticRouter,
+        staticRequest,
+        STATIC_PATH,
+        false,
+        true,
+      );
 
     case "dispatch-request-dynamic":
-      return dispatchCell(dynamicRouter, dynamicRequest, DYNAMIC_PATH, true, true);
+      return dispatchCell(
+        dynamicRouter,
+        dynamicRequest,
+        DYNAMIC_PATH,
+        true,
+        true,
+      );
   }
 }
 
@@ -257,10 +275,7 @@ function pathnameCell(url: string, expected: string): PreparedCell {
   };
 }
 
-function requestPathnameCell(
-  request: Request,
-  expected: string,
-): PreparedCell {
+function requestPathnameCell(request: Request, expected: string): PreparedCell {
   return {
     operation: () => pathnameFromUrl(request.url).length,
     assertCorrectness: () => {
@@ -354,8 +369,7 @@ function consumeMatch(
   }
 
   return (
-    match.route.path.length +
-    (dynamic ? (match.params.id?.length ?? 0) : 0)
+    match.route.path.length + (dynamic ? (match.params.id?.length ?? 0) : 0)
   );
 }
 
