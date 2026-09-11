@@ -96,8 +96,7 @@ interface RequestIdOptions {
   readonly headerName?: string;
   readonly maxLength?: number;
   readonly trustIncoming?:
-    | boolean
-    | ((value: string, request: Request) => boolean);
+    boolean | ((value: string, request: Request) => boolean);
   readonly generator?: (request: Request) => string;
 }
 ```
