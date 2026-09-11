@@ -383,7 +383,7 @@ function getServerProcess(
       return {
         command: [process.execPath, artifact],
         cwd: dirname(artifact),
-        env: { ...env, ROUTES: undefined, ROUTE_KIND: undefined, BODY_KIND: undefined },
+        env,
       };
     }
   }

@@ -85,6 +85,14 @@ The acceptance harness must reject timing unless:
 - Elysia next is exactly `2.0.0-beta.14`;
 - Elysia AOT island is exactly `2.0.0-beta.14`.
 
+## Invalid pre-timing harness evidence
+
+The first CP2-H correctness-only workflow, run `34581098748`, is retained as **harness-invalid** evidence. It executed the Elysia 2 AOT artifact after explicitly removing `ROUTES`, `ROUTE_KIND`, and `BODY_KIND` from the runtime environment. The generated artifact therefore used the benchmark app defaults (`3` routes, JSON), causing `/r/4999` to return `404`. No `oha` timing was executed.
+
+Diagnostic run `34581406018` proved the artifact was listening normally but exposed only the default runtime route set when those variables were omitted. Diagnostic run `34581490615` then executed the same 5,000-route artifact with the CP1-accepted runtime environment (`ROUTES=5000`, matching route/body kind): `/r/0`, `/r/2`, `/r/3`, `/r/999`, and `/r/4999` all returned `200`, raw `GET`, and `text/plain`.
+
+The harness fix is therefore limited to preserving the same runtime environment already used by the accepted CP1 AOT probe. Production source, comparator versions, workloads, sampling, and timing protocol are unchanged.
+
 ## Authority
 
 Only the first valid run on the user's local Windows / Intel i5-10500H machine is authoritative CP2-H performance evidence. CI may build AOT artifacts and run correctness/type/format probes but must not run or promote HTTP timing as authoritative evidence.
