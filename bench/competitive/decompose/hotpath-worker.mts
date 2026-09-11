@@ -32,11 +32,7 @@ const dynamicPayload = { method: "GET", id: "value-42" } as const;
 const staticJson = JSON.stringify(staticPayload);
 const dynamicJson = JSON.stringify(dynamicPayload);
 
-type Scenario =
-  | "static-raw"
-  | "dynamic-raw"
-  | "static-json"
-  | "dynamic-json";
+type Scenario = "static-raw" | "dynamic-raw" | "static-json" | "dynamic-json";
 
 type Stage =
   | "url-router"
@@ -302,10 +298,7 @@ function prepareCell(cell: Cell): {
       return responseFactoryCell(() => new Response("GET"), "static-raw");
 
     case "response-raw-dynamic":
-      return responseFactoryCell(
-        () => new Response("value-42"),
-        "dynamic-raw",
-      );
+      return responseFactoryCell(() => new Response("value-42"), "dynamic-raw");
 
     case "normalize-existing-response": {
       const response = new Response("GET");
@@ -316,7 +309,9 @@ function prepareCell(cell: Cell): {
         },
         assertCorrectness: () => {
           if (normalizeResponse(response) !== response) {
-            throw new Error("normalizeResponse did not preserve Response identity");
+            throw new Error(
+              "normalizeResponse did not preserve Response identity",
+            );
           }
         },
       };
@@ -386,7 +381,9 @@ function prepareIntegrated(
         manualSnapshot.status !== appSnapshot.status ||
         manualSnapshot.body !== appSnapshot.body
       ) {
-        throw new Error("manual pipeline and app.fetch are not byte-equivalent");
+        throw new Error(
+          "manual pipeline and app.fetch are not byte-equivalent",
+        );
       }
 
       if (stage === "url-router-handler") {
@@ -477,7 +474,9 @@ function responseFactoryCell(
   return {
     operation: () => {
       const response = factory();
-      return response.status + (response.headers.get("content-type")?.length ?? 0);
+      return (
+        response.status + (response.headers.get("content-type")?.length ?? 0)
+      );
     },
     assertCorrectness: async () => {
       const snapshot = await responseSnapshot(factory());
@@ -535,7 +534,9 @@ function assertJsonPayload(value: unknown, scenario: Scenario): void {
   const expected = scenario === "static-json" ? staticJson : dynamicJson;
   const actual = JSON.stringify(value);
   if (actual !== expected) {
-    throw new Error(`handler payload mismatch: expected ${expected}, got ${actual}`);
+    throw new Error(
+      `handler payload mismatch: expected ${expected}, got ${actual}`,
+    );
   }
 }
 
@@ -571,7 +572,9 @@ function assertScenarioResponse(
 
   if (isRaw(scenario)) {
     if (snapshot.mediaType !== "" && snapshot.mediaType !== "text/plain") {
-      throw new Error(`${label} raw media type mismatch: ${snapshot.mediaType}`);
+      throw new Error(
+        `${label} raw media type mismatch: ${snapshot.mediaType}`,
+      );
     }
   } else if (snapshot.mediaType !== "application/json") {
     throw new Error(`${label} JSON media type mismatch: ${snapshot.mediaType}`);

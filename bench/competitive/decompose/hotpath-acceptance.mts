@@ -12,11 +12,7 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const WORKER = join(HERE, "hotpath-worker.mts");
 const REPOSITORY_ROOT = resolve(HERE, "../../..");
 
-type Scenario =
-  | "static-raw"
-  | "dynamic-raw"
-  | "static-json"
-  | "dynamic-json";
+type Scenario = "static-raw" | "dynamic-raw" | "static-json" | "dynamic-json";
 
 type Stage =
   | "url-router"
@@ -130,7 +126,9 @@ if (probeOnly) {
     console.log(`PASS ${cell}`);
   }
   console.log();
-  console.log(`CP3-A CORRECTNESS PROBE: PASS (${cells.length}/${cells.length})`);
+  console.log(
+    `CP3-A CORRECTNESS PROBE: PASS (${cells.length}/${cells.length})`,
+  );
   process.exit(0);
 }
 
@@ -163,7 +161,9 @@ for (const scenario of SCENARIOS) {
 }
 
 console.log();
-console.log("Derived diagnostics — non-additive, for engineering direction only");
+console.log(
+  "Derived diagnostics — non-additive, for engineering direction only",
+);
 console.log("| diagnostic | value |");
 console.log("| --- | ---: |");
 
@@ -276,16 +276,15 @@ function runWorker(cell: Cell, workerProbeOnly: boolean): WorkerResult {
     );
   }
 
-  const line = result.stdout
-    .trim()
-    .split(/\r?\n/)
-    .filter(Boolean)
-    .at(-1);
-  if (line === undefined) throw new Error(`Worker emitted no result for ${cell}`);
+  const line = result.stdout.trim().split(/\r?\n/).filter(Boolean).at(-1);
+  if (line === undefined)
+    throw new Error(`Worker emitted no result for ${cell}`);
 
   const parsed = JSON.parse(line) as WorkerResult;
   if (parsed.cell !== cell) {
-    throw new Error(`Worker cell mismatch: expected ${cell}, got ${parsed.cell}`);
+    throw new Error(
+      `Worker cell mismatch: expected ${cell}, got ${parsed.cell}`,
+    );
   }
   return parsed;
 }
