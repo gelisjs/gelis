@@ -38,6 +38,16 @@
       "types": "./src/secure-headers/index.ts",
       "import": "./src/secure-headers/index.ts",
       "default": "./src/secure-headers/index.ts"
+    },
+    "./request-id": {
+      "types": "./src/request-id/index.ts",
+      "import": "./src/request-id/index.ts",
+      "default": "./src/request-id/index.ts"
+    },
+    "./timeout": {
+      "types": "./src/timeout/index.ts",
+      "import": "./src/timeout/index.ts",
+      "default": "./src/timeout/index.ts"
     }
   },
   "packageManager": "bun@1.4.0",

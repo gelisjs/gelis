@@ -5,7 +5,9 @@ import { serve, serveReady } from "gelis/bun";
 import { bodyLimit } from "gelis/body-limit";
 import { generateCookie, getCookie, setCookie } from "gelis/cookie";
 import { cors } from "gelis/cors";
+import { requestId } from "gelis/request-id";
 import { secureHeaders } from "gelis/secure-headers";
+import { TimeoutError, timeout } from "gelis/timeout";
 
 describe("Gelis package exports", () => {
   test("resolves the portable root export", () => {
@@ -65,6 +67,32 @@ describe("Gelis package exports", () => {
     expect(app).toBeInstanceOf(Gelis);
   });
 
+  test("resolves the portable request-id subpath", () => {
+    expect(typeof requestId).toBe("function");
+
+    const app = new Gelis();
+    const ids = requestId({ generator: () => "package-request-id" });
+
+    app.use(ids);
+    app.get("/", () => "ok");
+
+    expect(app).toBeInstanceOf(Gelis);
+  });
+
+  test("resolves the portable timeout subpath", () => {
+    expect(typeof timeout).toBe("function");
+    expect(typeof TimeoutError).toBe("function");
+
+    const app = new Gelis();
+    app.use(timeout({ duration: 1_000 }));
+    app.get("/", { timeout: 500 }, () => "ok");
+
+    const error = new TimeoutError(500, "route");
+    expect(error.code).toBe("REQUEST_TIMEOUT");
+    expect(error.scope).toBe("route");
+    expect(app).toBeInstanceOf(Gelis);
+  });
+
   test("does not expose Bun adapter APIs from the portable root", async () => {
     const root = await import("gelis");
 
@@ -96,5 +124,13 @@ describe("Gelis package exports", () => {
     const root = await import("gelis");
 
     expect("secureHeaders" in root).toBe(false);
+  });
+
+  test("does not re-export request-ID or timeout convenience APIs from the portable root", async () => {
+    const root = await import("gelis");
+
+    expect("requestId" in root).toBe(false);
+    expect("timeout" in root).toBe(false);
+    expect("TimeoutError" in root).toBe(false);
   });
 });
