@@ -1,0 +1,42 @@
+name: P11-G10 Candidate SHA Update
+
+on:
+  push:
+    branches:
+      - diag/p11-g10-candidate-sha-update
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Checkout target branch
+        run: |
+          git fetch origin work/p11-g10-timeout-competitor
+          git checkout -B work/p11-g10-timeout-competitor origin/work/p11-g10-timeout-competitor
+      - name: Update frozen candidate identity
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path("bench/request-id-timeout/p11-g10-timeout-acceptance.mts")
+          text = path.read_text()
+          old = 'const CANDIDATE_SHA = "4b9053d7efaec35e71d35b3fbb0cb5b97cba7b61";'
+          new = 'const CANDIDATE_SHA = "1dd5f94cf0e9ad884ca44e537ee287587cd8baab";'
+          if text.count(old) != 1:
+              raise SystemExit("expected exactly one frozen candidate SHA")
+          path.write_text(text.replace(old, new, 1))
+          PY
+          git diff --check
+      - name: Commit target branch
+        run: |
+          git config user.name "Rigent"
+          git config user.email "127601320+rigenttio@users.noreply.github.com"
+          git add bench/request-id-timeout/p11-g10-timeout-acceptance.mts
+          git commit -m "bench(timeout): point P11-G10 at optimized candidate"
+          git push origin HEAD:work/p11-g10-timeout-competitor
