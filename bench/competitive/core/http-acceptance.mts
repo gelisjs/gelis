@@ -34,11 +34,7 @@ type Framework =
   | "elysia-next"
   | "elysia-next-aot";
 
-type Scenario =
-  | "static-raw"
-  | "dynamic-raw"
-  | "static-json"
-  | "dynamic-json";
+type Scenario = "static-raw" | "dynamic-raw" | "static-json" | "dynamic-json";
 
 interface HttpSampleResult {
   readonly framework: Framework;
@@ -118,7 +114,9 @@ if (probeOnly) {
   console.log(
     `Sampling:    ${SAMPLE_COUNT} mirrored fresh-server pairs/cell, warmup ${WARMUP_DURATION}/${WARMUP_CONNECTIONS}c, measure ${MEASURE_DURATION}/${MEASURE_CONNECTIONS}c`,
   );
-  console.log("Ratio:       Gelis req/s / comparator req/s (>1 means Gelis faster)\n");
+  console.log(
+    "Ratio:       Gelis req/s / comparator req/s (>1 means Gelis faster)\n",
+  );
   await runTimedMatrix();
   console.log("\nCP2-H LOCAL HTTP CROWN RUN: COMPLETE");
 }
@@ -201,9 +199,7 @@ async function runTimedMatrix(): Promise<void> {
   console.log(
     "| comparator | scenario | Gelis req/s | comparator req/s | ratio | Gelis-first | comparator-first | Gelis p50/p95/p99 ms | comparator p50/p95/p99 ms |",
   );
-  console.log(
-    "| --- | --- | ---: | ---: | ---: | ---: | ---: | --- | --- |",
-  );
+  console.log("| --- | --- | ---: | ---: | ---: | ---: | ---: | --- | --- |");
 
   for (const scenario of scenarios) {
     for (const competitor of competitors) {
@@ -230,7 +226,8 @@ async function runTimedMatrix(): Promise<void> {
       }
 
       const ratios = pairs.map(
-        (pair) => pair.gelis.requestsPerSecond / pair.competitor.requestsPerSecond,
+        (pair) =>
+          pair.gelis.requestsPerSecond / pair.competitor.requestsPerSecond,
       );
       const gelisFirstRatios = pairs
         .filter((pair) => pair.gelisFirst)
@@ -261,11 +258,7 @@ async function runHttpSample(
     await verifyHttpResponse(url, framework, scenario);
     await runOha(url, WARMUP_DURATION, WARMUP_CONNECTIONS);
 
-    const measured = await runOha(
-      url,
-      MEASURE_DURATION,
-      MEASURE_CONNECTIONS,
-    );
+    const measured = await runOha(url, MEASURE_DURATION, MEASURE_CONNECTIONS);
     const successRate = getSuccessRate(measured);
 
     if (successRate !== 1) {
@@ -438,8 +431,11 @@ async function verifyHttpResponse(
   }
 
   const mediaType =
-    response.headers.get("content-type")?.split(";", 1)[0]?.trim().toLowerCase() ??
-    "";
+    response.headers
+      .get("content-type")
+      ?.split(";", 1)[0]
+      ?.trim()
+      .toLowerCase() ?? "";
   const expectedMediaType = scenario.endsWith("-raw")
     ? "text/plain"
     : "application/json";
