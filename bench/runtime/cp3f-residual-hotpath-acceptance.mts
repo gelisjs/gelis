@@ -72,7 +72,9 @@ const cpu = cpus()[0]?.model ?? "unknown";
 
 preflight();
 
-console.log("Competitive Performance v0.1 — CP3-F residual hot-path decomposition");
+console.log(
+  "Competitive Performance v0.1 — CP3-F residual hot-path decomposition",
+);
 console.log(`Bun:         ${Bun.version}`);
 console.log(`Revision:    ${Bun.revision}`);
 console.log(`CPU:         ${cpu}`);
@@ -96,7 +98,9 @@ if (probeOnly) {
   }
 
   console.log();
-  console.log(`CP3-F CORRECTNESS PROBE: PASS (${CELLS.length}/${CELLS.length})`);
+  console.log(
+    `CP3-F CORRECTNESS PROBE: PASS (${CELLS.length}/${CELLS.length})`,
+  );
   process.exit(0);
 }
 
@@ -119,17 +123,61 @@ console.log("Derived diagnostics — non-additive, engineering direction only");
 console.log("| diagnostic | value |");
 console.log("| --- | ---: |");
 
-printRatio("router dynamic/static consume", "router-dynamic-consume", "router-static-consume");
-printRatio("router static escape/consume", "router-static-escape", "router-static-consume");
-printRatio("router dynamic escape/consume", "router-dynamic-escape", "router-dynamic-consume");
-printRatio("normalize static / Response.json static", "normalize-static-json", "response-json-static");
-printRatio("normalize dynamic / Response.json dynamic", "normalize-dynamic-json", "response-json-dynamic");
-printDelta("app.fetch - pipeline static raw", "app-fetch-static-raw", "pipeline-static-raw");
-printDelta("app.fetch - pipeline dynamic raw", "app-fetch-dynamic-raw", "pipeline-dynamic-raw");
-printDelta("app.fetch - pipeline static JSON", "app-fetch-static-json", "pipeline-static-json");
-printDelta("app.fetch - pipeline dynamic JSON", "app-fetch-dynamic-json", "pipeline-dynamic-json");
-printRatio("dynamic/static app.fetch raw", "app-fetch-dynamic-raw", "app-fetch-static-raw");
-printRatio("dynamic/static app.fetch JSON", "app-fetch-dynamic-json", "app-fetch-static-json");
+printRatio(
+  "router dynamic/static consume",
+  "router-dynamic-consume",
+  "router-static-consume",
+);
+printRatio(
+  "router static escape/consume",
+  "router-static-escape",
+  "router-static-consume",
+);
+printRatio(
+  "router dynamic escape/consume",
+  "router-dynamic-escape",
+  "router-dynamic-consume",
+);
+printRatio(
+  "normalize static / Response.json static",
+  "normalize-static-json",
+  "response-json-static",
+);
+printRatio(
+  "normalize dynamic / Response.json dynamic",
+  "normalize-dynamic-json",
+  "response-json-dynamic",
+);
+printDelta(
+  "app.fetch - pipeline static raw",
+  "app-fetch-static-raw",
+  "pipeline-static-raw",
+);
+printDelta(
+  "app.fetch - pipeline dynamic raw",
+  "app-fetch-dynamic-raw",
+  "pipeline-dynamic-raw",
+);
+printDelta(
+  "app.fetch - pipeline static JSON",
+  "app-fetch-static-json",
+  "pipeline-static-json",
+);
+printDelta(
+  "app.fetch - pipeline dynamic JSON",
+  "app-fetch-dynamic-json",
+  "pipeline-dynamic-json",
+);
+printRatio(
+  "dynamic/static app.fetch raw",
+  "app-fetch-dynamic-raw",
+  "app-fetch-static-raw",
+);
+printRatio(
+  "dynamic/static app.fetch JSON",
+  "app-fetch-dynamic-json",
+  "app-fetch-static-json",
+);
 
 console.log();
 console.log("CP3-F LOCAL RESIDUAL DECOMPOSITION RUN: COMPLETE");
@@ -158,7 +206,11 @@ function measureCell(cell: Cell): Summary {
 function runWorker(cell: Cell, workerProbeOnly: boolean): WorkerResult {
   const result = spawnSync(
     process.execPath,
-    [WORKER, `--cell=${cell}`, `--probe-only=${workerProbeOnly ? "true" : "false"}`],
+    [
+      WORKER,
+      `--cell=${cell}`,
+      `--probe-only=${workerProbeOnly ? "true" : "false"}`,
+    ],
     {
       cwd: REPOSITORY_ROOT,
       encoding: "utf8",
@@ -174,11 +226,14 @@ function runWorker(cell: Cell, workerProbeOnly: boolean): WorkerResult {
   }
 
   const line = result.stdout.trim().split(/\r?\n/).filter(Boolean).at(-1);
-  if (line === undefined) throw new Error(`Worker emitted no result for ${cell}`);
+  if (line === undefined)
+    throw new Error(`Worker emitted no result for ${cell}`);
 
   const parsed = JSON.parse(line) as WorkerResult;
   if (parsed.cell !== cell) {
-    throw new Error(`Worker cell mismatch: expected ${cell}, got ${parsed.cell}`);
+    throw new Error(
+      `Worker cell mismatch: expected ${cell}, got ${parsed.cell}`,
+    );
   }
   return parsed;
 }
@@ -195,12 +250,23 @@ function preflight(): void {
 
   const sourceDiff = spawnSync(
     "git",
-    ["-C", REPOSITORY_ROOT, "diff", "--quiet", PRODUCTION_SOURCE, "HEAD", "--", "src"],
+    [
+      "-C",
+      REPOSITORY_ROOT,
+      "diff",
+      "--quiet",
+      PRODUCTION_SOURCE,
+      "HEAD",
+      "--",
+      "src",
+    ],
     { encoding: "utf8" },
   );
 
   if (sourceDiff.status !== 0) {
-    throw new Error(`src/** differs from frozen production source ${PRODUCTION_SOURCE}`);
+    throw new Error(
+      `src/** differs from frozen production source ${PRODUCTION_SOURCE}`,
+    );
   }
 }
 
@@ -231,7 +297,9 @@ function median(cell: Cell): number {
 }
 
 function printRatio(label: string, numerator: Cell, denominator: Cell): void {
-  console.log(`| ${label} | ${(median(numerator) / median(denominator)).toFixed(4)}x |`);
+  console.log(
+    `| ${label} | ${(median(numerator) / median(denominator)).toFixed(4)}x |`,
+  );
 }
 
 function printDelta(label: string, left: Cell, right: Cell): void {

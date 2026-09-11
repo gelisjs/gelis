@@ -135,13 +135,25 @@ function prepareCell(cell: Cell): {
       return routerEscapeCell(router, DYNAMIC_PATH, true);
     }
     case "response-json-static":
-      return responseFactoryCell(() => Response.json(staticPayload), "static-json");
+      return responseFactoryCell(
+        () => Response.json(staticPayload),
+        "static-json",
+      );
     case "response-json-dynamic":
-      return responseFactoryCell(() => Response.json(dynamicPayload), "dynamic-json");
+      return responseFactoryCell(
+        () => Response.json(dynamicPayload),
+        "dynamic-json",
+      );
     case "normalize-static-json":
-      return responseFactoryCell(() => normalizeResponse(staticPayload), "static-json");
+      return responseFactoryCell(
+        () => normalizeResponse(staticPayload),
+        "static-json",
+      );
     case "normalize-dynamic-json":
-      return responseFactoryCell(() => normalizeResponse(dynamicPayload), "dynamic-json");
+      return responseFactoryCell(
+        () => normalizeResponse(dynamicPayload),
+        "dynamic-json",
+      );
     case "pipeline-static-raw":
       return pipelineCell("static-raw");
     case "pipeline-dynamic-raw":
@@ -168,7 +180,9 @@ function routerConsumeCell(router: Router, pathname: string, dynamic: boolean) {
       if (match === undefined) return 0;
       return (
         match.route.path.length +
-        (dynamic ? (match.params.id?.length ?? 0) : Object.keys(match.params).length)
+        (dynamic
+          ? (match.params.id?.length ?? 0)
+          : Object.keys(match.params).length)
       );
     },
     assertCorrectness: () => assertRouterMatch(router, pathname, dynamic),
@@ -234,7 +248,9 @@ function responseFactoryCell(
   return {
     operation: () => {
       const response = factory();
-      return response.status + (response.headers.get("content-type")?.length ?? 0);
+      return (
+        response.status + (response.headers.get("content-type")?.length ?? 0)
+      );
     },
     assertCorrectness: async () => assertScenarioResponse(factory(), scenario),
   };
@@ -242,7 +258,8 @@ function responseFactoryCell(
 
 function buildRouter(scenario: Scenario): Router {
   const router = new Router();
-  for (let index = 0; index < ROUTES; index++) router.register(createRoute(scenario, index));
+  for (let index = 0; index < ROUTES; index++)
+    router.register(createRoute(scenario, index));
   return router;
 }
 
@@ -251,19 +268,28 @@ function buildApp(scenario: Scenario): Gelis {
 
   for (let index = 0; index < ROUTES; index++) {
     if (scenario === "static-raw") {
-      app.get(`/r/${index}` as `/r/${number}`, ({ request }) => new Response(request.method));
+      app.get(
+        `/r/${index}` as `/r/${number}`,
+        ({ request }) => new Response(request.method),
+      );
     } else if (scenario === "dynamic-raw") {
-      app.get(`/r/${index}/:id` as `/r/${number}/:id`, ({ params }) => new Response(params.id));
+      app.get(
+        `/r/${index}/:id` as `/r/${number}/:id`,
+        ({ params }) => new Response(params.id),
+      );
     } else if (scenario === "static-json") {
       app.get(`/r/${index}` as `/r/${number}`, ({ request }) => ({
         method: request.method,
         route: index,
       }));
     } else {
-      app.get(`/r/${index}/:id` as `/r/${number}/:id`, ({ request, params }) => ({
-        method: request.method,
-        id: params.id,
-      }));
+      app.get(
+        `/r/${index}/:id` as `/r/${number}/:id`,
+        ({ request, params }) => ({
+          method: request.method,
+          id: params.id,
+        }),
+      );
     }
   }
 
@@ -279,7 +305,10 @@ function createRoute(scenario: Scenario, index: number): RuntimeRouteRecord {
         ? ({ params }) => new Response(params.id)
         : scenario === "static-json"
           ? ({ request }) => ({ method: request.method, route: index })
-          : ({ request, params }) => ({ method: request.method, id: params.id });
+          : ({ request, params }) => ({
+              method: request.method,
+              id: params.id,
+            });
 
   return {
     method: "GET",
@@ -306,7 +335,11 @@ function createContext(
   };
 }
 
-function assertRouterMatch(router: Router, pathname: string, dynamic: boolean): void {
+function assertRouterMatch(
+  router: Router,
+  pathname: string,
+  dynamic: boolean,
+): void {
   const match = router.match("GET", pathname);
   if (match === undefined) throw new Error("router correctness miss");
 
@@ -328,8 +361,12 @@ function assertRouterMatch(router: Router, pathname: string, dynamic: boolean): 
   }
 }
 
-async function assertScenarioResponse(response: Response, scenario: Scenario): Promise<void> {
-  if (response.status !== 200) throw new Error(`response status mismatch: ${response.status}`);
+async function assertScenarioResponse(
+  response: Response,
+  scenario: Scenario,
+): Promise<void> {
+  if (response.status !== 200)
+    throw new Error(`response status mismatch: ${response.status}`);
 
   const body = await response.text();
   const expected =
@@ -342,7 +379,9 @@ async function assertScenarioResponse(response: Response, scenario: Scenario): P
           : JSON.stringify(dynamicPayload);
 
   if (body !== expected) {
-    throw new Error(`response body mismatch: expected ${expected}, got ${body}`);
+    throw new Error(
+      `response body mismatch: expected ${expected}, got ${body}`,
+    );
   }
 
   if (scenario === "static-json" || scenario === "dynamic-json") {
@@ -366,7 +405,10 @@ function calibrate(operation: () => void): number {
   while (true) {
     const elapsed = measure(operation, iterations);
     if (elapsed >= MIN_CALIBRATION_MS) {
-      return Math.max(1, Math.round((iterations * TARGET_MS) / Math.max(elapsed, 0.001)));
+      return Math.max(
+        1,
+        Math.round((iterations * TARGET_MS) / Math.max(elapsed, 0.001)),
+      );
     }
     iterations *= 2;
   }
@@ -395,19 +437,28 @@ function readArgs(values: readonly string[]): ParsedArgs {
 }
 
 function required(value: string | undefined, flag: string): string {
-  if (value === undefined || value.length === 0) throw new Error(`Missing ${flag}`);
+  if (value === undefined || value.length === 0)
+    throw new Error(`Missing ${flag}`);
   return value;
 }
 
 function assertCell(value: string): asserts value is Cell {
-  if (!CELLS.has(value as Cell)) throw new Error(`Unknown CP3-F cell: ${value}`);
+  if (!CELLS.has(value as Cell))
+    throw new Error(`Unknown CP3-F cell: ${value}`);
 }
 
-function assertSync<T>(value: T | PromiseLike<T>, label: string): asserts value is T {
+function assertSync<T>(
+  value: T | PromiseLike<T>,
+  label: string,
+): asserts value is T {
   if (isPromiseLike(value)) throw new Error(`unexpected async ${label}`);
 }
 
 function isPromiseLike<T>(value: T | PromiseLike<T>): value is PromiseLike<T> {
-  if (value === null || (typeof value !== "object" && typeof value !== "function")) return false;
+  if (
+    value === null ||
+    (typeof value !== "object" && typeof value !== "function")
+  )
+    return false;
   return typeof (value as { then?: unknown }).then === "function";
 }
