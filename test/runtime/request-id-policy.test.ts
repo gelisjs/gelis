@@ -151,9 +151,9 @@ describe("P11-G request-ID policy compiler", () => {
 
     for (const value of invalidValues) {
       const policy = compileRequestIdPolicy({ generator: () => value });
-      expect(() => policy.resolve(new Request("http://localhost/invalid"))).toThrow(
-        TypeError,
-      );
+      expect(() =>
+        policy.resolve(new Request("http://localhost/invalid")),
+      ).toThrow(TypeError);
     }
 
     const overLength = compileRequestIdPolicy({
@@ -185,7 +185,9 @@ describe("P11-G request-ID policy compiler", () => {
       ),
     ).toThrow("trust failed");
     expect(() =>
-      generatorFailure.resolve(new Request("http://localhost/generator-failure")),
+      generatorFailure.resolve(
+        new Request("http://localhost/generator-failure"),
+      ),
     ).toThrow("generator failed");
   });
 
