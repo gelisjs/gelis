@@ -1,0 +1,21 @@
+name: P11-G7 TypeScript Scaling Acceptance
+
+on:
+  push:
+    branches:
+      - diag/p11-g7-types-bench
+
+permissions:
+  contents: read
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.0
+      - run: bun install --frozen-lockfile
+      - name: Run frozen P11-G7 type-scaling gate
+        run: bun bench/types/p11-g7-timeout-acceptance.mts
