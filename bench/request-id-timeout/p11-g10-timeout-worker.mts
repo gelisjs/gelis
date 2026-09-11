@@ -96,12 +96,16 @@ async function runDirect(args: ParsedArgs): Promise<DirectWorkerResult> {
     framework === "gelis"
       ? await createGelisDirectBenchmark(candidateRoot, scenario)
       : createHonoDirectBenchmark(scenario);
-  const request = new Request("http://gelis.test/resource");
+  const requestUrl = "http://gelis.test/resource";
 
-  await verifyDispatch(benchmark, request, `${framework}/${scenario}`);
+  await verifyDispatch(
+    benchmark,
+    new Request(requestUrl),
+    `${framework}/${scenario}`,
+  );
 
   let sink = 0;
-  const operation = async () => {
+  const operation = async (request: Request) => {
     const result = benchmark.dispatch(request);
     const response = result instanceof Response ? result : await result;
 
@@ -112,12 +116,14 @@ async function runDirect(args: ParsedArgs): Promise<DirectWorkerResult> {
     sink ^= response.status;
   };
 
-  for (let index = 0; index < WARMUP_ASYNC; index++) {
-    await operation();
+  const warmupRequests = createRequests(requestUrl, WARMUP_ASYNC);
+  for (let index = 0; index < warmupRequests.length; index++) {
+    await operation(warmupRequests[index]!);
   }
 
-  const iterations = await calibrateAsync(operation);
-  const elapsed = await measureAsync(operation, iterations);
+  const iterations = await calibrateAsync(operation, requestUrl);
+  const measuredRequests = createRequests(requestUrl, iterations);
+  const elapsed = await measureAsync(operation, measuredRequests);
 
   return {
     mode: "direct",
@@ -143,15 +149,15 @@ async function runRouteScale(
   }
 
   const benchmark = await createGelisRouteScaleBenchmark(candidateRoot, routes);
-  const request = new Request("http://gelis.test/route/0");
+  const requestUrl = "http://gelis.test/route/0";
 
-  const verification = benchmark.dispatch(request);
+  const verification = benchmark.dispatch(new Request(requestUrl));
   if (!(verification instanceof Response) || verification.status !== 204) {
     throw new Error("P11-G10 route-scale synchronous verification failed");
   }
 
   let sink = 0;
-  const operation = () => {
+  const operation = (request: Request) => {
     const response = benchmark.dispatch(request);
 
     if (!(response instanceof Response) || response.status !== 204) {
@@ -161,12 +167,14 @@ async function runRouteScale(
     sink ^= response.status;
   };
 
-  for (let index = 0; index < WARMUP_SYNC; index++) {
-    operation();
+  const warmupRequests = createRequests(requestUrl, WARMUP_SYNC);
+  for (let index = 0; index < warmupRequests.length; index++) {
+    operation(warmupRequests[index]!);
   }
 
-  const iterations = calibrateSync(operation);
-  const elapsed = measureSync(operation, iterations);
+  const iterations = calibrateSync(operation, requestUrl);
+  const measuredRequests = createRequests(requestUrl, iterations);
+  const elapsed = measureSync(operation, measuredRequests);
 
   return {
     mode: "route-scale",
@@ -400,11 +408,15 @@ function assertDirectScenario(value: string): asserts value is DirectScenario {
   }
 }
 
-async function calibrateAsync(operation: () => Promise<void>): Promise<number> {
+async function calibrateAsync(
+  operation: (request: Request) => Promise<void>,
+  requestUrl: string,
+): Promise<number> {
   let iterations = 100;
 
   while (true) {
-    const elapsed = await measureAsync(operation, iterations);
+    const requests = createRequests(requestUrl, iterations);
+    const elapsed = await measureAsync(operation, requests);
 
     if (elapsed >= MIN_CALIBRATION_MS) {
       return Math.max(
@@ -418,23 +430,27 @@ async function calibrateAsync(operation: () => Promise<void>): Promise<number> {
 }
 
 async function measureAsync(
-  operation: () => Promise<void>,
-  iterations: number,
+  operation: (request: Request) => Promise<void>,
+  requests: readonly Request[],
 ): Promise<number> {
   const start = performance.now();
 
-  for (let index = 0; index < iterations; index++) {
-    await operation();
+  for (let index = 0; index < requests.length; index++) {
+    await operation(requests[index]!);
   }
 
   return performance.now() - start;
 }
 
-function calibrateSync(operation: () => void): number {
+function calibrateSync(
+  operation: (request: Request) => void,
+  requestUrl: string,
+): number {
   let iterations = 1_000;
 
   while (true) {
-    const elapsed = measureSync(operation, iterations);
+    const requests = createRequests(requestUrl, iterations);
+    const elapsed = measureSync(operation, requests);
 
     if (elapsed >= MIN_CALIBRATION_MS) {
       return Math.max(
@@ -447,12 +463,25 @@ function calibrateSync(operation: () => void): number {
   }
 }
 
-function measureSync(operation: () => void, iterations: number): number {
+function measureSync(
+  operation: (request: Request) => void,
+  requests: readonly Request[],
+): number {
   const start = performance.now();
 
-  for (let index = 0; index < iterations; index++) {
-    operation();
+  for (let index = 0; index < requests.length; index++) {
+    operation(requests[index]!);
   }
 
   return performance.now() - start;
+}
+
+function createRequests(requestUrl: string, count: number): Request[] {
+  const requests = new Array<Request>(count);
+
+  for (let index = 0; index < count; index++) {
+    requests[index] = new Request(requestUrl);
+  }
+
+  return requests;
 }
