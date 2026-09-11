@@ -133,7 +133,21 @@ The exact calibrated iteration count is recorded by every worker.
 
 ### Correctness guard
 
-Before timing, every worker must validate one fresh request against the exact CP1 status, media type, and body bytes. If correctness fails, the worker fails and emits no promotable timing.
+Before timing, every worker validates one fresh direct-dispatch request.
+
+Direct dispatch and final HTTP header normalization are intentionally distinguished:
+
+- status must be exactly `200`;
+- response body bytes must exactly match the CP1 body contract;
+- `Content-Encoding` must be absent;
+- JSON direct responses must expose media type `application/json`;
+- raw direct responses may expose no `Content-Type` because a plain Web `Response(string)` does not itself require one; if raw `Content-Type` is present it must normalize to `text/plain`.
+
+Final over-the-wire media-type equivalence remains covered by CP1 and is revalidated in CP2-H. A direct framework must not be penalized or rewarded for server-layer header normalization that is outside the direct-dispatch domain.
+
+This clarification was frozen after the first CP2-D correctness-only probe showed that Gelis direct `new Response("GET")` correctly returned the expected status/body but no `Content-Type`. No timing had been executed, so no candidate performance result existed when this protocol clarification was made.
+
+If correctness fails, the worker fails and emits no promotable timing.
 
 ## CP2-H — real HTTP crown and raw Bun ceiling
 
