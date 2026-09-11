@@ -96,7 +96,9 @@ const probeOnly = process.argv.includes("--probe-only");
 await assertEnvironment(probeOnly);
 await buildAotArtifacts();
 
-console.log("Competitive Performance v0.1 — CP3-D HTTP Core Crown revalidation");
+console.log(
+  "Competitive Performance v0.1 — CP3-D HTTP Core Crown revalidation",
+);
 console.log(`Bun:         ${Bun.version}`);
 console.log(`CPU:         ${cpus()[0]?.model ?? "unknown"}`);
 console.log(`Harness SHA: ${gitHead(REPO_ROOT)}`);
