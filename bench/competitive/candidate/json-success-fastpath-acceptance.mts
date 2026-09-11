@@ -61,7 +61,9 @@ const cells = PAYLOAD_KINDS.flatMap((payloadKind) =>
 
 preflight();
 
-console.log("Competitive Performance v0.1 — CP3-C JSON success fast-path candidate");
+console.log(
+  "Competitive Performance v0.1 — CP3-C JSON success fast-path candidate",
+);
 console.log(`Bun:         ${Bun.version}`);
 console.log(`CPU:         ${cpu}`);
 console.log(`Harness SHA: ${harnessSha}`);
@@ -87,7 +89,9 @@ if (probeOnly) {
   }
 
   console.log();
-  console.log(`CP3-C CORRECTNESS PROBE: PASS (${cells.length}/${cells.length})`);
+  console.log(
+    `CP3-C CORRECTNESS PROBE: PASS (${cells.length}/${cells.length})`,
+  );
   process.exit(0);
 }
 
@@ -110,7 +114,9 @@ for (const payloadKind of PAYLOAD_KINDS) {
 }
 
 console.log();
-console.log("Derived diagnostics — non-additive, for engineering direction only");
+console.log(
+  "Derived diagnostics — non-additive, for engineering direction only",
+);
 console.log("| diagnostic | value |");
 console.log("| --- | ---: |");
 
