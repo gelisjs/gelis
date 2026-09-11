@@ -7,7 +7,7 @@ const ROOT = resolve(HERE, "../..");
 const WORKER = resolve(HERE, "p11-g8-zero-unused-worker.mts");
 
 const CONTROL_SHA = "c6a65d639679464744ba3be21cfc8acb0f850d9a";
-const CANDIDATE_SHA = "4b9053d7efaec35e71d35b3fbb0cb5b97cba7b61";
+const CANDIDATE_SHA = "1dd5f94cf0e9ad884ca44e537ee287587cd8baab";
 const SAMPLE_COUNT = 11;
 const CASE_GATE = 1.03;
 const GEOMEAN_GATE = 1.015;
