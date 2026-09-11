@@ -1,0 +1,38 @@
+name: P11-H3 Evidence Prettier
+
+on:
+  push:
+    branches:
+      - diag/p11-h3-prettier
+
+permissions:
+  contents: write
+
+jobs:
+  format:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.0
+      - name: Checkout target branch
+        run: git switch work/p11-h3-package-aot-docs
+      - run: bun install --frozen-lockfile
+      - name: Apply repository Prettier
+        run: >-
+          bunx prettier
+          docs/architecture/p11-h3-package-aot-docs-audit.md
+          test/runtime/p11-h-aot-composition.test.ts
+          --write
+      - name: Commit formatted evidence
+        shell: bash
+        run: |
+          git diff --check
+          git config user.name "Rigent"
+          git config user.email "127601320+rigenttio@users.noreply.github.com"
+          git add docs/architecture/p11-h3-package-aot-docs-audit.md test/runtime/p11-h-aot-composition.test.ts
+          git commit -m "style(p11-h): format H3 evidence"
+          git push origin HEAD:work/p11-h3-package-aot-docs
