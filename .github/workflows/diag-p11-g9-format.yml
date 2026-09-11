@@ -1,0 +1,43 @@
+name: P11-G9 Format Harness
+
+on:
+  push:
+    branches:
+      - diag/p11-g9-format
+
+permissions:
+  contents: write
+
+jobs:
+  format:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.0
+      - name: Checkout target branch
+        run: |
+          git fetch origin work/p11-g9-request-id-competitor
+          git checkout -B work/p11-g9-request-id-competitor origin/work/p11-g9-request-id-competitor
+      - run: bun install --frozen-lockfile
+      - name: Format and typecheck G9 harness
+        run: |
+          bunx prettier \
+            bench/request-id-timeout/p11-g9-request-id-worker.mts \
+            bench/request-id-timeout/p11-g9-request-id-http-server.mts \
+            bench/request-id-timeout/p11-g9-request-id-acceptance.mts \
+            --write
+          git diff --check
+          bun run typecheck:bench
+      - name: Commit target branch
+        run: |
+          git config user.name "Rigent"
+          git config user.email "127601320+rigenttio@users.noreply.github.com"
+          git add bench/request-id-timeout/p11-g9-request-id-worker.mts \
+            bench/request-id-timeout/p11-g9-request-id-http-server.mts \
+            bench/request-id-timeout/p11-g9-request-id-acceptance.mts
+          git commit -m "style(bench): format P11-G9 request-ID harness"
+          git push origin HEAD:work/p11-g9-request-id-competitor
