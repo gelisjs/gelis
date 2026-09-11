@@ -17,8 +17,9 @@ export interface TimeoutState {
 }
 
 interface TimeoutRequestState {
-  signal: AbortSignal;
-  readonly applicationController: AbortController | undefined;
+  cooperativeController: AbortController | undefined;
+  cooperativeAbortRecorded: boolean;
+  cooperativeAbortReason: unknown;
   applicationDeadline: number | undefined;
 }
 
@@ -29,27 +30,48 @@ export function createTimeoutState(
 
   return {
     prepare(request) {
-      if (applicationDuration === undefined) {
-        requests.set(request, {
-          signal: request.signal,
-          applicationController: undefined,
-          applicationDeadline: undefined,
-        });
-        return;
-      }
-
-      const applicationController = new AbortController();
-      forwardAbort(request.signal, applicationController);
-
       requests.set(request, {
-        signal: applicationController.signal,
-        applicationController,
+        cooperativeController: undefined,
+        cooperativeAbortRecorded: false,
+        cooperativeAbortReason: undefined,
         applicationDeadline: undefined,
       });
     },
 
     signal(request) {
-      return requests.get(request)?.signal ?? request.signal;
+      const state = requests.get(request);
+
+      if (state === undefined) {
+        return request.signal;
+      }
+
+      const existing = state.cooperativeController;
+      if (existing !== undefined) {
+        return existing.signal;
+      }
+
+      const controller = new AbortController();
+      state.cooperativeController = controller;
+
+      if (state.cooperativeAbortRecorded) {
+        controller.abort(state.cooperativeAbortReason);
+        return controller.signal;
+      }
+
+      if (request.signal.aborted) {
+        recordCooperativeAbort(state, request.signal.reason);
+        return controller.signal;
+      }
+
+      request.signal.addEventListener(
+        "abort",
+        () => {
+          recordCooperativeAbort(state, request.signal.reason);
+        },
+        { once: true },
+      );
+
+      return controller.signal;
     },
 
     executeApplication(request, run) {
@@ -58,16 +80,17 @@ export function createTimeoutState(
       }
 
       const state = requests.get(request);
-      if (state === undefined || state.applicationController === undefined) {
+      if (state === undefined) {
         throw new Error("Missing Gelis timeout request state");
       }
 
       state.applicationDeadline = Date.now() + applicationDuration;
 
       return executeWithDeadline(
+        request,
+        state,
         applicationDuration,
         "application",
-        state.applicationController,
         run,
       );
     },
@@ -94,19 +117,16 @@ export function createTimeoutState(
         return run();
       }
 
-      const routeController = new AbortController();
-      forwardAbort(state.signal, routeController);
-      state.signal = routeController.signal;
-
-      return executeWithDeadline(duration, "route", routeController, run);
+      return executeWithDeadline(request, state, duration, "route", run);
     },
   };
 }
 
 function executeWithDeadline(
+  request: Request,
+  state: TimeoutRequestState,
   duration: number,
   scope: TimeoutScope,
-  controller: AbortController,
   run: () => Response | Promise<Response>,
 ): Response | Promise<Response> {
   let settled = false;
@@ -119,7 +139,14 @@ function executeWithDeadline(
 
     settled = true;
     const error = new TimeoutError(duration, scope);
-    controller.abort(error);
+
+    if (!state.cooperativeAbortRecorded) {
+      recordCooperativeAbort(
+        state,
+        request.signal.aborted ? request.signal.reason : error,
+      );
+    }
+
     rejectTimeout?.(error);
   }, duration);
 
@@ -165,17 +192,15 @@ function executeWithDeadline(
   });
 }
 
-function forwardAbort(source: AbortSignal, target: AbortController): void {
-  if (source.aborted) {
-    target.abort(source.reason);
+function recordCooperativeAbort(
+  state: TimeoutRequestState,
+  reason: unknown,
+): void {
+  if (state.cooperativeAbortRecorded) {
     return;
   }
 
-  source.addEventListener(
-    "abort",
-    () => {
-      target.abort(source.reason);
-    },
-    { once: true },
-  );
+  state.cooperativeAbortRecorded = true;
+  state.cooperativeAbortReason = reason;
+  state.cooperativeController?.abort(reason);
 }
