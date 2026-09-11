@@ -50,12 +50,12 @@ This is decomposition evidence used to choose the next optimization target. It i
 | router dynamic escape/consume             | 0.9764x |
 | normalize static / Response.json static   | 1.0311x |
 | normalize dynamic / Response.json dynamic | 1.0292x |
-| app.fetch - pipeline static raw            | 19.5 ns |
-| app.fetch - pipeline dynamic raw           | 22.0 ns |
-| app.fetch - pipeline static JSON           |  3.6 ns |
-| app.fetch - pipeline dynamic JSON          | 20.4 ns |
-| dynamic/static app.fetch raw               | 1.4862x |
-| dynamic/static app.fetch JSON              | 1.2828x |
+| app.fetch - pipeline static raw           | 19.5 ns |
+| app.fetch - pipeline dynamic raw          | 22.0 ns |
+| app.fetch - pipeline static JSON          |  3.6 ns |
+| app.fetch - pipeline dynamic JSON         | 20.4 ns |
+| dynamic/static app.fetch raw              | 1.4862x |
+| dynamic/static app.fetch JSON             | 1.2828x |
 
 Additional engineering decomposition from the authoritative medians:
 
