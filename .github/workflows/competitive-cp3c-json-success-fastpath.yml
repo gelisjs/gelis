@@ -1,0 +1,32 @@
+name: Competitive CP3-C JSON Success Fast-Path Candidate
+
+on:
+  push:
+    branches:
+      - work/competitive-cp3c-json-success-fastpath
+
+jobs:
+  candidate:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Setup Bun 1.4.2
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+
+      - name: Install frozen dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Typecheck CP3-C harness
+        run: bun ./node_modules/typescript/bin/tsc -p bench/competitive/candidate/tsconfig.json --noEmit
+
+      - name: Run ordinary response regression tests
+        run: bun test test/runtime/response-normalization-fastpath.test.ts test/runtime/response-content-type.test.ts test/runtime/response-contract.test.ts
+
+      - name: Run CP3-C correctness probe only
+        run: bun bench/competitive/candidate/json-success-fastpath-acceptance.mts --probe-only
