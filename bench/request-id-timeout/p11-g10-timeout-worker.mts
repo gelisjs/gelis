@@ -130,12 +130,16 @@ async function runDirect(args: ParsedArgs): Promise<DirectWorkerResult> {
   };
 }
 
-async function runRouteScale(args: ParsedArgs): Promise<RouteScaleWorkerResult> {
+async function runRouteScale(
+  args: ParsedArgs,
+): Promise<RouteScaleWorkerResult> {
   const candidateRoot = required(args.candidateRoot, "--candidate-root");
   const routes = Number(required(args.routes, "--routes"));
 
   if (routes !== 1_000 && routes !== 5_000) {
-    throw new Error(`P11-G10 route-scale requires 1000 or 5000 routes, got ${routes}`);
+    throw new Error(
+      `P11-G10 route-scale requires 1000 or 5000 routes, got ${routes}`,
+    );
   }
 
   const benchmark = await createGelisRouteScaleBenchmark(candidateRoot, routes);
@@ -190,7 +194,9 @@ async function runFire(args: ParsedArgs): Promise<FireWorkerResult> {
   const elapsedMs = performance.now() - started;
 
   if (response.status !== 504) {
-    throw new Error(`${framework} timeout-fire diagnostic returned ${response.status}`);
+    throw new Error(
+      `${framework} timeout-fire diagnostic returned ${response.status}`,
+    );
   }
 
   return {
@@ -212,9 +218,7 @@ async function createGelisDirectBenchmark(
   const asynchronous = scenario.includes("-async-");
 
   app.use(
-    applicationTimeout
-      ? timeout({ duration: DIRECT_TIMEOUT_MS })
-      : timeout(),
+    applicationTimeout ? timeout({ duration: DIRECT_TIMEOUT_MS }) : timeout(),
   );
 
   const handler = asynchronous
@@ -232,7 +236,9 @@ async function createGelisDirectBenchmark(
   };
 }
 
-function createHonoDirectBenchmark(scenario: DirectScenario): BenchmarkDispatch {
+function createHonoDirectBenchmark(
+  scenario: DirectScenario,
+): BenchmarkDispatch {
   const app = new Hono();
   const applicationTimeout = scenario.startsWith("application-");
   const asynchronous = scenario.includes("-async-");

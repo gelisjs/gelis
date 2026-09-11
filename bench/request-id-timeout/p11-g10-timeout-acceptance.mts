@@ -61,9 +61,7 @@ interface FireWorkerResult {
 }
 
 type WorkerResult =
-  | DirectWorkerResult
-  | RouteScaleWorkerResult
-  | FireWorkerResult;
+  DirectWorkerResult | RouteScaleWorkerResult | FireWorkerResult;
 
 interface PairedResult {
   readonly gelisNs: number;
@@ -164,7 +162,9 @@ const directScenarios: readonly DirectScenario[] = [
   "route-async-static-204",
 ];
 
-console.log("Timeout successful-under-deadline direct comparison vs Hono 4.13.5");
+console.log(
+  "Timeout successful-under-deadline direct comparison vs Hono 4.13.5",
+);
 console.log(
   "| scenario | Gelis ns/op | Hono ns/op | Gelis/Hono | Hono-first | Gelis-first | gate |",
 );
@@ -192,8 +192,11 @@ console.log(
   `\nTimeout direct geomean: ${formatRatio(directGeomean)} <= ${DIRECT_GEOMEAN_GATE.toFixed(2)}x => ${directGeomeanPass ? "PASS" : "FAIL"}\n`,
 );
 
-console.log("Timeout-fire diagnostic (correctness only; not a performance gate)");
-const firePairs: Array<{ gelis: FireWorkerResult; hono: FireWorkerResult }> = [];
+console.log(
+  "Timeout-fire diagnostic (correctness only; not a performance gate)",
+);
+const firePairs: Array<{ gelis: FireWorkerResult; hono: FireWorkerResult }> =
+  [];
 
 for (let sample = 0; sample < FIRE_SAMPLE_COUNT; sample++) {
   const honoFirst = sample % 2 === 0;
@@ -280,15 +283,11 @@ const routeScale = await runMirroredRouteScale(candidateRoot);
 const routeScalePass = routeScale.ratio <= ROUTE_SCALE_GATE;
 accepted &&= routeScalePass;
 
-console.log(
-  `1,000 routes median: ${formatNs(routeScale.thousandNs)} ns/op`,
-);
+console.log(`1,000 routes median: ${formatNs(routeScale.thousandNs)} ns/op`);
 console.log(
   `5,000 routes median: ${formatNs(routeScale.fiveThousandNs)} ns/op`,
 );
-console.log(
-  `5000/1000 median:    ${formatRatio(routeScale.ratio)}`,
-);
+console.log(`5000/1000 median:    ${formatRatio(routeScale.ratio)}`);
 console.log(
   `Order diagnostics:  1000-first ${formatRatio(routeScale.thousandFirstRatio)}, 5000-first ${formatRatio(routeScale.fiveThousandFirstRatio)}`,
 );
@@ -379,9 +378,7 @@ async function runMirroredRouteScale(
 
   return {
     thousandNs: median(pairs.map((pair) => pair.thousand.nsPerOp)),
-    fiveThousandNs: median(
-      pairs.map((pair) => pair.fiveThousand.nsPerOp),
-    ),
+    fiveThousandNs: median(pairs.map((pair) => pair.fiveThousand.nsPerOp)),
     ratio: median(ratios),
     thousandFirstRatio: median(thousandFirstRatios),
     fiveThousandFirstRatio: median(fiveThousandFirstRatios),
