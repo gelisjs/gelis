@@ -1,0 +1,20 @@
+name: P11-G4 Prettier Diagnostic
+
+on:
+  push:
+    branches:
+      - diag/p11-g4-prettier
+
+jobs:
+  prettier:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.0
+      - run: bun install --frozen-lockfile
+      - name: Show authoritative Prettier diff
+        run: |
+          bunx prettier src/runtime/application-http.ts src/timeout/policy.ts --write
+          git diff -- src/runtime/application-http.ts src/timeout/policy.ts
