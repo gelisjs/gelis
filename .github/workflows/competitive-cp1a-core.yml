@@ -1,0 +1,44 @@
+name: Competitive CP1-A Core Equivalence
+
+on:
+  push:
+    branches:
+      - work/competitive-cp1a-core-equivalence
+
+permissions:
+  contents: read
+
+jobs:
+  equivalence:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Setup Bun 1.4.2
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+
+      - name: Install root dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Install exact competitive dependencies
+        run: bun install --cwd bench/competitive
+
+      - name: Typecheck competitive harness
+        working-directory: bench/competitive
+        run: bun ../../node_modules/typescript/bin/tsc -p tsconfig.json --noEmit
+
+      - name: Run CP1-A equivalence probe
+        working-directory: bench/competitive
+        run: bun core/probe.mts
+
+      - name: Emit competitive lockfile for freeze
+        shell: bash
+        run: |
+          echo "__COMPETITIVE_LOCK_START__"
+          cat bench/competitive/bun.lock
+          echo "__COMPETITIVE_LOCK_END__"
