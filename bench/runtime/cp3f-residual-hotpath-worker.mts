@@ -3,12 +3,11 @@ import { Router } from "../../src/runtime/router.ts";
 import { normalizeResponse, runtimeReply } from "../../src/runtime/response.ts";
 import { pathnameFromUrl } from "../../src/runtime/url.ts";
 import { RUNTIME_ROUTE_PLAIN } from "../../src/runtime/types.ts";
-
+import type { RuntimeRouteMatch } from "../../src/runtime/router.ts";
 import type {
   RuntimeRouteContext,
   RuntimeRouteHandler,
   RuntimeRouteRecord,
-  RuntimeRouteMatch,
 } from "../../src/runtime/types.ts";
 
 const ROUTES = 5_000;
@@ -16,16 +15,14 @@ const LAST = ROUTES - 1;
 const WARMUP = 20_000;
 const TARGET_MS = 120;
 const MIN_CALIBRATION_MS = 20;
-
 const STATIC_PATH = `/r/${LAST}`;
 const DYNAMIC_PATH = `/r/${LAST}/value-42`;
 const STATIC_URL = `http://gelis.test${STATIC_PATH}`;
 const DYNAMIC_URL = `http://gelis.test${DYNAMIC_PATH}`;
-
 const staticPayload = { method: "GET", route: LAST } as const;
 const dynamicPayload = { method: "GET", id: "value-42" } as const;
 
-export type Cell =
+type Cell =
   | "router-static-consume"
   | "router-dynamic-consume"
   | "router-static-escape"
@@ -43,6 +40,9 @@ export type Cell =
   | "app-fetch-static-json"
   | "app-fetch-dynamic-json";
 
+type Scenario = "static-raw" | "dynamic-raw" | "static-json" | "dynamic-json";
+type Operation = () => number;
+
 interface WorkerResult {
   readonly cell: Cell;
   readonly probeOnly: boolean;
@@ -52,16 +52,30 @@ interface WorkerResult {
   readonly sink: number;
 }
 
-type Operation = () => number;
-
-type Scenario = "static-raw" | "dynamic-raw" | "static-json" | "dynamic-json";
+const CELLS = new Set<Cell>([
+  "router-static-consume",
+  "router-dynamic-consume",
+  "router-static-escape",
+  "router-dynamic-escape",
+  "response-json-static",
+  "response-json-dynamic",
+  "normalize-static-json",
+  "normalize-dynamic-json",
+  "pipeline-static-raw",
+  "pipeline-dynamic-raw",
+  "pipeline-static-json",
+  "pipeline-dynamic-json",
+  "app-fetch-static-raw",
+  "app-fetch-dynamic-raw",
+  "app-fetch-static-json",
+  "app-fetch-dynamic-json",
+]);
 
 const args = readArgs(process.argv.slice(2));
 const requestedCell = required(args.cell, "--cell");
 assertCell(requestedCell);
 const cell = requestedCell;
 const probeOnly = args.probeOnly === "true";
-
 let escapedMatch: RuntimeRouteMatch | undefined;
 
 const prepared = prepareCell(cell);
@@ -76,7 +90,6 @@ if (probeOnly) {
     nsPerOp: null,
     sink: escapedMatch?.route.path.length ?? 0,
   };
-
   console.log(JSON.stringify(result));
 } else {
   let sink = 0;
@@ -86,7 +99,6 @@ if (probeOnly) {
   };
 
   for (let index = 0; index < WARMUP; index++) operation();
-
   const iterations = calibrate(operation);
   const elapsed = measure(operation, iterations);
 
@@ -98,7 +110,6 @@ if (probeOnly) {
     nsPerOp: (elapsed * 1_000_000) / iterations,
     sink: sink ^ (escapedMatch?.route.path.length ?? 0),
   };
-
   console.log(JSON.stringify(result));
 }
 
@@ -111,86 +122,60 @@ function prepareCell(cell: Cell): {
       const router = buildRouter("static-json");
       return routerConsumeCell(router, STATIC_PATH, false);
     }
-
     case "router-dynamic-consume": {
       const router = buildRouter("dynamic-json");
       return routerConsumeCell(router, DYNAMIC_PATH, true);
     }
-
     case "router-static-escape": {
       const router = buildRouter("static-json");
       return routerEscapeCell(router, STATIC_PATH, false);
     }
-
     case "router-dynamic-escape": {
       const router = buildRouter("dynamic-json");
       return routerEscapeCell(router, DYNAMIC_PATH, true);
     }
-
     case "response-json-static":
       return responseFactoryCell(() => Response.json(staticPayload), "static-json");
-
     case "response-json-dynamic":
       return responseFactoryCell(() => Response.json(dynamicPayload), "dynamic-json");
-
     case "normalize-static-json":
       return responseFactoryCell(() => normalizeResponse(staticPayload), "static-json");
-
     case "normalize-dynamic-json":
       return responseFactoryCell(() => normalizeResponse(dynamicPayload), "dynamic-json");
-
     case "pipeline-static-raw":
       return pipelineCell("static-raw");
-
     case "pipeline-dynamic-raw":
       return pipelineCell("dynamic-raw");
-
     case "pipeline-static-json":
       return pipelineCell("static-json");
-
     case "pipeline-dynamic-json":
       return pipelineCell("dynamic-json");
-
     case "app-fetch-static-raw":
       return appFetchCell("static-raw");
-
     case "app-fetch-dynamic-raw":
       return appFetchCell("dynamic-raw");
-
     case "app-fetch-static-json":
       return appFetchCell("static-json");
-
     case "app-fetch-dynamic-json":
       return appFetchCell("dynamic-json");
   }
 }
 
-function routerConsumeCell(
-  router: Router,
-  pathname: string,
-  dynamic: boolean,
-): {
-  readonly operation: Operation;
-  readonly assertCorrectness: () => void;
-} {
+function routerConsumeCell(router: Router, pathname: string, dynamic: boolean) {
   return {
     operation: () => {
       const match = router.match("GET", pathname);
       if (match === undefined) return 0;
-      return match.route.path.length + (dynamic ? (match.params.id?.length ?? 0) : Object.keys(match.params).length);
+      return (
+        match.route.path.length +
+        (dynamic ? (match.params.id?.length ?? 0) : Object.keys(match.params).length)
+      );
     },
     assertCorrectness: () => assertRouterMatch(router, pathname, dynamic),
   };
 }
 
-function routerEscapeCell(
-  router: Router,
-  pathname: string,
-  dynamic: boolean,
-): {
-  readonly operation: Operation;
-  readonly assertCorrectness: () => void;
-} {
+function routerEscapeCell(router: Router, pathname: string, dynamic: boolean) {
   return {
     operation: () => {
       escapedMatch = router.match("GET", pathname);
@@ -200,11 +185,8 @@ function routerEscapeCell(
   };
 }
 
-function pipelineCell(scenario: Scenario): {
-  readonly operation: Operation;
-  readonly assertCorrectness: () => Promise<void>;
-} {
-  const staticRoute = scenario === "static-raw" || scenario === "static-json";
+function pipelineCell(scenario: Scenario) {
+  const staticRoute = isStatic(scenario);
   const pathname = staticRoute ? STATIC_PATH : DYNAMIC_PATH;
   const request = new Request(staticRoute ? STATIC_URL : DYNAMIC_URL);
   const router = buildRouter(scenario);
@@ -213,7 +195,6 @@ function pipelineCell(scenario: Scenario): {
     const path = pathnameFromUrl(request.url);
     const match = router.match("GET", path);
     if (match === undefined) throw new Error("pipeline route miss");
-
     const value = match.route.handler(createContext(request, match.params));
     assertSync(value, "pipeline handler");
     return normalizeResponse(value);
@@ -228,12 +209,8 @@ function pipelineCell(scenario: Scenario): {
   };
 }
 
-function appFetchCell(scenario: Scenario): {
-  readonly operation: Operation;
-  readonly assertCorrectness: () => Promise<void>;
-} {
-  const staticRoute = scenario === "static-raw" || scenario === "static-json";
-  const request = new Request(staticRoute ? STATIC_URL : DYNAMIC_URL);
+function appFetchCell(scenario: Scenario) {
+  const request = new Request(isStatic(scenario) ? STATIC_URL : DYNAMIC_URL);
   const app = buildApp(scenario);
 
   return {
@@ -253,10 +230,7 @@ function appFetchCell(scenario: Scenario): {
 function responseFactoryCell(
   factory: () => Response,
   scenario: "static-json" | "dynamic-json",
-): {
-  readonly operation: Operation;
-  readonly assertCorrectness: () => Promise<void>;
-} {
+) {
   return {
     operation: () => {
       const response = factory();
@@ -268,11 +242,7 @@ function responseFactoryCell(
 
 function buildRouter(scenario: Scenario): Router {
   const router = new Router();
-
-  for (let index = 0; index < ROUTES; index++) {
-    router.register(createRoute(scenario, index));
-  }
-
+  for (let index = 0; index < ROUTES; index++) router.register(createRoute(scenario, index));
   return router;
 }
 
@@ -282,31 +252,26 @@ function buildApp(scenario: Scenario): Gelis {
   for (let index = 0; index < ROUTES; index++) {
     if (scenario === "static-raw") {
       app.get(`/r/${index}` as `/r/${number}`, ({ request }) => new Response(request.method));
-      continue;
-    }
-
-    if (scenario === "dynamic-raw") {
+    } else if (scenario === "dynamic-raw") {
       app.get(`/r/${index}/:id` as `/r/${number}/:id`, ({ params }) => new Response(params.id));
-      continue;
+    } else if (scenario === "static-json") {
+      app.get(`/r/${index}` as `/r/${number}`, ({ request }) => ({
+        method: request.method,
+        route: index,
+      }));
+    } else {
+      app.get(`/r/${index}/:id` as `/r/${number}/:id`, ({ request, params }) => ({
+        method: request.method,
+        id: params.id,
+      }));
     }
-
-    if (scenario === "static-json") {
-      app.get(`/r/${index}` as `/r/${number}`, ({ request }) => ({ method: request.method, route: index }));
-      continue;
-    }
-
-    app.get(`/r/${index}/:id` as `/r/${number}/:id`, ({ request, params }) => ({
-      method: request.method,
-      id: params.id,
-    }));
   }
 
   return app;
 }
 
 function createRoute(scenario: Scenario, index: number): RuntimeRouteRecord {
-  const path = scenario === "static-raw" || scenario === "static-json" ? `/r/${index}` : `/r/${index}/:id`;
-
+  const path = isStatic(scenario) ? `/r/${index}` : `/r/${index}/:id`;
   const handler: RuntimeRouteHandler =
     scenario === "static-raw"
       ? ({ request }) => new Response(request.method)
@@ -364,9 +329,7 @@ function assertRouterMatch(router: Router, pathname: string, dynamic: boolean): 
 }
 
 async function assertScenarioResponse(response: Response, scenario: Scenario): Promise<void> {
-  if (response.status !== 200) {
-    throw new Error(`response status mismatch: ${response.status}`);
-  }
+  if (response.status !== 200) throw new Error(`response status mismatch: ${response.status}`);
 
   const body = await response.text();
   const expected =
@@ -383,16 +346,23 @@ async function assertScenarioResponse(response: Response, scenario: Scenario): P
   }
 
   if (scenario === "static-json" || scenario === "dynamic-json") {
-    const mediaType = response.headers.get("content-type")?.split(";", 1)[0]?.trim().toLowerCase();
+    const mediaType = response.headers
+      .get("content-type")
+      ?.split(";", 1)[0]
+      ?.trim()
+      .toLowerCase();
     if (mediaType !== "application/json") {
       throw new Error(`JSON media type mismatch: ${mediaType}`);
     }
   }
 }
 
+function isStatic(scenario: Scenario): boolean {
+  return scenario === "static-raw" || scenario === "static-json";
+}
+
 function calibrate(operation: () => void): number {
   let iterations = 1_000;
-
   while (true) {
     const elapsed = measure(operation, iterations);
     if (elapsed >= MIN_CALIBRATION_MS) {
@@ -421,35 +391,13 @@ function readArgs(values: readonly string[]): ParsedArgs {
     if (separator === -1) continue;
     entries.set(value.slice(2, separator), value.slice(separator + 1));
   }
-  return {
-    cell: entries.get("cell"),
-    probeOnly: entries.get("probe-only"),
-  };
+  return { cell: entries.get("cell"), probeOnly: entries.get("probe-only") };
 }
 
 function required(value: string | undefined, flag: string): string {
   if (value === undefined || value.length === 0) throw new Error(`Missing ${flag}`);
   return value;
 }
-
-const CELLS = new Set<Cell>([
-  "router-static-consume",
-  "router-dynamic-consume",
-  "router-static-escape",
-  "router-dynamic-escape",
-  "response-json-static",
-  "response-json-dynamic",
-  "normalize-static-json",
-  "normalize-dynamic-json",
-  "pipeline-static-raw",
-  "pipeline-dynamic-raw",
-  "pipeline-static-json",
-  "pipeline-dynamic-json",
-  "app-fetch-static-raw",
-  "app-fetch-dynamic-raw",
-  "app-fetch-static-json",
-  "app-fetch-dynamic-json",
-]);
 
 function assertCell(value: string): asserts value is Cell {
   if (!CELLS.has(value as Cell)) throw new Error(`Unknown CP3-F cell: ${value}`);
