@@ -1,0 +1,148 @@
+name: P11-G5 Route Timeout Build
+
+on:
+  push:
+    branches:
+      - diag/p11-g5-route-timeout-build
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.0
+      - name: Checkout target branch
+        run: |
+          git fetch origin work/p11-g5-route-timeout
+          git checkout -B work/p11-g5-route-timeout origin/work/p11-g5-route-timeout
+      - run: bun install --frozen-lockfile
+      - name: Apply G5 route-timeout specialization
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          def replace_once(path: str, old: str, new: str):
+              p = Path(path)
+              text = p.read_text()
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f"{path}: expected one match, got {count}: {old[:80]!r}")
+              p.write_text(text.replace(old, new, 1))
+
+          def replace_exact_count(path: str, old: str, new: str, expected: int):
+              p = Path(path)
+              text = p.read_text()
+              count = text.count(old)
+              if count != expected:
+                  raise SystemExit(f"{path}: expected {expected} matches, got {count}: {old[:80]!r}")
+              p.write_text(text.replace(old, new))
+
+          # Public non-generic route option.
+          replace_exact_count(
+              "src/route.ts",
+              "  readonly bodyLimit?: number;\n\n  readonly responses?:",
+              "  readonly bodyLimit?: number;\n\n  readonly timeout?: number;\n\n  readonly responses?:",
+              2,
+          )
+
+          # Timed-route-only runtime sidecar and bit. Plain route object shape stays unchanged.
+          replace_once(
+              "src/runtime/types.ts",
+              "export const RUNTIME_ROUTE_MODULE_REQUEST_SCOPE = 32;\n\n",
+              '''export const RUNTIME_ROUTE_MODULE_REQUEST_SCOPE = 32;\n\nexport const RUNTIME_ROUTE_TIMEOUT = 64;\n\nexport const RUNTIME_ROUTE_TIMEOUT_PLAN = Symbol(\n  "gelis.runtime.route.timeout-plan",\n);\n\nexport type RuntimeRouteTimeoutExecutor = (\n  request: Request,\n  run: () => Response | Promise<Response>,\n) => Response | Promise<Response>;\n\nexport interface RuntimeRouteTimeoutPlan {\n  readonly duration: number;\n  readonly execute?: RuntimeRouteTimeoutExecutor;\n}\n\n''',
+          )
+          replace_once(
+              "src/runtime/types.ts",
+              "  readonly handler: RuntimeRouteHandler;\n\n",
+              '''  /*\n   * Present only on routes that explicitly declare RouteOptions.timeout.\n   * The timeout capability replaces the unbound declaration-time plan with\n   * an application-bound executor during Lane C specialization.\n   */\n  [RUNTIME_ROUTE_TIMEOUT_PLAN]?: RuntimeRouteTimeoutPlan;\n\n  readonly handler: RuntimeRouteHandler;\n\n''',
+          )
+
+          # RouteBuilder records/validates timeout only on option-bearing routes.
+          replace_once(
+              "src/route-builder.ts",
+              "  RUNTIME_ROUTE_RESPONSE,\n} from \"./runtime/types\";",
+              '''  RUNTIME_ROUTE_RESPONSE,\n  RUNTIME_ROUTE_TIMEOUT,\n  RUNTIME_ROUTE_TIMEOUT_PLAN,\n} from "./runtime/types";''',
+          )
+          replace_once(
+              "src/route-builder.ts",
+              "    const fullPath = this.resolve(path);\n\n    const input = createRuntimeInputPlan(options);",
+              '''    const fullPath = this.resolve(path);\n\n    const timeout = options?.timeout;\n\n    if (timeout !== undefined) {\n      assertRouteTimeoutDuration(timeout);\n    }\n\n    const input = createRuntimeInputPlan(options);''',
+          )
+          replace_once(
+              "src/route-builder.ts",
+              "    if (responsePlan !== undefined) {\n      flags |= RUNTIME_ROUTE_RESPONSE;\n    }\n\n    const runtimeRoute: RuntimeRouteRecord = {",
+              '''    if (responsePlan !== undefined) {\n      flags |= RUNTIME_ROUTE_RESPONSE;\n    }\n\n    if (timeout !== undefined) {\n      flags |= RUNTIME_ROUTE_TIMEOUT;\n    }\n\n    const runtimeRoute: RuntimeRouteRecord = {''',
+          )
+          replace_once(
+              "src/route-builder.ts",
+              "    if (contractMetadata !== undefined) {\n",
+              '''    if (timeout !== undefined) {\n      runtimeRoute[RUNTIME_ROUTE_TIMEOUT_PLAN] = {\n        duration: timeout,\n      };\n    }\n\n    if (contractMetadata !== undefined) {\n''',
+          )
+          p = Path("src/route-builder.ts")
+          text = p.read_text()
+          text += '''\n\nfunction assertRouteTimeoutDuration(value: number): void {\n  if (\n    !Number.isSafeInteger(value) ||\n    value < 1 ||\n    value > 2_147_483_647\n  ) {\n    throw new TypeError(\n      "Gelis route timeout must be an integer between 1 and 2147483647 milliseconds",\n    );\n  }\n}\n'''
+          p.write_text(text)
+
+          # Extend request-local timeout state with absolute application deadline and route race.
+          Path("src/timeout/state.ts").write_text('''import { TimeoutError } from "./error";\n\nimport type { TimeoutScope } from "./error";\n\nexport interface TimeoutState {\n  prepare(request: Request): void;\n  signal(request: Request): AbortSignal;\n  executeApplication(\n    request: Request,\n    run: () => Response | Promise<Response>,\n  ): Response | Promise<Response>;\n  executeRoute(\n    request: Request,\n    duration: number,\n    run: () => Response | Promise<Response>,\n  ): Response | Promise<Response>;\n}\n\ninterface TimeoutRequestState {\n  signal: AbortSignal;\n  readonly applicationController: AbortController | undefined;\n  applicationDeadline: number | undefined;\n}\n\nexport function createTimeoutState(\n  applicationDuration: number | undefined,\n): TimeoutState {\n  const requests = new WeakMap<Request, TimeoutRequestState>();\n\n  return {\n    prepare(request) {\n      if (applicationDuration === undefined) {\n        requests.set(request, {\n          signal: request.signal,\n          applicationController: undefined,\n          applicationDeadline: undefined,\n        });\n        return;\n      }\n\n      const applicationController = new AbortController();\n      forwardAbort(request.signal, applicationController);\n\n      requests.set(request, {\n        signal: applicationController.signal,\n        applicationController,\n        applicationDeadline: undefined,\n      });\n    },\n\n    signal(request) {\n      return requests.get(request)?.signal ?? request.signal;\n    },\n\n    executeApplication(request, run) {\n      if (applicationDuration === undefined) {\n        return run();\n      }\n\n      const state = requests.get(request);\n      if (state === undefined || state.applicationController === undefined) {\n        throw new Error("Missing Gelis timeout request state");\n      }\n\n      state.applicationDeadline = Date.now() + applicationDuration;\n\n      return executeWithDeadline(\n        applicationDuration,\n        "application",\n        state.applicationController,\n        run,\n      );\n    },\n\n    executeRoute(request, duration, run) {\n      const state = requests.get(request);\n\n      if (state === undefined) {\n        throw new Error("Missing Gelis timeout request state");\n      }\n\n      const routeDeadline = Date.now() + duration;\n      const applicationDeadline = state.applicationDeadline;\n\n      /*\n       * The application deadline started earlier. If its absolute deadline\n       * is already earlier than or equal to this route deadline, adding a\n       * route timer cannot win and would only add overhead.\n       */\n      if (\n        applicationDeadline !== undefined &&\n        applicationDeadline <= routeDeadline\n      ) {\n        return run();\n      }\n\n      const routeController = new AbortController();\n      forwardAbort(state.signal, routeController);\n      state.signal = routeController.signal;\n\n      return executeWithDeadline(\n        duration,\n        "route",\n        routeController,\n        run,\n      );\n    },\n  };\n}\n\nfunction executeWithDeadline(\n  duration: number,\n  scope: TimeoutScope,\n  controller: AbortController,\n  run: () => Response | Promise<Response>,\n): Response | Promise<Response> {\n  let settled = false;\n  let rejectTimeout: ((error: TimeoutError) => void) | undefined;\n\n  const timer = setTimeout(() => {\n    if (settled) {\n      return;\n    }\n\n    settled = true;\n    const error = new TimeoutError(duration, scope);\n    controller.abort(error);\n    rejectTimeout?.(error);\n  }, duration);\n\n  let result: Response | Promise<Response>;\n\n  try {\n    result = run();\n  } catch (error) {\n    settled = true;\n    clearTimeout(timer);\n    throw error;\n  }\n\n  if (result instanceof Response) {\n    settled = true;\n    clearTimeout(timer);\n    return result;\n  }\n\n  return new Promise<Response>((resolve, reject) => {\n    rejectTimeout = reject;\n\n    result.then(\n      (response) => {\n        if (settled) {\n          return;\n        }\n\n        settled = true;\n        clearTimeout(timer);\n        resolve(response);\n      },\n      (error) => {\n        if (settled) {\n          return;\n        }\n\n        settled = true;\n        clearTimeout(timer);\n        reject(error);\n      },\n    );\n  });\n}\n\nfunction forwardAbort(source: AbortSignal, target: AbortController): void {\n  if (source.aborted) {\n    target.abort(source.reason);\n    return;\n  }\n\n  source.addEventListener(\n    "abort",\n    () => {\n      target.abort(source.reason);\n    },\n    { once: true },\n  );\n}\n''')
+
+          # Bind timed routes to exactly this timeout capability instance.
+          Path("src/timeout/index.ts").write_text('''import {\n  declareOfficialPluginRouteSpecializer,\n  defineCapability,\n  definePlugin,\n} from "../plugin";\n\nimport type { Capability, Plugin } from "../plugin";\n\nimport { createOfficialApplicationHttpMarker } from "../runtime/application-http";\n\nimport type { RuntimeApplicationTimeoutPolicy } from "../runtime/application-http";\n\nimport { RUNTIME_ROUTE_TIMEOUT_PLAN } from "../runtime/types";\n\nimport { TimeoutError } from "./error";\nimport { compileTimeoutPolicy } from "./policy";\nimport { createTimeoutState } from "./state";\n\nimport type { TimeoutOptions } from "./policy";\n\nexport type { TimeoutOptions } from "./policy";\nexport { TimeoutError } from "./error";\nexport type { TimeoutScope } from "./error";\n\nexport interface TimeoutCapability extends Plugin {\n  signal(request: Request): AbortSignal;\n}\n\nconst timeoutCapability = defineCapability(\n  "gelis.timeout.application-policy",\n) as unknown as Capability<true>;\n\nexport function timeout(options?: TimeoutOptions): TimeoutCapability {\n  const compiled = compileTimeoutPolicy(options);\n  const state = createTimeoutState(compiled.duration);\n  const policy = createTimeoutPolicy(compiled.duration, state);\n\n  const plugin = definePlugin("gelis/timeout", (context) => {\n    timeoutCapability.provide(context, true);\n\n    declareOfficialPluginRouteSpecializer(context, (route) => {\n      const declared = route[RUNTIME_ROUTE_TIMEOUT_PLAN];\n\n      if (declared === undefined) {\n        return;\n      }\n\n      const duration = declared.duration;\n\n      route[RUNTIME_ROUTE_TIMEOUT_PLAN] = {\n        duration,\n        execute(request, run) {\n          return state.executeRoute(request, duration, run);\n        },\n      };\n    });\n\n    context.onRequest(\n      createOfficialApplicationHttpMarker({\n        kind: "timeout",\n        policy,\n      }),\n    );\n  });\n\n  return {\n    ...plugin,\n    signal(request) {\n      return state.signal(request);\n    },\n  };\n}\n\nfunction createTimeoutPolicy(\n  duration: number | undefined,\n  state: ReturnType<typeof createTimeoutState>,\n): RuntimeApplicationTimeoutPolicy {\n  return {\n    hasApplicationDeadline: duration !== undefined,\n\n    prepare(request) {\n      state.prepare(request);\n    },\n\n    execute(request, run) {\n      return state.executeApplication(request, run);\n    },\n\n    handleError(error) {\n      if (!(error instanceof TimeoutError)) {\n        return undefined;\n      }\n\n      return Response.json(\n        {\n          error: {\n            code: "REQUEST_TIMEOUT",\n            message: "Request exceeded the configured timeout",\n          },\n        },\n        {\n          status: 504,\n        },\n      );\n    },\n  };\n}\n''')
+
+          # Runtime route dispatch: no lookup before the existing plain-route return.
+          replace_once(
+              "src/app.ts",
+              "  RUNTIME_ROUTE_RESPONSE,\n} from \"./runtime/types\";",
+              '''  RUNTIME_ROUTE_RESPONSE,\n  RUNTIME_ROUTE_TIMEOUT,\n  RUNTIME_ROUTE_TIMEOUT_PLAN,\n} from "./runtime/types";''',
+          )
+          replace_once(
+              "src/app.ts",
+              '''      default: {\n        /*\n         * Module request scope gets a dedicated compiled execution path.\n''',
+              '''      default: {\n        if ((route.flags & RUNTIME_ROUTE_TIMEOUT) !== 0) {\n          const timeoutPlan = route[RUNTIME_ROUTE_TIMEOUT_PLAN];\n\n          if (timeoutPlan === undefined || timeoutPlan.execute === undefined) {\n            throw new Error(\n              `Timed route requires gelis/timeout: ${route.method} ${route.path}`,\n            );\n          }\n\n          const baseFlags = route.flags & ~RUNTIME_ROUTE_TIMEOUT;\n\n          return timeoutPlan.execute(request, () =>\n            invokeTimedRuntimeRoute(\n              route,\n              request,\n              params,\n              baseFlags,\n            ),\n          );\n        }\n\n        /*\n         * Module request scope gets a dedicated compiled execution path.\n''',
+          )
+          replace_once(
+              "src/app.ts",
+              '''  if (route.responsePlan !== undefined) {\n    flags |= RUNTIME_ROUTE_RESPONSE;\n  }\n\n  route.flags = flags;\n}\n\nfunction invokePlainModuleRequestScopeRoute(''',
+              '''  if (route.responsePlan !== undefined) {\n    flags |= RUNTIME_ROUTE_RESPONSE;\n  }\n\n  if (route[RUNTIME_ROUTE_TIMEOUT_PLAN] !== undefined) {\n    flags |= RUNTIME_ROUTE_TIMEOUT;\n  }\n\n  route.flags = flags;\n}\n\nfunction invokePlainModuleRequestScopeRoute(''',
+          )
+
+          timed_helper = r'''\nfunction invokeTimedRuntimeRoute(\n  route: RuntimeRouteRecord,\n  request: Request,\n  params: Record<string, string>,\n  flags: number,\n): Response | Promise<Response> {\n  if (flags === RUNTIME_ROUTE_PLAIN) {\n    const result = route.handler({\n      request,\n      params,\n      query: undefined,\n      body: undefined,\n      reply: runtimeReply,\n    });\n\n    if (isPromiseLike(result)) {\n      return Promise.resolve(result).then(normalizeResponse);\n    }\n\n    return normalizeResponse(result);\n  }\n\n  if (flags === RUNTIME_ROUTE_RESPONSE) {\n    const result = route.handler({\n      request,\n      params,\n      query: undefined,\n      body: undefined,\n      reply: runtimeReply,\n    });\n\n    const finalize = route.responsePlan!.finalize;\n\n    if (isPromiseLike(result)) {\n      return Promise.resolve(result).then(finalize);\n    }\n\n    return finalize(result);\n  }\n\n  switch (flags) {\n    case RUNTIME_ROUTE_INPUT:\n      return runInputPlan(route, request, params, invokeHandlerRoute);\n\n    case RUNTIME_ROUTE_BEFORE_HANDLE:\n      return invokeBeforeHandleRoute(\n        route,\n        request,\n        params,\n        undefined,\n        undefined,\n      );\n\n    case RUNTIME_ROUTE_INPUT_BEFORE_HANDLE:\n      return runInputPlan(route, request, params, invokeBeforeHandleRoute);\n\n    case RUNTIME_ROUTE_AFTER_HANDLE:\n      return invokeAfterHandleRoute(\n        route,\n        request,\n        params,\n        undefined,\n        undefined,\n      );\n\n    case RUNTIME_ROUTE_INPUT_AFTER_HANDLE:\n      return runInputPlan(route, request, params, invokeAfterHandleRoute);\n\n    case RUNTIME_ROUTE_BEFORE_AFTER_HANDLE:\n      return invokeBeforeAfterHandleRoute(\n        route,\n        request,\n        params,\n        undefined,\n        undefined,\n      );\n\n    case RUNTIME_ROUTE_INPUT_BEFORE_AFTER_HANDLE:\n      return runInputPlan(route, request, params, invokeBeforeAfterHandleRoute);\n\n    case RUNTIME_ROUTE_INPUT_RESPONSE:\n      return runInputPlan(route, request, params, invokeResponseRoute);\n\n    case RUNTIME_ROUTE_BEFORE_HANDLE_RESPONSE:\n      return invokeBeforeHandleResponseRoute(\n        route,\n        request,\n        params,\n        undefined,\n        undefined,\n      );\n\n    case RUNTIME_ROUTE_INPUT_BEFORE_HANDLE_RESPONSE:\n      return runInputPlan(route, request, params, invokeBeforeHandleResponseRoute);\n\n    case RUNTIME_ROUTE_AFTER_HANDLE_RESPONSE:\n      return invokeAfterHandleResponseRoute(\n        route,\n        request,\n        params,\n        undefined,\n        undefined,\n      );\n\n    case RUNTIME_ROUTE_INPUT_AFTER_HANDLE_RESPONSE:\n      return runInputPlan(route, request, params, invokeAfterHandleResponseRoute);\n\n    case RUNTIME_ROUTE_BEFORE_AFTER_HANDLE_RESPONSE:\n      return invokeBeforeAfterHandleResponseRoute(\n        route,\n        request,\n        params,\n        undefined,\n        undefined,\n      );\n\n    case RUNTIME_ROUTE_INPUT_BEFORE_AFTER_HANDLE_RESPONSE:\n      return runInputPlan(\n        route,\n        request,\n        params,\n        invokeBeforeAfterHandleResponseRoute,\n      );\n\n    default:\n      if (flags === RUNTIME_ROUTE_MODULE_REQUEST_SCOPE) {\n        return invokePlainModuleRequestScopeRoute(route, request, params);\n      }\n\n      if (\n        flags ===\n          (RUNTIME_ROUTE_MODULE_REQUEST_SCOPE |\n            RUNTIME_ROUTE_BEFORE_HANDLE |\n            RUNTIME_ROUTE_AFTER_HANDLE) &&\n        route.beforeHandle === undefined &&\n        route.afterHandle === undefined\n      ) {\n        return invokeLocalModuleRequestScopeBeforeAfterRoute(\n          route,\n          request,\n          params,\n        );\n      }\n\n      if ((flags & RUNTIME_ROUTE_MODULE_REQUEST_SCOPE) !== 0) {\n        if ((flags & RUNTIME_ROUTE_INPUT) !== 0) {\n          return runInputPlan(\n            route,\n            request,\n            params,\n            invokeModuleRequestScopeValidatedRoute,\n          );\n        }\n\n        return invokeModuleRequestScopeValidatedRoute(\n          route,\n          request,\n          params,\n          undefined,\n          undefined,\n        );\n      }\n\n      if (flags === RUNTIME_ROUTE_REQUEST_SCOPE) {\n        return invokePlainRequestScopeRoute(route, request, params);\n      }\n\n      if (\n        flags ===\n          (RUNTIME_ROUTE_REQUEST_SCOPE |\n            RUNTIME_ROUTE_BEFORE_HANDLE |\n            RUNTIME_ROUTE_AFTER_HANDLE) &&\n        route.beforeHandle === undefined &&\n        route.afterHandle === undefined\n      ) {\n        return invokeLocalRequestScopeBeforeAfterRoute(route, request, params);\n      }\n\n      if ((flags & RUNTIME_ROUTE_REQUEST_SCOPE) !== 0) {\n        if ((flags & RUNTIME_ROUTE_INPUT) !== 0) {\n          return runInputPlan(\n            route,\n            request,\n            params,\n            invokeRequestScopeValidatedRoute,\n          );\n        }\n\n        return invokeRequestScopeValidatedRoute(\n          route,\n          request,\n          params,\n          undefined,\n          undefined,\n        );\n      }\n\n      throw new Error("Invalid Gelis timed runtime route flags");\n  }\n}\n\n'''
+          replace_once(
+              "src/app.ts",
+              "function commitModuleRuntimeRoutesAtomic(\n",
+              timed_helper + "function commitModuleRuntimeRoutesAtomic(\n",
+          )
+
+          # Focused G5 correctness coverage.
+          Path("test/runtime/timeout-route.test.ts").write_text('''import { describe, expect, test } from "bun:test";\n\nimport { Gelis } from "../../src/app";\nimport { TimeoutError, timeout } from "../../src/timeout/index";\n\nconst API_URL = "https://api.example";\n\ndescribe("P11-G route timeout specialization", () => {\n  test("fails invalid route durations synchronously", () => {\n    const app = new Gelis();\n\n    expect(() =>\n      app.get("/zero", { timeout: 0 }, () => "never"),\n    ).toThrow(TypeError);\n    expect(() =>\n      app.get("/fraction", { timeout: 1.5 }, () => "never"),\n    ).toThrow(TypeError);\n    expect(() =>\n      app.get("/too-large", { timeout: 2_147_483_648 }, () => "never"),\n    ).toThrow(TypeError);\n  });\n\n  test("never silently executes a timed route without timeout capability", () => {\n    const app = new Gelis();\n    let called = false;\n\n    app.get("/timed", { timeout: 10 }, () => {\n      called = true;\n      return "unexpected";\n    });\n\n    expect(() => app.fetch(new Request(`${API_URL}/timed`))).toThrow(\n      "Timed route requires gelis/timeout",\n    );\n    expect(called).toBe(false);\n  });\n\n  test("supports route declaration before timeout capability installation", async () => {\n    const app = new Gelis();\n    app.get("/timed", { timeout: 100 }, () => "ok");\n\n    app.use(timeout());\n\n    const response = await app.fetch(new Request(`${API_URL}/timed`));\n    expect(response.status).toBe(200);\n    expect(await response.text()).toBe("ok");\n  });\n\n  test("route-only timeout wins with route-scoped TimeoutError", async () => {\n    const app = new Gelis();\n    const deadlines = timeout();\n    let signal: AbortSignal | undefined;\n\n    app.use(deadlines);\n    app.get("/slow", { timeout: 5 }, ({ request }) => {\n      signal = deadlines.signal(request);\n      return new Promise<Response>(() => {});\n    });\n\n    const response = await app.fetch(new Request(`${API_URL}/slow`));\n\n    expect(response.status).toBe(504);\n    expect(signal?.aborted).toBe(true);\n    expect(signal?.reason).toBeInstanceOf(TimeoutError);\n\n    const reason = signal?.reason as TimeoutError;\n    expect(reason.scope).toBe("route");\n    expect(reason.duration).toBe(5);\n  });\n\n  test("shorter route timeout tightens application deadline", async () => {\n    const app = new Gelis();\n    const deadlines = timeout({ duration: 100 });\n    let seen: TimeoutError | undefined;\n\n    app.use(deadlines);\n    app.onError(({ error }) => {\n      if (error instanceof TimeoutError) {\n        seen = error;\n      }\n      return undefined;\n    });\n    app.get("/slow", { timeout: 5 }, () => new Promise<Response>(() => {}));\n\n    const response = await app.fetch(new Request(`${API_URL}/slow`));\n\n    expect(response.status).toBe(504);\n    expect(seen?.scope).toBe("route");\n    expect(seen?.duration).toBe(5);\n  });\n\n  test("longer route timeout never extends application deadline", async () => {\n    const app = new Gelis();\n    const deadlines = timeout({ duration: 5 });\n    let seen: TimeoutError | undefined;\n\n    app.use(deadlines);\n    app.onError(({ error }) => {\n      if (error instanceof TimeoutError) {\n        seen = error;\n      }\n      return undefined;\n    });\n    app.get("/slow", { timeout: 100 }, () => new Promise<Response>(() => {}));\n\n    const response = await app.fetch(new Request(`${API_URL}/slow`));\n\n    expect(response.status).toBe(504);\n    expect(seen?.scope).toBe("application");\n    expect(seen?.duration).toBe(5);\n  });\n\n  test("route deadline wraps lifecycle before the handler", async () => {\n    const app = new Gelis();\n    app.use(timeout());\n\n    let handlerCalled = false;\n    app.get(\n      "/slow-before",\n      { timeout: 5 },\n      () => {\n        handlerCalled = true;\n        return "unexpected";\n      },\n      {\n        beforeHandle: () => new Promise<void>(() => {}),\n      },\n    );\n\n    const response = await app.fetch(new Request(`${API_URL}/slow-before`));\n\n    expect(response.status).toBe(504);\n    expect(handlerCalled).toBe(false);\n  });\n\n  test("synchronous timed route can retain synchronous completion", async () => {\n    const app = new Gelis();\n    app.use(timeout());\n    app.get("/sync", { timeout: 100 }, () => "ok");\n\n    const result = app.fetch(new Request(`${API_URL}/sync`));\n\n    expect(result).toBeInstanceOf(Response);\n    expect(await (result as Response).text()).toBe("ok");\n  });\n});\n''')
+          PY
+
+          bunx prettier \
+            src/route.ts \
+            src/runtime/types.ts \
+            src/route-builder.ts \
+            src/timeout/state.ts \
+            src/timeout/index.ts \
+            src/app.ts \
+            test/runtime/timeout-route.test.ts \
+            --write
+
+          git diff --check
+          bun run typecheck
+          bun run typecheck:runtime-tests
+          bun test test/runtime/timeout-application.test.ts test/runtime/timeout-route.test.ts
+      - name: Commit target branch
+        run: |
+          git config user.name "Rigent"
+          git config user.email "127601320+rigenttio@users.noreply.github.com"
+          git add src/route.ts src/runtime/types.ts src/route-builder.ts src/timeout/state.ts src/timeout/index.ts src/app.ts test/runtime/timeout-route.test.ts
+          git commit -m "feat(timeout): specialize route deadlines"
+          git push origin HEAD:work/p11-g5-route-timeout
