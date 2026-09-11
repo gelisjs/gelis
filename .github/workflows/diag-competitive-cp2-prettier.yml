@@ -1,4 +1,4 @@
-name: Competitive CP2-D Prettier
+name: Competitive CP2-H Prettier
 
 on:
   push:
@@ -26,23 +26,22 @@ jobs:
       - name: Install root dependencies
         run: bun install --frozen-lockfile
 
-      - name: Format CP2-D evidence tree
+      - name: Format CP2-H evidence tree
         run: >-
           bunx prettier
-          bench/competitive/core/direct-acceptance.mts
-          bench/competitive/core/direct-worker.mts
-          docs/benchmarks/competitive-cp2-core-crown-freeze.md
+          bench/competitive/core/http-acceptance.mts
+          docs/benchmarks/competitive-cp2d-local-authoritative.md
           --write
 
       - name: Commit formatted tree
         shell: bash
         run: |
-          if git diff --quiet -- bench/competitive/core/direct-acceptance.mts bench/competitive/core/direct-worker.mts docs/benchmarks/competitive-cp2-core-crown-freeze.md; then
+          if git diff --quiet -- bench/competitive/core/http-acceptance.mts docs/benchmarks/competitive-cp2d-local-authoritative.md; then
             echo "No formatting changes needed"
             exit 0
           fi
           git config user.name "Rigent"
           git config user.email "127601320+rigenttio@users.noreply.github.com"
-          git add bench/competitive/core/direct-acceptance.mts bench/competitive/core/direct-worker.mts docs/benchmarks/competitive-cp2-core-crown-freeze.md
-          git commit -m "style(competitive): format CP2-D evidence"
+          git add bench/competitive/core/http-acceptance.mts docs/benchmarks/competitive-cp2d-local-authoritative.md
+          git commit -m "style(competitive): format CP2-H evidence"
           git push origin HEAD:work/competitive-cp2-core-crown
