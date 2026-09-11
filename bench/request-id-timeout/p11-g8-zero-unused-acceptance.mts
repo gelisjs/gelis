@@ -13,10 +13,7 @@ const CASE_GATE = 1.03;
 const GEOMEAN_GATE = 1.015;
 
 type ZeroScenario =
-  | "static-raw"
-  | "dynamic-raw"
-  | "static-json"
-  | "dynamic-json";
+  "static-raw" | "dynamic-raw" | "static-json" | "dynamic-json";
 
 interface WorkerResult {
   readonly mode: "zero-unused";
