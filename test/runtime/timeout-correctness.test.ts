@@ -56,7 +56,8 @@ describe("P11-G timeout abort/race/cross-capability correctness", () => {
       return new Promise<Response>((resolve) => {
         signal.addEventListener(
           "abort",
-          () => resolve(new Response("cooperative-client-abort", { status: 499 })),
+          () =>
+            resolve(new Response("cooperative-client-abort", { status: 499 })),
           { once: true },
         );
       });
