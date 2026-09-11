@@ -38,16 +38,16 @@ P11-H benchmark/documentation commits do not replace that runtime candidate.
 
 ## Acceptance summary
 
-| Gate | Result | Primary evidence |
-| --- | --- | --- |
-| H1 architecture/type/performance freeze | PASS | `3dd785c82a42aefd385d2ce98ac0258f1a3427be` |
-| H2 cumulative correctness + security | PASS | `bc09560b82d0c8ef872b27b46a6e9e564647376c` |
-| H3 package + AOT/prebuilt + docs | PASS | `9789ff118ae011f3b203f0c2315bf8767d04ad13` |
-| H4 cumulative TypeScript scaling | PASS | local authoritative run using harness `3765ef1df35ff0bd44b8792bd92309e4e0e1ec5b` |
-| H5 cumulative zero-unused performance | PASS | local authoritative run using harness `fc05453a5910c567d024a6f17594e209f92136c2` |
-| H6 representative enabled composition | PASS | local authoritative run using harness `11d441228a0c76cc5517fa3a03a72b0c87079d5a` |
-| H7 full repository quality gate | PASS | Quality run `34570428131` on exact repository candidate `11d441228a0c76cc5517fa3a03a72b0c87079d5a` |
-| H8 documentation Quality | PENDING ON THIS TREE | required before this document becomes authoritative |
+| Gate                                    | Result               | Primary evidence                                                                                   |
+| --------------------------------------- | -------------------- | -------------------------------------------------------------------------------------------------- |
+| H1 architecture/type/performance freeze | PASS                 | `3dd785c82a42aefd385d2ce98ac0258f1a3427be`                                                         |
+| H2 cumulative correctness + security    | PASS                 | `bc09560b82d0c8ef872b27b46a6e9e564647376c`                                                         |
+| H3 package + AOT/prebuilt + docs        | PASS                 | `9789ff118ae011f3b203f0c2315bf8767d04ad13`                                                         |
+| H4 cumulative TypeScript scaling        | PASS                 | local authoritative run using harness `3765ef1df35ff0bd44b8792bd92309e4e0e1ec5b`                   |
+| H5 cumulative zero-unused performance   | PASS                 | local authoritative run using harness `fc05453a5910c567d024a6f17594e209f92136c2`                   |
+| H6 representative enabled composition   | PASS                 | local authoritative run using harness `11d441228a0c76cc5517fa3a03a72b0c87079d5a`                   |
+| H7 full repository quality gate         | PASS                 | Quality run `34570428131` on exact repository candidate `11d441228a0c76cc5517fa3a03a72b0c87079d5a` |
+| H8 documentation Quality                | PENDING ON THIS TREE | required before this document becomes authoritative                                                |
 
 No production source changed during P11-H. Therefore H4 through H7 all refer to the same accepted production runtime candidate.
 
@@ -141,11 +141,11 @@ candidate: 1dd5f94cf0e9ad884ca44e537ee287587cd8baab
 ## Matrix A — plain cumulative no-regression
 
 | Routes | Control inst. | Candidate inst. | Inst. ratio | Control memory | Candidate memory | Memory ratio | Control check | Candidate check | Check ratio | Result |
-| ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |
-| 100 | 106,766 | 109,640 | 1.0269x | 88.6 MB | 89.8 MB | 1.0135x | 0.313 s | 0.267 s | 0.8530x | PASS |
-| 500 | 167,450 | 170,821 | 1.0201x | 96.5 MB | 97.9 MB | 1.0145x | 0.328 s | 0.285 s | 0.8689x | PASS |
-| 1,000 | 242,450 | 245,821 | 1.0139x | 106.4 MB | 107.5 MB | 1.0103x | 0.349 s | 0.317 s | 0.9083x | PASS |
-| 5,000 | 842,450 | 845,821 | 1.0040x | 182.5 MB | 183.8 MB | 1.0071x | 0.563 s | 0.529 s | 0.9396x | PASS |
+| -----: | ------------: | --------------: | ----------: | -------------: | ---------------: | -----------: | ------------: | --------------: | ----------: | ------ |
+|    100 |       106,766 |         109,640 |     1.0269x |        88.6 MB |          89.8 MB |      1.0135x |       0.313 s |         0.267 s |     0.8530x | PASS   |
+|    500 |       167,450 |         170,821 |     1.0201x |        96.5 MB |          97.9 MB |      1.0145x |       0.328 s |         0.285 s |     0.8689x | PASS   |
+|  1,000 |       242,450 |         245,821 |     1.0139x |       106.4 MB |         107.5 MB |      1.0103x |       0.349 s |         0.317 s |     0.9083x | PASS   |
+|  5,000 |       842,450 |         845,821 |     1.0040x |       182.5 MB |         183.8 MB |      1.0071x |       0.563 s |         0.529 s |     0.9396x | PASS   |
 
 Candidate 1,000-to-5,000 growth:
 
@@ -159,11 +159,11 @@ check-time growth:    1.6688x <= 6.0x  PASS
 The feature case used the same managed POST/schema/handler shape as baseline, with only route `bodyLimit` and `timeout` enabled.
 
 | Routes | Inst. feature/baseline | Memory feature/baseline | Check feature/baseline | Result |
-| ---: | ---: | ---: | ---: | --- |
-| 100 | 1.0000x | 1.0024x | 1.0000x | PASS |
-| 500 | 1.0000x | 1.0174x | 1.0728x | PASS |
-| 1,000 | 1.0000x | 1.0382x | 1.0081x | PASS |
-| 5,000 | 1.0000x | 1.0802x | 1.0885x | PASS |
+| -----: | ---------------------: | ----------------------: | ---------------------: | ------ |
+|    100 |                1.0000x |                 1.0024x |                1.0000x | PASS   |
+|    500 |                1.0000x |                 1.0174x |                1.0728x | PASS   |
+|  1,000 |                1.0000x |                 1.0382x |                1.0081x | PASS   |
+|  5,000 |                1.0000x |                 1.0802x |                1.0885x | PASS   |
 
 Feature 1,000-to-5,000 growth:
 
@@ -202,13 +202,13 @@ candidate: 1dd5f94cf0e9ad884ca44e537ee287587cd8baab
 
 Authoritative local result:
 
-| Case | Candidate/control | Gate | Result |
-| --- | ---: | ---: | --- |
-| static raw | 0.9746x | <= 1.03x | PASS |
-| dynamic raw | 0.9950x | <= 1.03x | PASS |
-| static JSON | 0.9860x | <= 1.03x | PASS |
-| dynamic JSON | 0.9888x | <= 1.03x | PASS |
-| four-case geometric mean | 0.9861x | <= 1.015x | PASS |
+| Case                     | Candidate/control |      Gate | Result |
+| ------------------------ | ----------------: | --------: | ------ |
+| static raw               |           0.9746x |  <= 1.03x | PASS   |
+| dynamic raw              |           0.9950x |  <= 1.03x | PASS   |
+| static JSON              |           0.9860x |  <= 1.03x | PASS   |
+| dynamic JSON             |           0.9888x |  <= 1.03x | PASS   |
+| four-case geometric mean |           0.9861x | <= 1.015x | PASS   |
 
 Structural assertions also passed:
 
@@ -268,10 +268,10 @@ Origin: https://client.test
 
 ## Direct comparison
 
-| Scenario | Gelis ns/op | Hono ns/op | Gelis/Hono | Hono-first | Gelis-first | Gate | Result |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |
-| actual-CORS static 204 | 5,352.9 | 9,196.3 | 0.5895x | 0.5737x | 0.6254x | <= 1.15x | PASS |
-| actual-CORS static JSON | 5,835.8 | 10,963.1 | 0.5432x | 0.5434x | 0.5175x | <= 1.15x | PASS |
+| Scenario                | Gelis ns/op | Hono ns/op | Gelis/Hono | Hono-first | Gelis-first |     Gate | Result |
+| ----------------------- | ----------: | ---------: | ---------: | ---------: | ----------: | -------: | ------ |
+| actual-CORS static 204  |     5,352.9 |    9,196.3 |    0.5895x |    0.5737x |     0.6254x | <= 1.15x | PASS   |
+| actual-CORS static JSON |     5,835.8 |   10,963.1 |    0.5432x |    0.5434x |     0.5175x | <= 1.15x | PASS   |
 
 ```text
 2-case geomean: 0.5659x <= 1.10x  PASS
@@ -304,10 +304,10 @@ HTTP gate:           1.0947x >= 0.90x  PASS
 
 Latency diagnostics:
 
-| Framework | p50 | p95 | p99 |
-| --- | ---: | ---: | ---: |
-| Gelis | 3.265 ms | 5.421 ms | 7.764 ms |
-| Hono | 3.615 ms | 5.946 ms | 8.389 ms |
+| Framework |      p50 |      p95 |      p99 |
+| --------- | -------: | -------: | -------: |
+| Gelis     | 3.265 ms | 5.421 ms | 7.764 ms |
+| Hono      | 3.615 ms | 5.946 ms | 8.389 ms |
 
 ## Combined route-policy scale
 
