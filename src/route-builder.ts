@@ -66,6 +66,24 @@ interface RuntimeRouteLifecycle {
   readonly afterHandle?: RuntimeAfterHandle;
 }
 
+interface TimeoutOnlyRouteOptions {
+  readonly timeout: number;
+
+  readonly query?: never;
+
+  readonly body?: never;
+
+  readonly bodyParser?: never;
+
+  readonly bodyContentTypes?: never;
+
+  readonly bodyLimit?: never;
+
+  readonly responses?: never;
+
+  readonly openapi?: never;
+}
+
 export class RouteBuilder<Prefix extends string = ""> {
   readonly #prefix: Prefix;
 
@@ -89,6 +107,34 @@ export class RouteBuilder<Prefix extends string = ""> {
    */
   get<const Path extends string, Result>(
     path: Path & ValidRoutePath<Path>,
+
+    handler: RouteHandler<JoinRoutePath<Prefix, Path>, never, never, Result>,
+
+    lifecycle?: RouteLifecycleFor<
+      JoinRoutePath<Prefix, Path>,
+      undefined,
+      undefined,
+      undefined,
+      Result
+    >,
+  ): RouteRef<
+    "GET",
+    JoinRoutePath<Prefix, Path>,
+    RouteRequestContract<InferPathParams<JoinRoutePath<Prefix, Path>>>,
+    InferImplicitResponses<Result>
+  >;
+
+  /*
+   * GET with timeout-only execution policy.
+   *
+   * Keep the common timeout-only shape on the same lightweight
+   * public type path as a plain route instead of instantiating
+   * query/body/response option conditionals for every declaration.
+   */
+  get<const Path extends string, Result>(
+    path: Path & ValidRoutePath<Path>,
+
+    options: TimeoutOnlyRouteOptions,
 
     handler: RouteHandler<JoinRoutePath<Prefix, Path>, never, never, Result>,
 
@@ -242,6 +288,34 @@ export class RouteBuilder<Prefix extends string = ""> {
   >;
 
   /*
+   * POST with timeout-only execution policy.
+   *
+   * Keep the common timeout-only shape on the same lightweight
+   * public type path as a plain route instead of instantiating
+   * query/body/response option conditionals for every declaration.
+   */
+  post<const Path extends string, Result>(
+    path: Path & ValidRoutePath<Path>,
+
+    options: TimeoutOnlyRouteOptions,
+
+    handler: RouteHandler<JoinRoutePath<Prefix, Path>, never, never, Result>,
+
+    lifecycle?: RouteLifecycleFor<
+      JoinRoutePath<Prefix, Path>,
+      undefined,
+      undefined,
+      undefined,
+      Result
+    >,
+  ): RouteRef<
+    "POST",
+    JoinRoutePath<Prefix, Path>,
+    RouteRequestContract<InferPathParams<JoinRoutePath<Prefix, Path>>>,
+    InferImplicitResponses<Result>
+  >;
+
+  /*
    * POST with options but without an explicit
    * response contract.
    */
@@ -344,6 +418,34 @@ export class RouteBuilder<Prefix extends string = ""> {
    */
   put<const Path extends string, Result>(
     path: Path & ValidRoutePath<Path>,
+
+    handler: RouteHandler<JoinRoutePath<Prefix, Path>, never, never, Result>,
+
+    lifecycle?: RouteLifecycleFor<
+      JoinRoutePath<Prefix, Path>,
+      undefined,
+      undefined,
+      undefined,
+      Result
+    >,
+  ): RouteRef<
+    "PUT",
+    JoinRoutePath<Prefix, Path>,
+    RouteRequestContract<InferPathParams<JoinRoutePath<Prefix, Path>>>,
+    InferImplicitResponses<Result>
+  >;
+
+  /*
+   * PUT with timeout-only execution policy.
+   *
+   * Keep the common timeout-only shape on the same lightweight
+   * public type path as a plain route instead of instantiating
+   * query/body/response option conditionals for every declaration.
+   */
+  put<const Path extends string, Result>(
+    path: Path & ValidRoutePath<Path>,
+
+    options: TimeoutOnlyRouteOptions,
 
     handler: RouteHandler<JoinRoutePath<Prefix, Path>, never, never, Result>,
 
@@ -482,6 +584,34 @@ export class RouteBuilder<Prefix extends string = ""> {
   >;
 
   /*
+   * PATCH with timeout-only execution policy.
+   *
+   * Keep the common timeout-only shape on the same lightweight
+   * public type path as a plain route instead of instantiating
+   * query/body/response option conditionals for every declaration.
+   */
+  patch<const Path extends string, Result>(
+    path: Path & ValidRoutePath<Path>,
+
+    options: TimeoutOnlyRouteOptions,
+
+    handler: RouteHandler<JoinRoutePath<Prefix, Path>, never, never, Result>,
+
+    lifecycle?: RouteLifecycleFor<
+      JoinRoutePath<Prefix, Path>,
+      undefined,
+      undefined,
+      undefined,
+      Result
+    >,
+  ): RouteRef<
+    "PATCH",
+    JoinRoutePath<Prefix, Path>,
+    RouteRequestContract<InferPathParams<JoinRoutePath<Prefix, Path>>>,
+    InferImplicitResponses<Result>
+  >;
+
+  /*
    * PATCH with options but without an explicit
    * response contract.
    */
@@ -584,6 +714,34 @@ export class RouteBuilder<Prefix extends string = ""> {
    */
   delete<const Path extends string, Result>(
     path: Path & ValidRoutePath<Path>,
+
+    handler: RouteHandler<JoinRoutePath<Prefix, Path>, never, never, Result>,
+
+    lifecycle?: RouteLifecycleFor<
+      JoinRoutePath<Prefix, Path>,
+      undefined,
+      undefined,
+      undefined,
+      Result
+    >,
+  ): RouteRef<
+    "DELETE",
+    JoinRoutePath<Prefix, Path>,
+    RouteRequestContract<InferPathParams<JoinRoutePath<Prefix, Path>>>,
+    InferImplicitResponses<Result>
+  >;
+
+  /*
+   * DELETE with timeout-only execution policy.
+   *
+   * Keep the common timeout-only shape on the same lightweight
+   * public type path as a plain route instead of instantiating
+   * query/body/response option conditionals for every declaration.
+   */
+  delete<const Path extends string, Result>(
+    path: Path & ValidRoutePath<Path>,
+
+    options: TimeoutOnlyRouteOptions,
 
     handler: RouteHandler<JoinRoutePath<Prefix, Path>, never, never, Result>,
 
@@ -722,6 +880,34 @@ export class RouteBuilder<Prefix extends string = ""> {
   >;
 
   /*
+   * OPTIONS with timeout-only execution policy.
+   *
+   * Keep the common timeout-only shape on the same lightweight
+   * public type path as a plain route instead of instantiating
+   * query/body/response option conditionals for every declaration.
+   */
+  options<const Path extends string, Result>(
+    path: Path & ValidRoutePath<Path>,
+
+    options: TimeoutOnlyRouteOptions,
+
+    handler: RouteHandler<JoinRoutePath<Prefix, Path>, never, never, Result>,
+
+    lifecycle?: RouteLifecycleFor<
+      JoinRoutePath<Prefix, Path>,
+      undefined,
+      undefined,
+      undefined,
+      Result
+    >,
+  ): RouteRef<
+    "OPTIONS",
+    JoinRoutePath<Prefix, Path>,
+    RouteRequestContract<InferPathParams<JoinRoutePath<Prefix, Path>>>,
+    InferImplicitResponses<Result>
+  >;
+
+  /*
    * OPTIONS with options but without an explicit
    * response contract.
    */
@@ -842,6 +1028,34 @@ export class RouteBuilder<Prefix extends string = ""> {
   >;
 
   /*
+   * HEAD with timeout-only execution policy.
+   *
+   * Keep the common timeout-only shape on the same lightweight
+   * public type path as a plain route instead of instantiating
+   * query/body/response option conditionals for every declaration.
+   */
+  head<const Path extends string, Result>(
+    path: Path & ValidRoutePath<Path>,
+
+    options: TimeoutOnlyRouteOptions,
+
+    handler: RouteHandler<JoinRoutePath<Prefix, Path>, never, never, Result>,
+
+    lifecycle?: RouteLifecycleFor<
+      JoinRoutePath<Prefix, Path>,
+      undefined,
+      undefined,
+      undefined,
+      Result
+    >,
+  ): RouteRef<
+    "HEAD",
+    JoinRoutePath<Prefix, Path>,
+    RouteRequestContract<InferPathParams<JoinRoutePath<Prefix, Path>>>,
+    InferImplicitResponses<Result>
+  >;
+
+  /*
    * HEAD with options but without an explicit
    * response contract.
    */
@@ -944,6 +1158,34 @@ export class RouteBuilder<Prefix extends string = ""> {
    */
   query<const Path extends string, Result>(
     path: Path & ValidRoutePath<Path>,
+
+    handler: RouteHandler<JoinRoutePath<Prefix, Path>, never, never, Result>,
+
+    lifecycle?: RouteLifecycleFor<
+      JoinRoutePath<Prefix, Path>,
+      undefined,
+      undefined,
+      undefined,
+      Result
+    >,
+  ): RouteRef<
+    "QUERY",
+    JoinRoutePath<Prefix, Path>,
+    RouteRequestContract<InferPathParams<JoinRoutePath<Prefix, Path>>>,
+    InferImplicitResponses<Result>
+  >;
+
+  /*
+   * QUERY with timeout-only execution policy.
+   *
+   * Keep the common timeout-only shape on the same lightweight
+   * public type path as a plain route instead of instantiating
+   * query/body/response option conditionals for every declaration.
+   */
+  query<const Path extends string, Result>(
+    path: Path & ValidRoutePath<Path>,
+
+    options: TimeoutOnlyRouteOptions,
 
     handler: RouteHandler<JoinRoutePath<Prefix, Path>, never, never, Result>,
 
@@ -1085,6 +1327,34 @@ export class RouteBuilder<Prefix extends string = ""> {
   >;
 
   /*
+   * ALL with timeout-only execution policy.
+   *
+   * Keep the common timeout-only shape on the same lightweight
+   * public type path as a plain route instead of instantiating
+   * query/body/response option conditionals for every declaration.
+   */
+  all<const Path extends string, Result>(
+    path: Path & ValidRoutePath<Path>,
+
+    options: TimeoutOnlyRouteOptions,
+
+    handler: RouteHandler<JoinRoutePath<Prefix, Path>, never, never, Result>,
+
+    lifecycle?: RouteLifecycleFor<
+      JoinRoutePath<Prefix, Path>,
+      undefined,
+      undefined,
+      undefined,
+      Result
+    >,
+  ): RouteRef<
+    "*",
+    JoinRoutePath<Prefix, Path>,
+    RouteRequestContract<InferPathParams<JoinRoutePath<Prefix, Path>>>,
+    InferImplicitResponses<Result>
+  >;
+
+  /*
    * ALL with options but without an explicit
    * response contract.
    */
@@ -1189,6 +1459,32 @@ export class RouteBuilder<Prefix extends string = ""> {
     method: Method & ValidHttpMethodLiteral<Method>,
 
     path: Path & ValidRoutePath<Path>,
+
+    handler: RouteHandler<JoinRoutePath<Prefix, Path>, never, never, Result>,
+
+    lifecycle?: RouteLifecycleFor<
+      JoinRoutePath<Prefix, Path>,
+      undefined,
+      undefined,
+      undefined,
+      Result
+    >,
+  ): RouteRef<
+    Method,
+    JoinRoutePath<Prefix, Path>,
+    RouteRequestContract<InferPathParams<JoinRoutePath<Prefix, Path>>>,
+    InferImplicitResponses<Result>
+  >;
+
+  /*
+   * Generic method route with timeout-only execution policy.
+   */
+  route<const Method extends string, const Path extends string, Result>(
+    method: Method & ValidHttpMethodLiteral<Method>,
+
+    path: Path & ValidRoutePath<Path>,
+
+    options: TimeoutOnlyRouteOptions,
 
     handler: RouteHandler<JoinRoutePath<Prefix, Path>, never, never, Result>,
 
