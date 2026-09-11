@@ -31,11 +31,8 @@ jobs:
       - name: Install frozen Elysia AOT island
         run: bun install --cwd bench/competitive/elysia-v2-aot --frozen-lockfile
 
-      - name: Show CP3-D Prettier diff
-        run: |
-          bun ./node_modules/prettier/bin/prettier.cjs bench/competitive/candidate/http-revalidation-acceptance.mts --write
-          git --no-pager diff -- bench/competitive/candidate/http-revalidation-acceptance.mts
-          git checkout -- bench/competitive/candidate/http-revalidation-acceptance.mts
+      - name: Check CP3-D harness formatting
+        run: bun ./node_modules/prettier/bin/prettier.cjs bench/competitive/candidate/http-revalidation-acceptance.mts --check
 
       - name: Typecheck CP3-D harness
         run: bun ./node_modules/typescript/bin/tsc -p bench/competitive/candidate/tsconfig.json --noEmit
