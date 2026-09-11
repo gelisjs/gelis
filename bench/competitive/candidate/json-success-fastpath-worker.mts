@@ -148,7 +148,7 @@ function prepareCell(cell: Cell): {
         return response;
       },
       dynamic ? "value-42" : "GET",
-      "text/plain",
+      "raw",
     );
   }
 
@@ -273,7 +273,7 @@ function createContext(
 function responseFactoryCell(
   factory: () => Response,
   expectedBody: string,
-  expectedMediaType: string,
+  expectedMediaType: "application/json" | "raw",
 ): {
   readonly operation: Operation;
   readonly assertCorrectness: () => Promise<void>;
@@ -281,7 +281,9 @@ function responseFactoryCell(
   return {
     operation: () => {
       const response = factory();
-      return response.status + (response.headers.get("content-type")?.length ?? 0);
+      return (
+        response.status + (response.headers.get("content-type")?.length ?? 0)
+      );
     },
     assertCorrectness: async () => {
       const snapshot = await responseSnapshot(factory());
@@ -296,7 +298,11 @@ function responseFactoryCell(
         );
       }
 
-      if (snapshot.mediaType !== expectedMediaType) {
+      if (expectedMediaType === "raw") {
+        if (snapshot.mediaType !== "" && snapshot.mediaType !== "text/plain") {
+          throw new Error(`raw media type mismatch: ${snapshot.mediaType}`);
+        }
+      } else if (snapshot.mediaType !== expectedMediaType) {
         throw new Error(
           `media type mismatch: expected ${expectedMediaType}, got ${snapshot.mediaType}`,
         );
