@@ -193,7 +193,7 @@ function prepareCell(cell: Cell): PreparedCell {
 
     case "params-factory-consume":
       return {
-        operation: () => paramsFactory(PARAM_VALUE).id.length,
+        operation: () => paramsFactory(PARAM_VALUE).id!.length,
         assertCorrectness: () => {
           if (paramsFactory(PARAM_VALUE).id !== PARAM_VALUE) {
             throw new Error("factory params mismatch");
