@@ -86,13 +86,13 @@ if (probeOnly) {
 }
 
 console.log(`Samples:     ${SAMPLE_COUNT} mirrored fresh-process pairs/cell`);
-console.log("Ratio:       competitor ns/op / Gelis ns/op (>1 means Gelis faster)\n");
+console.log(
+  "Ratio:       competitor ns/op / Gelis ns/op (>1 means Gelis faster)\n",
+);
 console.log(
   "| competitor | routes | scenario | Gelis ns/op | competitor ns/op | ratio | Gelis-first | competitor-first | completion |",
 );
-console.log(
-  "| --- | ---: | --- | ---: | ---: | ---: | ---: | ---: | --- |",
-);
+console.log("| --- | ---: | --- | ---: | ---: | ---: | ---: | ---: | --- |");
 
 for (const routes of routeCounts) {
   for (const scenario of scenarios) {
@@ -246,7 +246,9 @@ async function runWorker(
 
 function assertEnvironment(): void {
   if (Bun.version !== REQUIRED_BUN) {
-    throw new Error(`CP2-D requires Bun ${REQUIRED_BUN}, received ${Bun.version}`);
+    throw new Error(
+      `CP2-D requires Bun ${REQUIRED_BUN}, received ${Bun.version}`,
+    );
   }
 
   assertEqual(packageVersion("hono"), REQUIRED_HONO, "Hono version");
@@ -262,7 +264,9 @@ function assertEnvironment(): void {
     { cwd: ROOT, stdout: "ignore", stderr: "pipe" },
   );
   if (sourceDiff.exitCode !== 0) {
-    throw new Error(`Repository src differs from frozen Gelis ${GELIS_SOURCE_SHA}`);
+    throw new Error(
+      `Repository src differs from frozen Gelis ${GELIS_SOURCE_SHA}`,
+    );
   }
 
   const status = Bun.spawnSync(["git", "status", "--porcelain"], {
@@ -281,7 +285,9 @@ function assertEnvironment(): void {
 
 function packageVersion(name: string): string {
   const path = resolve(PACKAGE_ROOT, "node_modules", name, "package.json");
-  const parsed = JSON.parse(readFileSync(path, "utf8")) as { version?: unknown };
+  const parsed = JSON.parse(readFileSync(path, "utf8")) as {
+    version?: unknown;
+  };
   if (typeof parsed.version !== "string") {
     throw new Error(`Missing version in ${path}`);
   }
@@ -316,7 +322,8 @@ function isWorkerResult(value: unknown): value is WorkerResult {
   if (record.kind !== "timed" && record.kind !== "probe") return false;
   if (!allFrameworks.includes(record.framework as Framework)) return false;
   if (!scenarios.includes(record.scenario as Scenario)) return false;
-  if (record.completion !== "sync" && record.completion !== "async") return false;
+  if (record.completion !== "sync" && record.completion !== "async")
+    return false;
   if (typeof record.routes !== "number" || record.routes < 1) return false;
 
   if (record.kind === "probe") return true;
@@ -334,7 +341,8 @@ function isWorkerResult(value: unknown): value is WorkerResult {
 }
 
 function median(values: readonly number[]): number {
-  if (values.length === 0) throw new Error("Cannot compute median of empty set");
+  if (values.length === 0)
+    throw new Error("Cannot compute median of empty set");
   const sorted = [...values].sort((left, right) => left - right);
   const midpoint = Math.floor(sorted.length / 2);
   return sorted.length % 2 === 1
@@ -344,7 +352,9 @@ function median(values: readonly number[]): number {
 
 function assertEqual(actual: unknown, expected: unknown, label: string): void {
   if (actual !== expected) {
-    throw new Error(`${label}: expected ${String(expected)}, got ${String(actual)}`);
+    throw new Error(
+      `${label}: expected ${String(expected)}, got ${String(actual)}`,
+    );
   }
 }
 

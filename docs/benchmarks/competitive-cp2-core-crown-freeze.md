@@ -31,11 +31,11 @@ A valid local run is not repeated merely because a result is unfavorable or nois
 
 All framework lanes use the CP1 response contracts:
 
-| workload | request target | response body |
-| --- | --- | --- |
-| static raw | `/r/<last>` | `GET` |
-| dynamic raw | `/r/<last>/value-42` | `value-42` |
-| static JSON | `/r/<last>` | `{"method":"GET","route":<last>}` |
+| workload     | request target       | response body                      |
+| ------------ | -------------------- | ---------------------------------- |
+| static raw   | `/r/<last>`          | `GET`                              |
+| dynamic raw  | `/r/<last>/value-42` | `value-42`                         |
+| static JSON  | `/r/<last>`          | `{"method":"GET","route":<last>}`  |
 | dynamic JSON | `/r/<last>/value-42` | `{"method":"GET","id":"value-42"}` |
 
 No compression, middleware, validation, body parsing, CORS, secure headers, request ID, timeout, or other production policy is enabled in CP2.

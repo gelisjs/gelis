@@ -15,11 +15,7 @@ type Framework =
   | "elysia-stable-precompile"
   | "elysia-next";
 
-type Scenario =
-  | "static-raw"
-  | "dynamic-raw"
-  | "static-json"
-  | "dynamic-json";
+type Scenario = "static-raw" | "dynamic-raw" | "static-json" | "dynamic-json";
 
 type CompletionMode = "sync" | "async";
 
@@ -98,7 +94,9 @@ async function run(
     const operation = () => {
       const response = fetch(request);
       if (isPromiseLike(response)) {
-        throw new Error(`${framework}/${scenario} changed completion mode to async`);
+        throw new Error(
+          `${framework}/${scenario} changed completion mode to async`,
+        );
       }
       if (!(response instanceof Response) || response.status !== 200) {
         throw new Error(`${framework}/${scenario} timed response was invalid`);
@@ -308,8 +306,11 @@ async function assertResponse(
 
   const body = await response.text();
   const mediaType =
-    response.headers.get("content-type")?.split(";", 1)[0]?.trim().toLowerCase() ??
-    "";
+    response.headers
+      .get("content-type")
+      ?.split(";", 1)[0]
+      ?.trim()
+      .toLowerCase() ?? "";
 
   const expectedBody =
     scenario === "static-raw"
