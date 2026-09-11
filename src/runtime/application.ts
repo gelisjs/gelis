@@ -55,15 +55,16 @@ export function compileApplicationFetch(
   /*
    * Error handling remains the outermost application boundary.
    *
-   * When an official response policy is active, handled onError values
-   * are finalized by that policy before they leave the boundary.
+   * Timeout contributes its default fallback after user onError hooks.
+   * Active response policies finalize handled error responses exactly once.
    */
-  if (onErrorHooks !== undefined && onErrorHooks.length > 0) {
-    const compiledErrorHooks =
-      httpPlan === undefined
-        ? onErrorHooks
-        : compileApplicationHttpErrorHooks(httpPlan, onErrorHooks);
+  const userErrorHooks = onErrorHooks ?? [];
+  const compiledErrorHooks =
+    httpPlan === undefined
+      ? userErrorHooks
+      : compileApplicationHttpErrorHooks(httpPlan, userErrorHooks);
 
+  if (compiledErrorHooks.length > 0) {
     fetch = compileOnErrorFetch(compiledErrorHooks, fetch);
   }
 
