@@ -36,8 +36,8 @@ jobs:
         working-directory: bench/competitive
         run: bun core/probe.mts
 
-      - name: Install isolated Elysia 2 AOT dependencies
-        run: bun install --cwd bench/competitive/elysia-v2-aot
+      - name: Install frozen isolated Elysia 2 AOT dependencies
+        run: bun install --cwd bench/competitive/elysia-v2-aot --frozen-lockfile
 
       - name: Typecheck isolated Elysia 2 AOT harness
         working-directory: bench/competitive/elysia-v2-aot
@@ -50,10 +50,3 @@ jobs:
       - name: Run CP1-A2 Elysia 2 AOT equivalence probe
         working-directory: bench/competitive/elysia-v2-aot
         run: bun probe.mts
-
-      - name: Emit isolated Elysia 2 AOT lockfile for freeze
-        shell: bash
-        run: |
-          echo "__ELYSIA_V2_AOT_LOCK_START__"
-          cat bench/competitive/elysia-v2-aot/bun.lock
-          echo "__ELYSIA_V2_AOT_LOCK_END__"

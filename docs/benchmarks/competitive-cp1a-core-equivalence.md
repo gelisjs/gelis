@@ -1,6 +1,6 @@
 # Competitive Performance v0.1 — CP1-A Core HTTP Equivalence
 
-**Status:** ACCEPTANCE CANDIDATE — authoritative after Quality passes on the exact formatted tree  
+**Status:** ACCEPTANCE CANDIDATE — authoritative after Quality and the frozen-dependency equivalence workflow pass on the exact formatted tree  
 **Protocol freeze:** `0cbaa9c7758aa92f6adcd6a289af4d7bcd88d58e`  
 **Gelis production source:** `1dd5f94cf0e9ad884ca44e537ee287587cd8baab`
 
@@ -8,7 +8,7 @@
 
 CP1-A proves semantic equivalence for the successful core HTTP workloads that CP2 will measure. It performs no timing and produces no performance ranking.
 
-The measured source-runtime lanes are:
+The source-runtime lanes are:
 
 ```text
 raw Bun.serve routes reference
@@ -19,11 +19,17 @@ Elysia 1.4.30 precompile
 Elysia 2.0.0-beta.14 source runtime
 ```
 
-Elysia 2 AOT is intentionally treated as a separate optimized lane and requires its own equivalence proof before any AOT performance result is promotable.
+CP1-A2 adds a separate optimized lane:
+
+```text
+Elysia 2.0.0-beta.14 AOT build
+```
+
+The AOT lane is reported separately from Elysia 2 source runtime. Raw Bun remains a runtime ceiling/reference rather than a framework competitor.
 
 ## Frozen dependency identities
 
-The competitive dependency graph is isolated under `bench/competitive` and uses exact top-level versions plus its own `bun.lock`.
+The source-runtime competitive dependency graph is isolated under `bench/competitive` and uses exact top-level versions plus its own `bun.lock`.
 
 ```text
 Bun:          1.4.2
@@ -32,7 +38,15 @@ Elysia:       1.4.30
 Elysia next:  2.0.0-beta.14
 ```
 
-The probe also verifies that the repository `src` tree is identical to the frozen Gelis production source SHA before executing.
+Elysia 2 AOT uses a second dependency island under `bench/competitive/elysia-v2-aot`. That project installs the beta under its original package name:
+
+```text
+elysia: 2.0.0-beta.14
+```
+
+It has its own `bun.lock` so AOT internals cannot accidentally resolve the colocated Elysia 1.4 package.
+
+The source-runtime probe also verifies that the repository `src` tree is identical to the frozen Gelis production source SHA before executing.
 
 ## Workloads
 
@@ -45,7 +59,7 @@ static JSON
 dynamic JSON
 ```
 
-The equivalence probe uses three generated routes because route count does not alter the response contract being checked here. CP2 independently measures the frozen route-count matrix `1 / 100 / 1,000 / 5,000`.
+The equivalence probes use three generated routes because route count does not alter the response contract being checked here. CP2 independently measures the frozen route-count matrix `1 / 100 / 1,000 / 5,000`.
 
 For the static lane the representative request is:
 
@@ -85,7 +99,7 @@ static JSON:  {"method":"GET","route":1}
 dynamic JSON: {"method":"GET","id":"value-42"}
 ```
 
-## Evidence
+## Source-runtime evidence
 
 Initial CP1-A workflow run `34576680372` was not acceptance evidence. It stopped at harness typechecking because the diagnostic stderr helper accepted a narrower stream type than Bun's generic subprocess type exposed. No equivalence probe ran in that attempt.
 
@@ -105,10 +119,41 @@ All 24 source-runtime combinations returned the required status, media type, and
 6 framework lanes × 4 cases = 24/24 equivalent
 ```
 
-After the generated competitive lockfile was promoted into the repository, the workflow was changed to use `--frozen-lockfile`. Final CP1-A acceptance requires that same frozen-dependency probe plus repository Quality to pass on the formatted evidence tree.
+The source-runtime dependency graph was then frozen into `bench/competitive/bun.lock`. Exact formatted validation commit `5eb53d6f0452fd24c48320e68009d9fb52d6ff5f` passed both the frozen-dependency CP1-A workflow and full repository Quality.
+
+## Elysia 2 AOT evidence
+
+The first beta.14 AOT attempt, workflow run `34577415861`, is retained as harness-invalid evidence. The build was launched from the source-runtime dependency island where Elysia 1.4 and the aliased Elysia 2 package coexist. Elysia 2 AOT internals resolved the bare `elysia` package to Elysia 1.4, producing an incompatible internal module graph:
+
+```text
+Elysia 2 compose.mjs expected ELYSIA_TRACE
+Elysia 1.4 trace.mjs did not export that symbol
+```
+
+That failure is not classified as an Elysia 2 AOT product failure and is not performance evidence.
+
+The harness was corrected by moving AOT into an isolated project where `elysia@2.0.0-beta.14` is installed under its original package name. No workload semantics changed.
+
+Workflow run `34577679061` then passed:
+
+```text
+source-runtime 24/24 equivalence: PASS
+isolated Elysia 2 AOT install: PASS
+AOT harness typecheck: PASS
+AOT build for all four cases: PASS
+AOT runtime equivalence probe: PASS
+```
+
+The AOT probe returned the same required status, media type, and exact response bytes in all cases:
+
+```text
+Elysia 2 AOT × 4 cases = 4/4 equivalent
+```
+
+The generated AOT dependency graph was promoted to `bench/competitive/elysia-v2-aot/bun.lock`. Final CP1-A/CP1-A2 acceptance requires both dependency islands to install with `--frozen-lockfile`, both equivalence probes to pass, and repository Quality to pass on the exact formatted evidence tree.
 
 ## Interpretation boundary
 
-CP1-A establishes equivalence only for the successful core HTTP workloads described above. It does not establish equivalence for validation, body handling, production policy composition, startup/lifecycle, memory checkpoints, or Elysia 2 AOT. Those lanes require their own CP1 sub-gates before their corresponding performance phases.
+CP1-A and CP1-A2 establish equivalence only for the successful core HTTP workloads described above. They do not establish equivalence for validation, body handling, production policy composition, startup/lifecycle, or memory checkpoints. Those lanes require their own CP1 sub-gates before their corresponding performance phases.
 
-No CP1-A result is a performance claim.
+No CP1-A or CP1-A2 result is a performance claim.
