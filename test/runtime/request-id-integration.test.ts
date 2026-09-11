@@ -36,10 +36,7 @@ describe("P11-G request-ID application integration", () => {
     });
     const response = await app.fetch(request);
 
-    expect(events).toEqual([
-      "onRequest:generated-id",
-      "handler:generated-id",
-    ]);
+    expect(events).toEqual(["onRequest:generated-id", "handler:generated-id"]);
     expect(await response.text()).toBe("generated-id");
     expect(response.headers.get("x-request-id")).toBe("generated-id");
     expect(request.headers.get("x-request-id")).toBe("untrusted-inbound");
