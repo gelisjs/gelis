@@ -275,7 +275,10 @@ function generateManagedRoutes(
   writeRootAssertion(directory, imports);
 }
 
-function writeRootAssertion(directory: string, imports: readonly string[]): void {
+function writeRootAssertion(
+  directory: string,
+  imports: readonly string[],
+): void {
   writeFileSync(
     resolve(directory, "index.ts"),
     [
@@ -538,7 +541,9 @@ function assertGitHead(root: string, expected: string, label: string): void {
 
   const actual = result.stdout.trim();
   if (actual !== expected) {
-    throw new Error(`${label} SHA mismatch: expected ${expected}, got ${actual}`);
+    throw new Error(
+      `${label} SHA mismatch: expected ${expected}, got ${actual}`,
+    );
   }
 }
 
