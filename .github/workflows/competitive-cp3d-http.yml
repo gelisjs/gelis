@@ -1,0 +1,39 @@
+name: Competitive CP3-D HTTP Revalidation Correctness
+
+on:
+  push:
+    branches:
+      - work/competitive-cp3d-http-revalidation
+
+permissions:
+  contents: read
+
+jobs:
+  http-revalidation:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Setup Bun 1.4.2
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+
+      - name: Install root dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Install frozen competitive dependencies
+        run: bun install --cwd bench/competitive --frozen-lockfile
+
+      - name: Install frozen Elysia AOT island
+        run: bun install --cwd bench/competitive/elysia-v2-aot --frozen-lockfile
+
+      - name: Typecheck CP3-D harness
+        run: bun ./node_modules/typescript/bin/tsc -p bench/competitive/candidate/tsconfig.json --noEmit
+
+      - name: Run CP3-D correctness probe only
+        working-directory: bench/competitive
+        run: bun candidate/http-revalidation-acceptance.mts --probe-only
