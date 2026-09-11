@@ -1,0 +1,48 @@
+name: Competitive CP2-D Prettier
+
+on:
+  push:
+    branches:
+      - diag/competitive-cp2-prettier
+
+permissions:
+  contents: write
+
+jobs:
+  format:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout target branch
+        uses: actions/checkout@v7
+        with:
+          ref: work/competitive-cp2-core-crown
+          fetch-depth: 0
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+
+      - name: Install root dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Format CP2-D evidence tree
+        run: >-
+          bunx prettier
+          bench/competitive/core/direct-acceptance.mts
+          bench/competitive/core/direct-worker.mts
+          docs/benchmarks/competitive-cp2-core-crown-freeze.md
+          --write
+
+      - name: Commit formatted tree
+        shell: bash
+        run: |
+          if git diff --quiet -- bench/competitive/core/direct-acceptance.mts bench/competitive/core/direct-worker.mts docs/benchmarks/competitive-cp2-core-crown-freeze.md; then
+            echo "No formatting changes needed"
+            exit 0
+          fi
+          git config user.name "Rigent"
+          git config user.email "127601320+rigenttio@users.noreply.github.com"
+          git add bench/competitive/core/direct-acceptance.mts bench/competitive/core/direct-worker.mts docs/benchmarks/competitive-cp2-core-crown-freeze.md
+          git commit -m "style(competitive): format CP2-D evidence"
+          git push origin HEAD:work/competitive-cp2-core-crown
