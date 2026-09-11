@@ -23,13 +23,16 @@ export function compileRequestIdPolicy(
 ): CompiledRequestIdPolicy {
   assertOptionsObject(options);
 
-  const headerName = options?.headerName ?? DEFAULT_HEADER_NAME;
+  const headerName =
+    options?.headerName === undefined ? DEFAULT_HEADER_NAME : options.headerName;
   assertHeaderName(headerName);
 
-  const maxLength = options?.maxLength ?? DEFAULT_MAX_LENGTH;
+  const maxLength =
+    options?.maxLength === undefined ? DEFAULT_MAX_LENGTH : options.maxLength;
   assertMaxLength(maxLength);
 
-  const trustIncoming = options?.trustIncoming ?? false;
+  const trustIncoming =
+    options?.trustIncoming === undefined ? false : options.trustIncoming;
   if (
     typeof trustIncoming !== "boolean" &&
     typeof trustIncoming !== "function"
@@ -39,7 +42,10 @@ export function compileRequestIdPolicy(
     );
   }
 
-  const generator = options?.generator ?? defaultRequestIdGenerator;
+  const generator =
+    options?.generator === undefined
+      ? defaultRequestIdGenerator
+      : options.generator;
   if (typeof generator !== "function") {
     throw new TypeError("Gelis request ID generator must be a function");
   }

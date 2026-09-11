@@ -195,9 +195,11 @@ describe("P11-G request-ID policy compiler", () => {
     const invalidOptions: unknown[] = [
       null,
       [],
+      { headerName: null },
       { headerName: "" },
       { headerName: "bad header" },
       { headerName: "bad\nheader" },
+      { maxLength: null },
       { maxLength: 0 },
       { maxLength: -1 },
       { maxLength: 1.5 },
