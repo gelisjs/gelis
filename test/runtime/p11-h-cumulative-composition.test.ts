@@ -2,11 +2,7 @@ import { describe, expect, test } from "bun:test";
 
 import { Gelis } from "../../src/app";
 import { bodyLimit } from "../../src/body-limit/index";
-import {
-  generateCookie,
-  getCookie,
-  setCookie,
-} from "../../src/cookie/public";
+import { generateCookie, getCookie, setCookie } from "../../src/cookie/public";
 import { cors } from "../../src/cors/index";
 import { requestId } from "../../src/request-id/index";
 import { secureHeaders } from "../../src/secure-headers/index";
@@ -62,9 +58,9 @@ describe("P11-H cumulative application-boundary composition", () => {
       expect(response.headers.get("x-powered-by")).toBeNull();
       expect(request.headers.get("x-request-id")).toBe("untrusted-inbound");
       expectPolicies(response);
-      expect(varyTokens(response).filter((value) => value === "origin")).toEqual([
-        "origin",
-      ]);
+      expect(
+        varyTokens(response).filter((value) => value === "origin"),
+      ).toEqual(["origin"]);
     }
   });
 
