@@ -1,0 +1,47 @@
+name: Competitive CP3-A Prettier
+
+on:
+  push:
+    branches:
+      - diag/competitive-cp3a-prettier
+
+permissions:
+  contents: write
+
+jobs:
+  format:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout target branch
+        uses: actions/checkout@v7
+        with:
+          ref: work/competitive-cp3a-hotpath-decomposition
+          fetch-depth: 0
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+
+      - name: Install root dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Format CP3-A harness
+        run: >-
+          bunx prettier
+          bench/competitive/decompose/hotpath-acceptance.mts
+          bench/competitive/decompose/hotpath-worker.mts
+          --write
+
+      - name: Commit formatted harness
+        shell: bash
+        run: |
+          if git diff --quiet -- bench/competitive/decompose/hotpath-acceptance.mts bench/competitive/decompose/hotpath-worker.mts; then
+            echo "No formatting changes needed"
+            exit 0
+          fi
+          git config user.name "Rigent"
+          git config user.email "127601320+rigenttio@users.noreply.github.com"
+          git add bench/competitive/decompose/hotpath-acceptance.mts bench/competitive/decompose/hotpath-worker.mts
+          git commit -m "style(competitive): format CP3-A harness"
+          git push origin HEAD:work/competitive-cp3a-hotpath-decomposition
