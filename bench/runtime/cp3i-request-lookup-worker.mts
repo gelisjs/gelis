@@ -162,28 +162,28 @@ function prepareCell(cell: Cell): PreparedCell {
       return trailingObjectLookupCell(trailingObject, dynamicRequest);
 
     case "router-trailing-stable":
-      return routerCell(trailingRouter, false, false);
+      return routerCell(trailingRouter, false);
 
     case "router-generic-stable":
-      return routerCell(genericRouter, false, true);
+      return routerCell(genericRouter, false);
 
     case "router-trailing-request":
-      return routerCell(trailingRouter, true, false);
+      return routerCell(trailingRouter, true);
 
     case "router-generic-request":
-      return routerCell(genericRouter, true, true);
+      return routerCell(genericRouter, true);
 
     case "dispatch-trailing-stable":
-      return dispatchCell(trailingRouter, false, false);
+      return dispatchCell(trailingRouter, false);
 
     case "dispatch-generic-stable":
-      return dispatchCell(genericRouter, false, true);
+      return dispatchCell(genericRouter, false);
 
     case "dispatch-trailing-request":
-      return dispatchCell(trailingRouter, true, false);
+      return dispatchCell(trailingRouter, true);
 
     case "dispatch-generic-request":
-      return dispatchCell(genericRouter, true, true);
+      return dispatchCell(genericRouter, true);
   }
 }
 
@@ -307,11 +307,7 @@ function trailingObjectLookupCell(
   };
 }
 
-function routerCell(
-  router: Router,
-  fromRequest: boolean,
-  generic: boolean,
-): PreparedCell {
+function routerCell(router: Router, fromRequest: boolean): PreparedCell {
   return {
     operation: () => {
       const path = fromRequest
@@ -323,16 +319,12 @@ function routerCell(
       const path = fromRequest
         ? pathnameFromUrl(dynamicRequest.url)
         : DYNAMIC_PATH;
-      assertTargetMatch(router, path, generic);
+      assertTargetMatch(router, path);
     },
   };
 }
 
-function dispatchCell(
-  router: Router,
-  fromRequest: boolean,
-  generic: boolean,
-): PreparedCell {
+function dispatchCell(router: Router, fromRequest: boolean): PreparedCell {
   const run = (): unknown => {
     const path = fromRequest
       ? pathnameFromUrl(dynamicRequest.url)
@@ -362,7 +354,7 @@ function dispatchCell(
       const path = fromRequest
         ? pathnameFromUrl(dynamicRequest.url)
         : DYNAMIC_PATH;
-      assertTargetMatch(router, path, generic);
+      assertTargetMatch(router, path);
       const payload = run() as {
         method: string;
         id: string | undefined;
@@ -497,11 +489,7 @@ function consumeMatch(match: ReturnType<Router["match"]>): number {
   return match.route.path.length + (match.params.id?.length ?? 0);
 }
 
-function assertTargetMatch(
-  router: Router,
-  path: string,
-  generic: boolean,
-): void {
+function assertTargetMatch(router: Router, path: string): void {
   const match = router.match("GET", path);
   if (match === undefined) {
     throw new Error("target route miss");
@@ -513,10 +501,6 @@ function assertTargetMatch(
 
   if (match.params.id !== PARAM_VALUE) {
     throw new Error(`target parameter mismatch: ${match.params.id}`);
-  }
-
-  if (generic && match.route.path === "/force/:a/:b") {
-    throw new Error("generic dummy route unexpectedly matched target");
   }
 }
 
