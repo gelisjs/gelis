@@ -14,10 +14,7 @@ const CASE_GATE = 1.03;
 const GEOMEAN_GATE = 1.015;
 
 type ZeroScenario =
-  | "static-raw"
-  | "dynamic-raw"
-  | "static-json"
-  | "dynamic-json";
+  "static-raw" | "dynamic-raw" | "static-json" | "dynamic-json";
 
 interface WorkerResult {
   readonly mode: "zero-unused";
@@ -127,9 +124,9 @@ async function assertZeroUnusedStructure(candidate: string): Promise<void> {
     candidate,
     "src/runtime/application-http.ts",
   )) as {
-    extractApplicationHttpPlan(
-      hooks: readonly unknown[] | undefined,
-    ): { readonly plan: unknown };
+    extractApplicationHttpPlan(hooks: readonly unknown[] | undefined): {
+      readonly plan: unknown;
+    };
   };
 
   const emptyExtraction = applicationHttp.extractApplicationHttpPlan(undefined);
@@ -212,9 +209,7 @@ async function assertZeroUnusedStructure(candidate: string): Promise<void> {
     candidate,
     "src/runtime/input.ts",
   )) as {
-    createRuntimeInputPlan(options: {
-      readonly body: unknown;
-    }):
+    createRuntimeInputPlan(options: { readonly body: unknown }):
       | {
           readonly bodyLimit?: number;
           readonly readBody?: (request: Request) => unknown | Promise<unknown>;
