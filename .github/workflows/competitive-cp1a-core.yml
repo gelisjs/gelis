@@ -28,7 +28,7 @@ jobs:
       - name: Install frozen competitive dependencies
         run: bun install --cwd bench/competitive --frozen-lockfile
 
-      - name: Typecheck competitive harness
+      - name: Typecheck source-runtime competitive harness
         working-directory: bench/competitive
         run: bun ../../node_modules/typescript/bin/tsc -p tsconfig.json --noEmit
 
@@ -36,10 +36,24 @@ jobs:
         working-directory: bench/competitive
         run: bun core/probe.mts
 
+      - name: Install isolated Elysia 2 AOT dependencies
+        run: bun install --cwd bench/competitive/elysia-v2-aot
+
+      - name: Typecheck isolated Elysia 2 AOT harness
+        working-directory: bench/competitive/elysia-v2-aot
+        run: bun ../../../node_modules/typescript/bin/tsc -p tsconfig.json --noEmit
+
       - name: Build Elysia 2 AOT equivalence artifacts
-        working-directory: bench/competitive
-        run: bun core/aot/build.mts
+        working-directory: bench/competitive/elysia-v2-aot
+        run: bun build.mts
 
       - name: Run CP1-A2 Elysia 2 AOT equivalence probe
-        working-directory: bench/competitive
-        run: bun core/aot/probe.mts
+        working-directory: bench/competitive/elysia-v2-aot
+        run: bun probe.mts
+
+      - name: Emit isolated Elysia 2 AOT lockfile for freeze
+        shell: bash
+        run: |
+          echo "__ELYSIA_V2_AOT_LOCK_START__"
+          cat bench/competitive/elysia-v2-aot/bun.lock
+          echo "__ELYSIA_V2_AOT_LOCK_END__"

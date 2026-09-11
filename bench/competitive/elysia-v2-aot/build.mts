@@ -2,11 +2,10 @@ import { mkdirSync, rmSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { aot } from "elysia-v2/plugin/aot/bun";
+import { aot } from "elysia/plugin/aot/bun";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
-const PACKAGE_ROOT = resolve(HERE, "../..");
-const GENERATED_DIR = resolve(PACKAGE_ROOT, "generated/core-aot");
+const GENERATED_DIR = resolve(HERE, "generated");
 const ROUTES = 3;
 
 const cases = [
@@ -25,7 +24,7 @@ if (selectedCase === undefined) {
   for (const benchmarkCase of cases) {
     const child = Bun.spawn({
       cmd: [process.execPath, import.meta.path],
-      cwd: PACKAGE_ROOT,
+      cwd: HERE,
       env: {
         ...process.env,
         ELYSIA_AOT_CASE: benchmarkCase.name,

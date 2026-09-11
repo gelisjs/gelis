@@ -2,8 +2,7 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
-const PACKAGE_ROOT = resolve(HERE, "../..");
-const GENERATED_DIR = resolve(PACKAGE_ROOT, "generated/core-aot");
+const GENERATED_DIR = resolve(HERE, "generated");
 
 const cases = [
   {
@@ -39,7 +38,7 @@ for (const benchmarkCase of cases) {
   const serverFile = resolve(GENERATED_DIR, benchmarkCase.name, "server.js");
   const child = Bun.spawn({
     cmd: [process.execPath, serverFile],
-    cwd: PACKAGE_ROOT,
+    cwd: HERE,
     env: {
       ...process.env,
       PORT: String(port),
