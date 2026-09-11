@@ -1,4 +1,4 @@
-name: Competitive CP2-H AOT Readiness Diagnostic
+name: Competitive CP2-H AOT Env Parity Fix
 
 on:
   push:
@@ -6,10 +6,10 @@ on:
       - diag/competitive-cp2h-aot-readiness
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  diagnose:
+  patch:
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout target
@@ -18,38 +18,37 @@ jobs:
           ref: work/competitive-cp2-core-crown
           fetch-depth: 0
 
-      - name: Setup Bun 1.4.2
-        uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: 1.4.2
-
-      - name: Install frozen Elysia AOT island
-        run: bun install --cwd bench/competitive/elysia-v2-aot --frozen-lockfile
-
-      - name: Build CP2-H AOT artifacts
-        working-directory: bench/competitive/elysia-v2-aot
-        run: bun http-aot-build.mts
-
-      - name: Verify static-raw 5k artifact with CP1-style runtime env
+      - name: Apply proven AOT runtime-env parity fix
         shell: bash
-        working-directory: bench/competitive/elysia-v2-aot
         run: |
-          set +e
-          PORT=3112 ROUTES=5000 ROUTE_KIND=static BODY_KIND=raw bun generated/cp2-http/static-raw/server.js >/tmp/cp2h-aot.out 2>/tmp/cp2h-aot.err &
-          pid=$!
-          echo "pid=$pid"
-          sleep 1
-          ps -p "$pid" -o pid,stat,etime,cmd
-          ss -ltnp | grep ':3112' || true
-          for path in /r/0 /r/2 /r/3 /r/999 /r/4999; do
-            echo "--- ${path} ---"
-            curl -sS -D - --max-time 2 "http://127.0.0.1:3112${path}" -o /tmp/cp2h-body || true
-            cat /tmp/cp2h-body 2>/dev/null || true
-            echo
-          done
-          echo "stdout:"
-          cat /tmp/cp2h-aot.out || true
-          echo "stderr:"
-          cat /tmp/cp2h-aot.err || true
-          kill "$pid" 2>/dev/null || true
-          wait "$pid" 2>/dev/null || true
+          python - <<'PY'
+          from pathlib import Path
+
+          source = Path("bench/competitive/core/http-acceptance.mts")
+          text = source.read_text()
+          old = '        env: { ...env, ROUTES: undefined, ROUTE_KIND: undefined, BODY_KIND: undefined },'
+          new = '        env,'
+          if text.count(old) != 1:
+              raise SystemExit(f"expected exactly one AOT env omission, found {text.count(old)}")
+          source.write_text(text.replace(old, new))
+
+          doc = Path("docs/benchmarks/competitive-cp2h-http-freeze.md")
+          text = doc.read_text()
+          anchor = "## Authority\n"
+          note = """## Invalid pre-timing harness evidence\n\nThe first CP2-H correctness-only workflow, run `34581098748`, is retained as **harness-invalid** evidence. It executed the Elysia 2 AOT artifact after explicitly removing `ROUTES`, `ROUTE_KIND`, and `BODY_KIND` from the runtime environment. The generated artifact therefore used the benchmark app defaults (`3` routes, JSON), causing `/r/4999` to return `404`. No `oha` timing was executed.\n\nDiagnostic run `34581406018` proved the artifact was listening normally but exposed only the default runtime route set when those variables were omitted. Diagnostic run `34581490615` then executed the same 5,000-route artifact with the CP1-accepted runtime environment (`ROUTES=5000`, matching route/body kind): `/r/0`, `/r/2`, `/r/3`, `/r/999`, and `/r/4999` all returned `200`, raw `GET`, and `text/plain`.\n\nThe harness fix is therefore limited to preserving the same runtime environment already used by the accepted CP1 AOT probe. Production source, comparator versions, workloads, sampling, and timing protocol are unchanged.\n\n"""
+          if note in text:
+              raise SystemExit("invalid-evidence note already present")
+          if text.count(anchor) != 1:
+              raise SystemExit("authority anchor not found exactly once")
+          doc.write_text(text.replace(anchor, note + anchor))
+          PY
+
+      - name: Commit target fix
+        shell: bash
+        run: |
+          git diff --check
+          git config user.name "Rigent"
+          git config user.email "127601320+rigenttio@users.noreply.github.com"
+          git add bench/competitive/core/http-acceptance.mts docs/benchmarks/competitive-cp2h-http-freeze.md
+          git commit -m "fix(competitive): preserve CP2-H AOT runtime env"
+          git push origin HEAD:work/competitive-cp2-core-crown
