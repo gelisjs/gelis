@@ -7,7 +7,7 @@ const ROOT = resolve(HERE, "../..");
 const WORKER = resolve(HERE, "p11-g9-request-id-worker.mts");
 const HTTP_SERVER = resolve(HERE, "p11-g9-request-id-http-server.mts");
 
-const CANDIDATE_SHA = "4b9053d7efaec35e71d35b3fbb0cb5b97cba7b61";
+const CANDIDATE_SHA = "1dd5f94cf0e9ad884ca44e537ee287587cd8baab";
 const HONO_VERSION = "4.13.5";
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
