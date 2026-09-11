@@ -1,0 +1,37 @@
+name: Competitive CP2-D Direct Harness
+
+on:
+  push:
+    branches:
+      - work/competitive-cp2-core-crown
+
+permissions:
+  contents: read
+
+jobs:
+  direct-harness:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Setup Bun 1.4.2
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+
+      - name: Install root dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Install frozen competitive dependencies
+        run: bun install --cwd bench/competitive --frozen-lockfile
+
+      - name: Typecheck competitive harness
+        working-directory: bench/competitive
+        run: bun ../../node_modules/typescript/bin/tsc -p tsconfig.json --noEmit
+
+      - name: Run CP2-D correctness probe only
+        working-directory: bench/competitive
+        run: bun core/direct-acceptance.mts --probe-only
