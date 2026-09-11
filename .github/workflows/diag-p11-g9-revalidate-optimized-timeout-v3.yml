@@ -1,0 +1,41 @@
+name: P11-G9 Optimized Timeout Revalidation V3
+
+on:
+  push:
+    branches:
+      - work/p11-g9-revalidate-optimized-timeout-v3
+
+permissions:
+  contents: read
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.0
+      - run: bun install --frozen-lockfile
+      - name: Install frozen oha 1.16.0
+        shell: bash
+        run: |
+          curl -fsSL \
+            https://github.com/hatoo/oha/releases/download/v1.16.0/oha-linux-amd64 \
+            -o /tmp/oha
+          echo "620bb9e16fb53eabc9a3fc45f88bdb41fefa3fee5c05e75892011ce320391716  /tmp/oha" | sha256sum --check
+          chmod +x /tmp/oha
+          sudo mv /tmp/oha /usr/local/bin/oha
+          oha --version
+      - name: Prepare frozen candidate worktree
+        shell: bash
+        run: |
+          git worktree add --detach ../p11-g9-candidate 1dd5f94cf0e9ad884ca44e537ee287587cd8baab
+          test -z "$(git -C ../p11-g9-candidate status --porcelain)"
+          test "$(git -C ../p11-g9-candidate rev-parse HEAD)" = "1dd5f94cf0e9ad884ca44e537ee287587cd8baab"
+      - name: Run frozen P11-G9 request-ID gate
+        run: |
+          bun bench/request-id-timeout/p11-g9-request-id-acceptance.mts \
+            --candidate-root=../p11-g9-candidate
