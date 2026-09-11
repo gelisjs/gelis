@@ -62,6 +62,39 @@ interface Summary {
   readonly max: number;
 }
 
+const PRIMITIVE_CELLS: readonly PrimitiveCell[] = [
+  "pathname",
+  "router-static",
+  "router-dynamic",
+  "handler-static-json",
+  "handler-dynamic-json",
+  "json-stringify-static",
+  "json-stringify-dynamic",
+  "response-json-static",
+  "response-json-dynamic",
+  "response-preserialized-static",
+  "response-preserialized-dynamic",
+  "normalize-static-json",
+  "normalize-dynamic-json",
+  "response-raw-static",
+  "response-raw-dynamic",
+  "normalize-existing-response",
+];
+
+const SCENARIOS: readonly Scenario[] = [
+  "static-raw",
+  "dynamic-raw",
+  "static-json",
+  "dynamic-json",
+];
+
+const STAGES: readonly Stage[] = [
+  "url-router",
+  "url-router-handler",
+  "url-router-handler-normalize",
+  "app-fetch",
+];
+
 const probeOnly = process.argv.includes("--probe-only");
 const harnessSha = git(["rev-parse", "HEAD"]);
 const cpu = cpus()[0]?.model ?? "unknown";
@@ -104,9 +137,7 @@ if (probeOnly) {
 const summaries = new Map<Cell, Summary>();
 
 console.log("Isolated production primitives");
-console.log(
-  "| cell | median ns/op | p25 | p75 | min | max |",
-);
+console.log("| cell | median ns/op | p25 | p75 | min | max |");
 console.log("| --- | ---: | ---: | ---: | ---: | ---: |");
 
 for (const cell of PRIMITIVE_CELLS) {
@@ -117,9 +148,7 @@ for (const cell of PRIMITIVE_CELLS) {
 
 console.log();
 console.log("Integrated staged plain pipeline");
-console.log(
-  "| scenario | stage | median ns/op | p25 | p75 | min | max |",
-);
+console.log("| scenario | stage | median ns/op | p25 | p75 | min | max |");
 console.log("| --- | --- | ---: | ---: | ---: | ---: | ---: |");
 
 for (const scenario of SCENARIOS) {
@@ -135,9 +164,7 @@ for (const scenario of SCENARIOS) {
 
 console.log();
 console.log("Derived diagnostics — non-additive, for engineering direction only");
-console.log(
-  "| diagnostic | value |",
-);
+console.log("| diagnostic | value |");
 console.log("| --- | ---: |");
 
 printDiagnostic(
@@ -331,43 +358,11 @@ function median(cell: Cell): number {
 }
 
 function printDiagnostic(label: string, value: number, unit: "x" | "ns"): void {
-  const rendered = unit === "x" ? `${value.toFixed(4)}x` : `${value.toFixed(1)} ns`;
+  const rendered =
+    unit === "x" ? `${value.toFixed(4)}x` : `${value.toFixed(1)} ns`;
   console.log(`| ${label} | ${rendered} |`);
 }
 
 function format(value: number): string {
   return value.toFixed(1);
 }
-
-const PRIMITIVE_CELLS: readonly PrimitiveCell[] = [
-  "pathname",
-  "router-static",
-  "router-dynamic",
-  "handler-static-json",
-  "handler-dynamic-json",
-  "json-stringify-static",
-  "json-stringify-dynamic",
-  "response-json-static",
-  "response-json-dynamic",
-  "response-preserialized-static",
-  "response-preserialized-dynamic",
-  "normalize-static-json",
-  "normalize-dynamic-json",
-  "response-raw-static",
-  "response-raw-dynamic",
-  "normalize-existing-response",
-];
-
-const SCENARIOS: readonly Scenario[] = [
-  "static-raw",
-  "dynamic-raw",
-  "static-json",
-  "dynamic-json",
-];
-
-const STAGES: readonly Stage[] = [
-  "url-router",
-  "url-router-handler",
-  "url-router-handler-normalize",
-  "app-fetch",
-];
