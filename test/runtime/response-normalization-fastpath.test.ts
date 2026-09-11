@@ -1,9 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import {
-  normalizeResponse,
-  runtimeReply,
-} from "../../src/runtime/response";
+import { normalizeResponse, runtimeReply } from "../../src/runtime/response";
 
 describe("ordinary response normalization", () => {
   test("preserves raw Response identity", () => {
