@@ -1,0 +1,683 @@
+name: P11-G7 Package Type AOT Build
+
+on:
+  push:
+    branches:
+      - diag/p11-g7-build
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.0
+      - name: Checkout target branch
+        run: |
+          git fetch origin work/p11-g7-package-types-aot
+          git checkout -B work/p11-g7-package-types-aot origin/work/p11-g7-package-types-aot
+      - run: bun install --frozen-lockfile
+      - name: Apply G7 package type and AOT evidence
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          def replace_once(path: str, old: str, new: str):
+              p = Path(path)
+              text = p.read_text()
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f"{path}: expected one match, got {count}: {old[:120]!r}")
+              p.write_text(text.replace(old, new, 1))
+
+          package_path = Path("package.json")
+          package = json.loads(package_path.read_text())
+          package["exports"]["./request-id"] = {
+              "types": "./src/request-id/index.ts",
+              "import": "./src/request-id/index.ts",
+              "default": "./src/request-id/index.ts",
+          }
+          package["exports"]["./timeout"] = {
+              "types": "./src/timeout/index.ts",
+              "import": "./src/timeout/index.ts",
+              "default": "./src/timeout/index.ts",
+          }
+          package_path.write_text(json.dumps(package, indent=2) + "\n")
+
+          replace_once(
+              "test/package/package-exports.test.ts",
+              'import { cors } from "gelis/cors";\nimport { secureHeaders } from "gelis/secure-headers";',
+              'import { cors } from "gelis/cors";\nimport { requestId } from "gelis/request-id";\nimport { secureHeaders } from "gelis/secure-headers";\nimport { TimeoutError, timeout } from "gelis/timeout";',
+          )
+          replace_once(
+              "test/package/package-exports.test.ts",
+              '''  test("resolves the portable secure-headers subpath", () => {\n    expect(typeof secureHeaders).toBe("function");\n\n    const app = new Gelis();\n    app.use(secureHeaders());\n    app.get("/", () => "ok");\n\n    expect(app).toBeInstanceOf(Gelis);\n  });\n''',
+              '''  test("resolves the portable secure-headers subpath", () => {\n    expect(typeof secureHeaders).toBe("function");\n\n    const app = new Gelis();\n    app.use(secureHeaders());\n    app.get("/", () => "ok");\n\n    expect(app).toBeInstanceOf(Gelis);\n  });\n\n  test("resolves the portable request-id subpath", () => {\n    expect(typeof requestId).toBe("function");\n\n    const app = new Gelis();\n    const ids = requestId({ generator: () => "package-request-id" });\n\n    app.use(ids);\n    app.get("/", () => "ok");\n\n    expect(app).toBeInstanceOf(Gelis);\n  });\n\n  test("resolves the portable timeout subpath", () => {\n    expect(typeof timeout).toBe("function");\n    expect(typeof TimeoutError).toBe("function");\n\n    const app = new Gelis();\n    app.use(timeout({ duration: 1_000 }));\n    app.get("/", { timeout: 500 }, () => "ok");\n\n    const error = new TimeoutError(500, "route");\n    expect(error.code).toBe("REQUEST_TIMEOUT");\n    expect(error.scope).toBe("route");\n    expect(app).toBeInstanceOf(Gelis);\n  });\n''',
+          )
+          replace_once(
+              "test/package/package-exports.test.ts",
+              '''  test("does not re-export secure-header helpers from the portable root", async () => {\n    const root = await import("gelis");\n\n    expect("secureHeaders" in root).toBe(false);\n  });\n''',
+              '''  test("does not re-export secure-header helpers from the portable root", async () => {\n    const root = await import("gelis");\n\n    expect("secureHeaders" in root).toBe(false);\n  });\n\n  test("does not re-export request-ID or timeout convenience APIs from the portable root", async () => {\n    const root = await import("gelis");\n\n    expect("requestId" in root).toBe(false);\n    expect("timeout" in root).toBe(false);\n    expect("TimeoutError" in root).toBe(false);\n  });\n''',
+          )
+
+          replace_once(
+              "test/package/portable/consumer.ts",
+              'import { cors } from "gelis/cors";\nimport {\n  secureHeaders,',
+              'import { cors } from "gelis/cors";\nimport {\n  requestId,\n  type RequestIdCapability,\n  type RequestIdOptions,\n  type RequestIdTrustIncoming,\n} from "gelis/request-id";\nimport {\n  secureHeaders,',
+          )
+          replace_once(
+              "test/package/portable/consumer.ts",
+              '''} from "gelis/secure-headers";\n\nconst app = new Gelis();''',
+              '''} from "gelis/secure-headers";\nimport {\n  TimeoutError,\n  timeout,\n  type TimeoutCapability,\n  type TimeoutOptions,\n  type TimeoutScope,\n} from "gelis/timeout";\n\nconst app = new Gelis();\n\nconst trustIncoming: RequestIdTrustIncoming = (value) =>\n  value.startsWith("req_");\nconst requestIdOptions: RequestIdOptions = {\n  trustIncoming,\n  generator: () => "req_generated",\n};\nconst ids: RequestIdCapability = requestId(requestIdOptions);\napp.use(ids);\n\nconst timeoutOptions: TimeoutOptions = { duration: 1_000 };\nconst deadlines: TimeoutCapability = timeout(timeoutOptions);\napp.use(deadlines);\n\nconst timeoutScope: TimeoutScope = "route";\nconst timeoutError = new TimeoutError(500, timeoutScope);''',
+          )
+          replace_once(
+              "test/package/portable/consumer.ts",
+              '''app.use(secureHeaders(secureHeaderOptions));\napp.get("/", () => "portable");''',
+              '''app.use(secureHeaders(secureHeaderOptions));\napp.get("/", () => "portable");\napp.get("/timed", { timeout: 500 }, ({ request }) => {\n  ids.get(request);\n  deadlines.signal(request);\n  return "timed";\n});\n\n// TypeScript can reject non-numeric timeout values without adding a route generic.\n// @ts-expect-error Gelis route timeout must be numeric.\napp.get("/invalid-timeout", { timeout: "500" }, () => "invalid");''',
+          )
+          replace_once(
+              "test/package/portable/consumer.ts",
+              '''void app;\nvoid headers;\nvoid inspectLimitedBody;''',
+              '''timeoutError.code;\n\nvoid app;\nvoid headers;\nvoid inspectLimitedBody;''',
+          )
+          PY
+
+          cat > test/runtime/request-id-timeout-aot.test.ts <<'EOF'
+          import { describe, expect, test } from "bun:test";
+
+          import { Gelis, inspectContract } from "../../src";
+          import { requestId } from "../../src/request-id/index";
+          import { timeout, TimeoutError } from "../../src/timeout/index";
+          import {
+            createAotAppSession,
+            createAotBuildAppSession,
+          } from "../../src/tooling/aot-app";
+          import { compileRouterSnapshot } from "../../src/tooling/router-snapshot-compiler";
+
+          const API_URL = "https://api.example";
+
+          describe("P11-G request-ID and timeout AOT preservation", () => {
+            test("keeps request ID active when installed before router hydration", async () => {
+              const snapshot = buildHealthSnapshot();
+              const runtime = createAotAppSession();
+              const ids = requestId({ generator: () => "aot-before" });
+
+              runtime.app.use(ids);
+              defineHealthRoute(runtime.app, "runtime");
+              runtime.hydrate(snapshot);
+
+              const response = await runtime.app.fetch(
+                new Request(`${API_URL}/health`),
+              );
+
+              expect(response.status).toBe(200);
+              expect(response.headers.get("x-request-id")).toBe("aot-before");
+            });
+
+            test("keeps request ID active when installed after router hydration", async () => {
+              const snapshot = buildHealthSnapshot();
+              const runtime = createAotAppSession();
+
+              defineHealthRoute(runtime.app, "runtime");
+              runtime.hydrate(snapshot);
+              runtime.app.use(requestId({ generator: () => "aot-after" }));
+
+              const response = await runtime.app.fetch(
+                new Request(`${API_URL}/health`),
+              );
+
+              expect(response.status).toBe(200);
+              expect(response.headers.get("x-request-id")).toBe("aot-after");
+            });
+
+            test("keeps application timeout active when installed before hydration", async () => {
+              const snapshot = buildSlowSnapshot(false);
+              const runtime = createAotAppSession();
+
+              runtime.app.use(timeout({ duration: 5 }));
+              defineSlowRoute(runtime.app, false);
+              runtime.hydrate(snapshot);
+
+              const response = await runtime.app.fetch(
+                new Request(`${API_URL}/slow`),
+              );
+
+              expect(response.status).toBe(504);
+            });
+
+            test("keeps application timeout active when installed after hydration", async () => {
+              const snapshot = buildSlowSnapshot(false);
+              const runtime = createAotAppSession();
+
+              defineSlowRoute(runtime.app, false);
+              runtime.hydrate(snapshot);
+              runtime.app.use(timeout({ duration: 5 }));
+
+              const response = await runtime.app.fetch(
+                new Request(`${API_URL}/slow`),
+              );
+
+              expect(response.status).toBe(504);
+            });
+
+            test("preserves and binds route timeout when capability is installed before hydration", async () => {
+              const snapshot = buildSlowSnapshot(true);
+              const runtime = createAotAppSession();
+              const deadlines = timeout();
+              let signal: AbortSignal | undefined;
+
+              runtime.app.use(deadlines);
+              runtime.app.get("/slow", { timeout: 5 }, ({ request }) => {
+                signal = deadlines.signal(request);
+                return new Promise<Response>(() => {});
+              });
+              runtime.hydrate(snapshot);
+
+              const response = await runtime.app.fetch(
+                new Request(`${API_URL}/slow`),
+              );
+
+              expect(response.status).toBe(504);
+              expect(signal?.reason).toBeInstanceOf(TimeoutError);
+              expect((signal?.reason as TimeoutError).scope).toBe("route");
+            });
+
+            test("preserves and binds route timeout when capability is installed after hydration", async () => {
+              const snapshot = buildSlowSnapshot(true);
+              const runtime = createAotAppSession();
+              const deadlines = timeout();
+              let signal: AbortSignal | undefined;
+
+              runtime.app.get("/slow", { timeout: 5 }, ({ request }) => {
+                signal = deadlines.signal(request);
+                return new Promise<Response>(() => {});
+              });
+              runtime.hydrate(snapshot);
+              runtime.app.use(deadlines);
+
+              const response = await runtime.app.fetch(
+                new Request(`${API_URL}/slow`),
+              );
+
+              expect(response.status).toBe(504);
+              expect(signal?.reason).toBeInstanceOf(TimeoutError);
+              expect((signal?.reason as TimeoutError).scope).toBe("route");
+            });
+
+            test("does not serialize request-ID or timeout execution policy into router artifacts", () => {
+              const control = buildSlowSnapshot(false);
+              const build = createAotBuildAppSession();
+
+              build.app.use(requestId({ generator: () => "build-id" }));
+              build.app.use(timeout({ duration: 1_000 }));
+              defineSlowRoute(build.app, true);
+
+              const candidate = compileRouterSnapshot(build.collectRoutes());
+
+              expect(candidate).toEqual(control);
+            });
+
+            test("keeps request-ID and timeout execution metadata out of contract snapshots", () => {
+              const app = new Gelis();
+
+              app.use(requestId({ generator: () => "contract-id" }));
+              app.use(timeout());
+              app.get("/timed", { timeout: 250 }, () => "ok");
+
+              const snapshot = inspectContract(app);
+              const route = snapshot.routes[0];
+
+              expect(route).toBeDefined();
+              expect("timeout" in route!).toBe(false);
+              expect("requestId" in route!).toBe(false);
+            });
+          });
+
+          function buildHealthSnapshot() {
+            const build = createAotBuildAppSession();
+            defineHealthRoute(build.app, "build");
+            return compileRouterSnapshot(build.collectRoutes());
+          }
+
+          function buildSlowSnapshot(timed: boolean) {
+            const build = createAotBuildAppSession();
+            defineSlowRoute(build.app, timed);
+            return compileRouterSnapshot(build.collectRoutes());
+          }
+
+          function defineHealthRoute(app: Gelis, identity: string): void {
+            app.get("/health", () => `${identity}:ok`);
+          }
+
+          function defineSlowRoute(app: Gelis, timed: boolean): void {
+            if (timed) {
+              app.get("/slow", { timeout: 5 }, () => new Promise<Response>(() => {}));
+              return;
+            }
+
+            app.get("/slow", () => new Promise<Response>(() => {}));
+          }
+          EOF
+
+          cat > bench/types/p11-g7-timeout-acceptance.mts <<'EOF'
+          import { spawnSync } from "node:child_process";
+          import { mkdirSync, writeFileSync } from "node:fs";
+          import { cpus } from "node:os";
+          import { resolve } from "node:path";
+          import { fileURLToPath } from "node:url";
+
+          import "./generate.mts";
+
+          const SIZES = [100, 500, 1000, 5000] as const;
+          const RUNS = 3;
+          const ROUTES_PER_FILE = 50;
+
+          const INSTANTIATIONS_MAX = 1.15;
+          const MEMORY_MAX = 1.15;
+          const CHECK_MAX = 1.25;
+          const CHECK_5000_MAX = 1.2;
+          const INSTANTIATIONS_GROWTH_MAX = 5.5;
+          const CHECK_GROWTH_MAX = 6;
+
+          type BenchmarkSize = (typeof SIZES)[number];
+          type Scenario = "routes" | "p11-timeout-route";
+
+          interface RouteChunk {
+            readonly start: number;
+            readonly end: number;
+          }
+
+          interface TypeDiagnostics {
+            readonly instantiations: number;
+            readonly memoryMB: number;
+            readonly checkTime: number;
+            readonly totalTime: number;
+          }
+
+          interface CaseSummary extends TypeDiagnostics {
+            readonly scenario: Scenario;
+            readonly routes: BenchmarkSize;
+          }
+
+          interface ComparisonSummary {
+            readonly routes: BenchmarkSize;
+            readonly instantiationsRatio: number;
+            readonly memoryRatio: number;
+            readonly checkRatio: number;
+            readonly pass: boolean;
+          }
+
+          const HERE = fileURLToPath(new URL(".", import.meta.url));
+          const ROOT = resolve(HERE, "../..");
+          const TSC = resolve(ROOT, "node_modules/typescript/lib/tsc.js");
+
+          for (const size of SIZES) {
+            generateTimeoutRoutes(size);
+          }
+
+          compile("routes", 100);
+
+          console.log("\nP11-G7 route-timeout TypeScript scalability acceptance\n");
+          console.log(`Runtime:       bun ${Bun.version}`);
+          console.log(`CPU:           ${cpus()[0]?.model ?? "unknown"}`);
+          console.log(`Runs/case:     ${RUNS}`);
+          console.log(`Sizes:         ${SIZES.join(", ")}`);
+          console.log("Control:       routes");
+          console.log("Candidate:     p11-timeout-route");
+          console.log(`Inst gate:     <= ${INSTANTIATIONS_MAX}x per size`);
+          console.log(`Memory gate:   <= ${MEMORY_MAX}x per size`);
+          console.log(`Check gate:    <= ${CHECK_MAX}x per size`);
+          console.log(`5k check gate: <= ${CHECK_5000_MAX}x`);
+          console.log(
+            `Growth gates:  inst <= ${INSTANTIATIONS_GROWTH_MAX}x; check <= ${CHECK_GROWTH_MAX}x (1000→5000)`,
+          );
+
+          const cases: CaseSummary[] = [];
+
+          for (const size of SIZES) {
+            for (const scenario of ["routes", "p11-timeout-route"] as const) {
+              const samples: TypeDiagnostics[] = [];
+
+              for (let run = 0; run < RUNS; run++) {
+                samples.push(compile(scenario, size));
+              }
+
+              const summary = medianDiagnostics(samples);
+              cases.push({ scenario, routes: size, ...summary });
+
+              console.log(
+                [
+                  scenario,
+                  `${size} routes`,
+                  `inst ${Math.round(summary.instantiations).toLocaleString("en-US")}`,
+                  `mem ${round(summary.memoryMB, 1)} MB`,
+                  `check ${round(summary.checkTime, 3)} s`,
+                ].join(" | "),
+              );
+            }
+          }
+
+          const comparisons = SIZES.map(compare);
+
+          console.log("\nP11-G7 relative TypeScript summary\n");
+          console.table(
+            comparisons.map((comparison) => ({
+              routes: comparison.routes,
+              "inst ratio": round(comparison.instantiationsRatio, 4),
+              "memory ratio": round(comparison.memoryRatio, 4),
+              "check ratio": round(comparison.checkRatio, 4),
+              "check gate":
+                comparison.routes === 5000
+                  ? `<= ${CHECK_5000_MAX}x`
+                  : `<= ${CHECK_MAX}x`,
+              verdict: comparison.pass ? "PASS" : "FAIL",
+            })),
+          );
+
+          const at1000 = findCase("p11-timeout-route", 1000);
+          const at5000 = findCase("p11-timeout-route", 5000);
+          const instantiationsGrowth = at5000.instantiations / at1000.instantiations;
+          const checkGrowth = at5000.checkTime / at1000.checkTime;
+          const growthPass =
+            instantiationsGrowth <= INSTANTIATIONS_GROWTH_MAX &&
+            checkGrowth <= CHECK_GROWTH_MAX;
+
+          console.log("\nP11-G7 1000→5000 growth summary\n");
+          console.table([
+            {
+              scenario: "p11-timeout-route",
+              "inst growth": round(instantiationsGrowth, 4),
+              "inst gate": `<= ${INSTANTIATIONS_GROWTH_MAX}x`,
+              "check growth": round(checkGrowth, 4),
+              "check gate": `<= ${CHECK_GROWTH_MAX}x`,
+              verdict: growthPass ? "PASS" : "FAIL",
+            },
+          ]);
+
+          const failed = comparisons.filter((comparison) => !comparison.pass);
+
+          if (failed.length !== 0 || !growthPass) {
+            throw new Error(
+              [
+                "P11-G7 TypeScript scalability gate failed",
+                ...failed.map((row) => `p11-timeout-route/${row.routes}`),
+                ...(growthPass ? [] : ["p11-timeout-route/growth"]),
+              ].join(": "),
+            );
+          }
+
+          console.log("\nStructural root-type assertion compiled successfully.");
+          console.log("Verdict: PASS");
+
+          function generateTimeoutRoutes(size: BenchmarkSize): void {
+            const directory = caseDir("p11-timeout-route", size);
+            const imports: string[] = [];
+
+            writeFileSync(
+              new URL("app.ts", directory),
+              [
+                "import { Gelis } from '../../../../src'",
+                "",
+                "export const app = new Gelis()",
+                "",
+              ].join("\n"),
+            );
+
+            for (const [fileIndex, { start, end }] of chunks(size).entries()) {
+              const name = `routes-${String(fileIndex).padStart(3, "0")}.ts`;
+              imports.push(`import './${name}'`);
+
+              const lines = ["import { app } from './app'", ""];
+
+              for (let index = start; index < end; index++) {
+                lines.push(
+                  `app.get('/bench/${index}/:id', { timeout: 1000 }, ` +
+                    `({ params }) => ({ id: params.id, route: ${index} }))`,
+                );
+              }
+
+              writeFileSync(new URL(name, directory), `${lines.join("\n")}\n`);
+            }
+
+            writeFileSync(
+              new URL("index.ts", directory),
+              [
+                imports.join("\n"),
+                "import { app } from './app'",
+                "import type { Gelis } from '../../../../src'",
+                "",
+                "type Equal<A, B> =",
+                "  (<T>() => T extends A ? 1 : 2) extends",
+                "  (<T>() => T extends B ? 1 : 2) ? true : false",
+                "type Expect<T extends true> = T",
+                "type RootStable = Expect<Equal<typeof app, Gelis>>",
+                "void (null as unknown as RootStable)",
+                "",
+              ].join("\n"),
+            );
+          }
+
+          function caseDir(name: string, size: BenchmarkSize): URL {
+            const directory = new URL(`./generated/${name}-${size}/`, import.meta.url);
+            mkdirSync(directory, { recursive: true });
+
+            writeFileSync(
+              new URL("tsconfig.json", directory),
+              `${JSON.stringify(
+                {
+                  extends: "../../../../tsconfig.json",
+                  compilerOptions: {
+                    noEmit: true,
+                    incremental: false,
+                  },
+                  include: ["./**/*.ts"],
+                },
+                null,
+                2,
+              )}\n`,
+            );
+
+            return directory;
+          }
+
+          function chunks(size: BenchmarkSize): RouteChunk[] {
+            const result: RouteChunk[] = [];
+
+            for (let start = 0; start < size; start += ROUTES_PER_FILE) {
+              result.push({
+                start,
+                end: Math.min(start + ROUTES_PER_FILE, size),
+              });
+            }
+
+            return result;
+          }
+
+          function compile(scenario: Scenario, size: BenchmarkSize): TypeDiagnostics {
+            const project = resolve(
+              HERE,
+              "generated",
+              `${scenario}-${size}`,
+              "tsconfig.json",
+            );
+
+            const result = spawnSync(
+              process.execPath,
+              [
+                TSC,
+                "--project",
+                project,
+                "--noEmit",
+                "--pretty",
+                "false",
+                "--extendedDiagnostics",
+              ],
+              {
+                cwd: ROOT,
+                encoding: "utf8",
+                env: process.env,
+              },
+            );
+
+            if (result.status !== 0) {
+              process.stderr.write(result.stdout ?? "");
+              process.stderr.write(result.stderr ?? "");
+              throw new Error(`TypeScript compile failed: ${scenario}/${size}`);
+            }
+
+            return parseDiagnostics(result.stdout);
+          }
+
+          function parseDiagnostics(output: string): TypeDiagnostics {
+            let instantiations: number | undefined;
+            let memoryMB: number | undefined;
+            let checkTime: number | undefined;
+            let totalTime: number | undefined;
+
+            for (const line of output.split(/\r?\n/)) {
+              const match = /^([^:]+):\s+(.+)$/.exec(line.trim());
+              if (!match) continue;
+
+              const key = match[1];
+              const raw = match[2];
+              if (key === undefined || raw === undefined) continue;
+
+              switch (key) {
+                case "Instantiations":
+                  instantiations = parseNumber(raw);
+                  break;
+                case "Memory used":
+                  memoryMB = parseMemoryMB(raw);
+                  break;
+                case "Check time":
+                  checkTime = parseSeconds(raw);
+                  break;
+                case "Total time":
+                  totalTime = parseSeconds(raw);
+                  break;
+              }
+            }
+
+            if (
+              instantiations === undefined ||
+              memoryMB === undefined ||
+              checkTime === undefined ||
+              totalTime === undefined
+            ) {
+              throw new Error("Unable to parse required TypeScript diagnostics");
+            }
+
+            return { instantiations, memoryMB, checkTime, totalTime };
+          }
+
+          function medianDiagnostics(
+            samples: readonly TypeDiagnostics[],
+          ): TypeDiagnostics {
+            return {
+              instantiations: median(samples.map((sample) => sample.instantiations)),
+              memoryMB: median(samples.map((sample) => sample.memoryMB)),
+              checkTime: median(samples.map((sample) => sample.checkTime)),
+              totalTime: median(samples.map((sample) => sample.totalTime)),
+            };
+          }
+
+          function compare(size: BenchmarkSize): ComparisonSummary {
+            const candidate = findCase("p11-timeout-route", size);
+            const control = findCase("routes", size);
+            const instantiationsRatio = candidate.instantiations / control.instantiations;
+            const memoryRatio = candidate.memoryMB / control.memoryMB;
+            const checkRatio = candidate.checkTime / control.checkTime;
+            const checkLimit = size === 5000 ? CHECK_5000_MAX : CHECK_MAX;
+
+            return {
+              routes: size,
+              instantiationsRatio,
+              memoryRatio,
+              checkRatio,
+              pass:
+                instantiationsRatio <= INSTANTIATIONS_MAX &&
+                memoryRatio <= MEMORY_MAX &&
+                checkRatio <= checkLimit,
+            };
+          }
+
+          function findCase(scenario: Scenario, size: BenchmarkSize): CaseSummary {
+            const result = cases.find(
+              (row) => row.scenario === scenario && row.routes === size,
+            );
+            if (result === undefined) {
+              throw new Error(`Missing TypeScript case: ${scenario}/${size}`);
+            }
+            return result;
+          }
+
+          function median(values: readonly number[]): number {
+            if (values.length === 0) {
+              throw new Error("Cannot compute median of empty TypeScript values");
+            }
+            const sorted = [...values].sort((left, right) => left - right);
+            const middle = Math.floor(sorted.length / 2);
+            return sorted.length % 2 === 1
+              ? sorted[middle]!
+              : (sorted[middle - 1]! + sorted[middle]!) / 2;
+          }
+
+          function parseNumber(value: string): number {
+            return Number(value.replaceAll(",", "").trim());
+          }
+
+          function parseSeconds(value: string): number {
+            return Number(value.replace(/s$/, "").trim());
+          }
+
+          function parseMemoryMB(value: string): number {
+            const trimmed = value.trim();
+            if (trimmed.endsWith("K")) {
+              return Number(trimmed.slice(0, -1)) / 1024;
+            }
+            if (trimmed.endsWith("M")) {
+              return Number(trimmed.slice(0, -1));
+            }
+            throw new Error(`Unsupported TypeScript memory value: ${value}`);
+          }
+
+          function round(value: number, digits: number): number {
+            return Number(value.toFixed(digits));
+          }
+          EOF
+
+          bunx prettier \
+            package.json \
+            test/package/package-exports.test.ts \
+            test/package/portable/consumer.ts \
+            test/runtime/request-id-timeout-aot.test.ts \
+            bench/types/p11-g7-timeout-acceptance.mts \
+            --write
+
+          git diff --check
+          bun run typecheck:package:portable
+          bun run test:package
+          bun run typecheck:runtime-tests
+          bun test test/runtime/request-id-timeout-aot.test.ts
+          bun run typecheck:bench
+      - name: Commit target branch
+        shell: bash
+        run: |
+          git config user.name "Rigent"
+          git config user.email "127601320+rigenttio@users.noreply.github.com"
+          git add \
+            package.json \
+            test/package/package-exports.test.ts \
+            test/package/portable/consumer.ts \
+            test/runtime/request-id-timeout-aot.test.ts \
+            bench/types/p11-g7-timeout-acceptance.mts
+          git commit -m "test(p11-g): preserve package type and AOT boundaries"
+          git push origin HEAD:work/p11-g7-package-types-aot
