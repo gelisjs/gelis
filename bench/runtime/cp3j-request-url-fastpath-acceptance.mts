@@ -143,12 +143,7 @@ console.log();
 console.log("Frozen acceptance diagnostics");
 console.log("| diagnostic | value | gate | result |");
 console.log("| --- | ---: | ---: | --- | ");
-printGate(
-  "pathname candidate/baseline static",
-  pathnameStaticRatio,
-  0.9,
-  "<=",
-);
+printGate("pathname candidate/baseline static", pathnameStaticRatio, 0.9, "<=");
 printGate(
   "pathname candidate/baseline dynamic",
   pathnameDynamicRatio,
@@ -167,12 +162,7 @@ printGate(
   1.01,
   "<=",
 );
-printGate(
-  "dispatch candidate/baseline geomean",
-  dispatchGeomean,
-  0.97,
-  "<=",
-);
+printGate("dispatch candidate/baseline geomean", dispatchGeomean, 0.97, "<=");
 printGate(
   "pipeline candidate/baseline static JSON",
   pipelineStaticRatio,
@@ -185,12 +175,7 @@ printGate(
   1.01,
   "<=",
 );
-printGate(
-  "pipeline candidate/baseline geomean",
-  pipelineGeomean,
-  0.99,
-  "<=",
-);
+printGate("pipeline candidate/baseline geomean", pipelineGeomean, 0.99, "<=");
 
 const accepted =
   pathnameStaticRatio <= 0.9 &&

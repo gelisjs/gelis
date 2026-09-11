@@ -1,10 +1,7 @@
 import { performance } from "node:perf_hooks";
 
 import { Router } from "../../src/runtime/router.ts";
-import {
-  normalizeResponse,
-  runtimeReply,
-} from "../../src/runtime/response.ts";
+import { normalizeResponse, runtimeReply } from "../../src/runtime/response.ts";
 import {
   pathnameFromRequestUrl,
   pathnameFromUrl,
@@ -220,7 +217,9 @@ function pathnameCell(
     assertCorrectness: () => {
       const pathname = extract(request.url);
       if (pathname !== expected) {
-        throw new Error(`pathname mismatch: expected ${expected}, got ${pathname}`);
+        throw new Error(
+          `pathname mismatch: expected ${expected}, got ${pathname}`,
+        );
       }
     },
   };
@@ -234,7 +233,8 @@ function dispatchCell(
   dynamic: boolean,
 ): PreparedCell {
   return {
-    operation: () => consumePayload(dispatch(router, request, extract), dynamic),
+    operation: () =>
+      consumePayload(dispatch(router, request, extract), dynamic),
     assertCorrectness: () => {
       assertPathParity(request, expectedPath);
       assertPayload(dispatch(router, request, extract), dynamic);
@@ -265,7 +265,9 @@ function pipelineCell(
       if (response.status !== 200) {
         throw new Error(`unexpected pipeline status: ${response.status}`);
       }
-      if (!response.headers.get("content-type")?.startsWith("application/json")) {
+      if (
+        !response.headers.get("content-type")?.startsWith("application/json")
+      ) {
         throw new Error("pipeline did not produce JSON response");
       }
     },
@@ -293,7 +295,11 @@ function assertPathParity(request: Request, expected: string): void {
   const baseline = pathnameFromUrl(request.url);
   const candidate = pathnameFromRequestUrl(request.url);
 
-  if (baseline !== expected || candidate !== expected || baseline !== candidate) {
+  if (
+    baseline !== expected ||
+    candidate !== expected ||
+    baseline !== candidate
+  ) {
     throw new Error(
       `path parity mismatch: baseline=${baseline}, candidate=${candidate}, expected=${expected}`,
     );
@@ -307,7 +313,9 @@ function consumePayload(payload: unknown, dynamic: boolean): number {
     id?: string;
   };
 
-  return value.route + value.kind.length + (dynamic ? (value.id?.length ?? 0) : 0);
+  return (
+    value.route + value.kind.length + (dynamic ? (value.id?.length ?? 0) : 0)
+  );
 }
 
 function assertPayload(payload: unknown, dynamic: boolean): void {
