@@ -22,40 +22,40 @@ This is decomposition evidence used to choose the next optimization target. It i
 
 ## Authoritative medians
 
-| cell | median ns/op |
-| --- | ---: |
-| router-static-consume | 2.8 |
-| router-dynamic-consume | 26.6 |
-| router-static-escape | 16.8 |
-| router-dynamic-escape | 26.0 |
-| response-json-static | 467.8 |
-| response-json-dynamic | 468.2 |
-| normalize-static-json | 482.4 |
-| normalize-dynamic-json | 481.9 |
-| pipeline-static-raw | 339.8 |
-| pipeline-dynamic-raw | 512.0 |
-| pipeline-static-json | 562.5 |
-| pipeline-dynamic-json | 705.8 |
-| app-fetch-static-raw | 359.3 |
-| app-fetch-dynamic-raw | 533.9 |
-| app-fetch-static-json | 566.1 |
-| app-fetch-dynamic-json | 726.2 |
+| cell                   | median ns/op |
+| ---------------------- | -----------: |
+| router-static-consume  |          2.8 |
+| router-dynamic-consume |         26.6 |
+| router-static-escape   |         16.8 |
+| router-dynamic-escape  |         26.0 |
+| response-json-static   |        467.8 |
+| response-json-dynamic  |        468.2 |
+| normalize-static-json  |        482.4 |
+| normalize-dynamic-json |        481.9 |
+| pipeline-static-raw    |        339.8 |
+| pipeline-dynamic-raw   |        512.0 |
+| pipeline-static-json   |        562.5 |
+| pipeline-dynamic-json  |        705.8 |
+| app-fetch-static-raw   |        359.3 |
+| app-fetch-dynamic-raw  |        533.9 |
+| app-fetch-static-json  |        566.1 |
+| app-fetch-dynamic-json |        726.2 |
 
 ## Derived diagnostics
 
-| diagnostic | value |
-| --- | ---: |
-| router dynamic/static consume | 9.3863x |
-| router static escape/consume | 5.9256x |
-| router dynamic escape/consume | 0.9764x |
-| normalize static / Response.json static | 1.0311x |
+| diagnostic                                |   value |
+| ----------------------------------------- | ------: |
+| router dynamic/static consume             | 9.3863x |
+| router static escape/consume              | 5.9256x |
+| router dynamic escape/consume             | 0.9764x |
+| normalize static / Response.json static   | 1.0311x |
 | normalize dynamic / Response.json dynamic | 1.0292x |
-| app.fetch - pipeline static raw | 19.5 ns |
-| app.fetch - pipeline dynamic raw | 22.0 ns |
-| app.fetch - pipeline static JSON | 3.6 ns |
-| app.fetch - pipeline dynamic JSON | 20.4 ns |
-| dynamic/static app.fetch raw | 1.4862x |
-| dynamic/static app.fetch JSON | 1.2828x |
+| app.fetch - pipeline static raw            | 19.5 ns |
+| app.fetch - pipeline dynamic raw           | 22.0 ns |
+| app.fetch - pipeline static JSON           |  3.6 ns |
+| app.fetch - pipeline dynamic JSON          | 20.4 ns |
+| dynamic/static app.fetch raw               | 1.4862x |
+| dynamic/static app.fetch JSON              | 1.2828x |
 
 Additional engineering decomposition from the authoritative medians:
 
