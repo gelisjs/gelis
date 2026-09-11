@@ -1,0 +1,88 @@
+name: P11-G7 Timeout Type Fast Path
+
+on:
+  push:
+    branches:
+      - diag/p11-g7-timeout-type-fastpath
+
+permissions:
+  contents: write
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.0
+      - name: Checkout target branch
+        run: |
+          git fetch origin work/p11-g7-package-types-aot
+          git checkout -B work/p11-g7-package-types-aot origin/work/p11-g7-package-types-aot
+      - run: bun install --frozen-lockfile
+      - name: Apply timeout-only overload fast path
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path("src/route-builder.ts")
+          text = path.read_text()
+
+          lifecycle_marker = '''interface RuntimeRouteLifecycle {\n  readonly beforeHandle?: RuntimeBeforeHandle;\n\n  readonly afterHandle?: RuntimeAfterHandle;\n}\n'''
+          if text.count(lifecycle_marker) != 1:
+              raise SystemExit("RuntimeRouteLifecycle marker mismatch")
+
+          timeout_options = lifecycle_marker + '''\ninterface TimeoutOnlyRouteOptions {\n  readonly timeout: number;\n\n  readonly query?: never;\n\n  readonly body?: never;\n\n  readonly bodyParser?: never;\n\n  readonly bodyContentTypes?: never;\n\n  readonly bodyLimit?: never;\n\n  readonly responses?: never;\n\n  readonly openapi?: never;\n}\n'''
+          text = text.replace(lifecycle_marker, timeout_options, 1)
+
+          def fixed_overload(name: str, method: str) -> str:
+              return f'''  /*\n   * {name.upper()} with timeout-only execution policy.\n   *\n   * Keep the common timeout-only shape on the same lightweight\n   * public type path as a plain route instead of instantiating\n   * query/body/response option conditionals for every declaration.\n   */\n  {name}<const Path extends string, Result>(\n    path: Path & ValidRoutePath<Path>,\n\n    options: TimeoutOnlyRouteOptions,\n\n    handler: RouteHandler<JoinRoutePath<Prefix, Path>, never, never, Result>,\n\n    lifecycle?: RouteLifecycleFor<\n      JoinRoutePath<Prefix, Path>,\n      undefined,\n      undefined,\n      undefined,\n      Result\n    >,\n  ): RouteRef<\n    "{method}",\n    JoinRoutePath<Prefix, Path>,\n    RouteRequestContract<InferPathParams<JoinRoutePath<Prefix, Path>>>,\n    InferImplicitResponses<Result>\n  >;\n\n'''
+
+          markers = [
+              ("get", "GET", '''  /*\n   * GET with options but without an explicit\n'''),
+              ("post", "POST", '''  /*\n   * POST with options but without an explicit\n'''),
+              ("put", "PUT", '''  /*\n   * PUT with options but without an explicit\n'''),
+              ("patch", "PATCH", '''  /*\n   * PATCH with options but without an explicit\n'''),
+              ("delete", "DELETE", '''  /*\n   * DELETE with options but without an explicit\n'''),
+              ("options", "OPTIONS", '''  /*\n   * OPTIONS with options but without an explicit\n'''),
+              ("head", "HEAD", '''  /*\n   * HEAD with options but without an explicit\n'''),
+              ("query", "QUERY", '''  /*\n   * QUERY with options but without an explicit\n'''),
+              ("all", "*", '''  /*\n   * ALL with options but without an explicit\n'''),
+          ]
+
+          for name, method, marker in markers:
+              if text.count(marker) != 1:
+                  raise SystemExit(f"{name}: options marker mismatch")
+              text = text.replace(marker, fixed_overload(name, method) + marker, 1)
+
+          generic_marker = '''  /*\n   * Generic method route with options but without\n'''
+          if text.count(generic_marker) != 1:
+              raise SystemExit("generic route options marker mismatch")
+
+          generic_overload = '''  /*\n   * Generic method route with timeout-only execution policy.\n   */\n  route<const Method extends string, const Path extends string, Result>(\n    method: Method & ValidHttpMethodLiteral<Method>,\n\n    path: Path & ValidRoutePath<Path>,\n\n    options: TimeoutOnlyRouteOptions,\n\n    handler: RouteHandler<JoinRoutePath<Prefix, Path>, never, never, Result>,\n\n    lifecycle?: RouteLifecycleFor<\n      JoinRoutePath<Prefix, Path>,\n      undefined,\n      undefined,\n      undefined,\n      Result\n    >,\n  ): RouteRef<\n    Method,\n    JoinRoutePath<Prefix, Path>,\n    RouteRequestContract<InferPathParams<JoinRoutePath<Prefix, Path>>>,\n    InferImplicitResponses<Result>\n  >;\n\n'''
+          text = text.replace(generic_marker, generic_overload + generic_marker, 1)
+          path.write_text(text)
+          PY
+
+          bunx prettier src/route-builder.ts --write
+          git diff --check
+          bun run typecheck
+          bun run typecheck:package:portable
+          bun run test:types
+          bun run typecheck:bench
+      - name: Freeze candidate commit locally
+        shell: bash
+        run: |
+          git config user.name "Rigent"
+          git config user.email "127601320+rigenttio@users.noreply.github.com"
+          git add src/route-builder.ts
+          git commit -m "perf(types): specialize timeout-only routes"
+          echo "Candidate SHA: $(git rev-parse HEAD)"
+      - name: Run frozen P11-G7 type-scaling gate
+        run: bun bench/types/p11-g7-timeout-acceptance.mts
+      - name: Promote passing candidate
+        run: git push origin HEAD:work/p11-g7-package-types-aot
