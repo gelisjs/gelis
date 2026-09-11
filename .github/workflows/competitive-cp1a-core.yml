@@ -25,8 +25,8 @@ jobs:
       - name: Install root dependencies
         run: bun install --frozen-lockfile
 
-      - name: Install exact competitive dependencies
-        run: bun install --cwd bench/competitive
+      - name: Install frozen competitive dependencies
+        run: bun install --cwd bench/competitive --frozen-lockfile
 
       - name: Typecheck competitive harness
         working-directory: bench/competitive
@@ -35,10 +35,3 @@ jobs:
       - name: Run CP1-A equivalence probe
         working-directory: bench/competitive
         run: bun core/probe.mts
-
-      - name: Emit competitive lockfile for freeze
-        shell: bash
-        run: |
-          echo "__COMPETITIVE_LOCK_START__"
-          cat bench/competitive/bun.lock
-          echo "__COMPETITIVE_LOCK_END__"
