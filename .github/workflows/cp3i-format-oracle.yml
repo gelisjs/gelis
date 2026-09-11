@@ -1,0 +1,58 @@
+name: CP3-I Format Oracle
+
+on:
+  push:
+    branches:
+      - work/competitive-cp3i-request-lookup-strategies
+
+permissions:
+  contents: write
+
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.0
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Format CP3-I files
+        shell: bash
+        run: |
+          bunx prettier \
+            bench/runtime/cp3i-request-lookup-worker.mts \
+            bench/runtime/cp3i-request-lookup-acceptance.mts \
+            docs/benchmarks/competitive-cp3h-local-authoritative.md \
+            docs/benchmarks/competitive-cp3i-request-lookup-freeze.md \
+            --write
+
+      - name: Commit formatted files if needed
+        shell: bash
+        run: |
+          if git diff --quiet -- \
+            bench/runtime/cp3i-request-lookup-worker.mts \
+            bench/runtime/cp3i-request-lookup-acceptance.mts \
+            docs/benchmarks/competitive-cp3h-local-authoritative.md \
+            docs/benchmarks/competitive-cp3i-request-lookup-freeze.md; then
+            echo "No formatting changes needed"
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add \
+            bench/runtime/cp3i-request-lookup-worker.mts \
+            bench/runtime/cp3i-request-lookup-acceptance.mts \
+            docs/benchmarks/competitive-cp3h-local-authoritative.md \
+            docs/benchmarks/competitive-cp3i-request-lookup-freeze.md
+          git commit -m "chore(competitive): format CP3-I harness and evidence"
+          git push
