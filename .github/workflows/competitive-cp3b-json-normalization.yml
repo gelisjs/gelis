@@ -1,0 +1,29 @@
+name: Competitive CP3-B JSON Normalization Harness
+
+on:
+  push:
+    branches:
+      - work/competitive-cp3b-json-normalization
+
+jobs:
+  normalization-harness:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Setup Bun 1.4.2
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+
+      - name: Install frozen dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Typecheck CP3-B harness
+        run: bun ./node_modules/typescript/bin/tsc -p bench/competitive/normalize/tsconfig.json --noEmit
+
+      - name: Run CP3-B correctness probe only
+        run: bun bench/competitive/normalize/json-normalization-acceptance.mts --probe-only
