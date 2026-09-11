@@ -1,0 +1,41 @@
+name: P11-G8 Apply Prettier
+
+on:
+  push:
+    branches:
+      - diag/p11-g8-prettier
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.0
+      - name: Checkout target branch
+        run: |
+          git fetch origin work/p11-g8-zero-unused
+          git checkout -B work/p11-g8-zero-unused origin/work/p11-g8-zero-unused
+      - run: bun install --frozen-lockfile
+      - name: Apply authoritative formatting only
+        run: |
+          bunx prettier \
+            bench/request-id-timeout/p11-g8-zero-unused-acceptance.mts \
+            bench/request-id-timeout/p11-g8-zero-unused-worker.mts \
+            --write
+          git diff --check
+      - name: Commit target branch
+        run: |
+          git config user.name "Rigent"
+          git config user.email "127601320+rigenttio@users.noreply.github.com"
+          git add \
+            bench/request-id-timeout/p11-g8-zero-unused-acceptance.mts \
+            bench/request-id-timeout/p11-g8-zero-unused-worker.mts
+          git commit -m "style(bench): format P11-G8 zero-unused harness"
+          git push origin HEAD:work/p11-g8-zero-unused
