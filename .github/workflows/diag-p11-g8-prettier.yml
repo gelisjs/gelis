@@ -1,0 +1,28 @@
+name: P11-G8 Prettier Diagnostic
+
+on:
+  push:
+    branches:
+      - diag/p11-g8-prettier
+
+permissions:
+  contents: read
+
+jobs:
+  prettier:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.0
+      - run: bun install --frozen-lockfile
+      - name: Show authoritative Prettier diff
+        run: |
+          bunx prettier \
+            bench/request-id-timeout/p11-g8-zero-unused-acceptance.mts \
+            bench/request-id-timeout/p11-g8-zero-unused-worker.mts \
+            --write
+          git diff -- \
+            bench/request-id-timeout/p11-g8-zero-unused-acceptance.mts \
+            bench/request-id-timeout/p11-g8-zero-unused-worker.mts
