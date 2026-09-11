@@ -214,11 +214,7 @@ function defineResourceRoutes(app: Gelis, identity: string): void {
 function buildTimedSnapshot() {
   const build = createAotBuildAppSession();
 
-  build.app.get(
-    "/slow",
-    { timeout: 5 },
-    () => new Promise<Response>(() => {}),
-  );
+  build.app.get("/slow", { timeout: 5 }, () => new Promise<Response>(() => {}));
 
   return compileRouterSnapshot(build.collectRoutes());
 }

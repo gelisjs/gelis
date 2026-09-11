@@ -64,13 +64,13 @@ H3 is not accepted until this cumulative suite and the complete repository Quali
 
 The accepted capability documents were checked against the final package/API surface.
 
-| Phase | Acceptance document | Public owner | Audit result |
-| --- | --- | --- | --- |
-| P11-C | `p11-c-cookie-capability-acceptance.md` | `gelis/cookie` | consistent |
-| P11-D | `p11-d-cors-capability-acceptance.md` | `gelis/cors` | consistent |
-| P11-E | `p11-e-request-body-limit-acceptance.md` | `gelis/body-limit` | consistent |
-| P11-F | `p11-f-secure-headers-acceptance.md` | `gelis/secure-headers` | consistent |
-| P11-G | `p11-g-request-id-timeout-acceptance.md` | `gelis/request-id`, `gelis/timeout` | consistent |
+| Phase | Acceptance document                      | Public owner                        | Audit result |
+| ----- | ---------------------------------------- | ----------------------------------- | ------------ |
+| P11-C | `p11-c-cookie-capability-acceptance.md`  | `gelis/cookie`                      | consistent   |
+| P11-D | `p11-d-cors-capability-acceptance.md`    | `gelis/cors`                        | consistent   |
+| P11-E | `p11-e-request-body-limit-acceptance.md` | `gelis/body-limit`                  | consistent   |
+| P11-F | `p11-f-secure-headers-acceptance.md`     | `gelis/secure-headers`              | consistent   |
+| P11-G | `p11-g-request-id-timeout-acceptance.md` | `gelis/request-id`, `gelis/timeout` | consistent   |
 
 No stale public subpath or capability name was found.
 
