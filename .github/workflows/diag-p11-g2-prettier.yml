@@ -1,0 +1,23 @@
+name: P11-G2 Prettier Diagnostic
+
+on:
+  push:
+    branches:
+      - diag/p11-g2-prettier
+
+permissions:
+  contents: read
+
+jobs:
+  prettier:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.0
+      - run: bun install --frozen-lockfile
+      - name: Show authoritative Prettier diff
+        run: |
+          bunx prettier test/runtime/request-id-policy.test.ts --write
+          git diff -- test/runtime/request-id-policy.test.ts
