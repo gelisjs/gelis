@@ -13,6 +13,7 @@ bench/runtime/results/
 bench/http/results/
 bench/http/generated/
 bench/http/elysia-v2-aot/generated/
+bench/competitive/generated/
 bench/types/context-model/generated/
 bench/types/context-model/results/
 

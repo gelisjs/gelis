@@ -32,6 +32,14 @@ jobs:
         working-directory: bench/competitive
         run: bun ../../node_modules/typescript/bin/tsc -p tsconfig.json --noEmit
 
-      - name: Run CP1-A equivalence probe
+      - name: Run CP1-A source-runtime equivalence probe
         working-directory: bench/competitive
         run: bun core/probe.mts
+
+      - name: Build Elysia 2 AOT equivalence artifacts
+        working-directory: bench/competitive
+        run: bun core/aot/build.mts
+
+      - name: Run CP1-A2 Elysia 2 AOT equivalence probe
+        working-directory: bench/competitive
+        run: bun core/aot/probe.mts
