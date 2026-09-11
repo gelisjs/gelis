@@ -1,0 +1,63 @@
+name: P11-G9 Hono Response Fix
+
+on:
+  push:
+    branches:
+      - diag/p11-g9-hono-response-fix
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.0
+      - name: Checkout target branch
+        run: |
+          git fetch origin work/p11-g9-request-id-competitor
+          git checkout -B work/p11-g9-request-id-competitor origin/work/p11-g9-request-id-competitor
+      - run: bun install --frozen-lockfile
+      - name: Use Hono context response path
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          worker = Path("bench/request-id-timeout/p11-g9-request-id-worker.mts")
+          text = worker.read_text()
+          old = '''  app.get("/resource", (context) => {\n    observed = context.get("requestId");\n    return new Response(null, { status: 204 });\n  });'''
+          new = '''  app.get("/resource", (context) => {\n    observed = context.get("requestId");\n    return context.body(null, 204);\n  });'''
+          if text.count(old) != 1:
+              raise SystemExit("worker Hono response marker mismatch")
+          worker.write_text(text.replace(old, new, 1))
+
+          server = Path("bench/request-id-timeout/p11-g9-request-id-http-server.mts")
+          text = server.read_text()
+          old = '''  app.get("/resource", (context) => {\n    const observed = context.get("requestId");\n\n    return new Response(null, {\n      status: 204,\n      headers: {\n        "X-Observed-Request-Id": observed,\n      },\n    });\n  });'''
+          new = '''  app.get("/resource", (context) => {\n    const observed = context.get("requestId");\n\n    context.header("X-Observed-Request-Id", observed);\n    return context.body(null, 204);\n  });'''
+          if text.count(old) != 1:
+              raise SystemExit("server Hono response marker mismatch")
+          server.write_text(text.replace(old, new, 1))
+          PY
+
+          bunx prettier \
+            bench/request-id-timeout/p11-g9-request-id-worker.mts \
+            bench/request-id-timeout/p11-g9-request-id-http-server.mts \
+            --write
+          git diff --check
+          bun run typecheck:bench
+      - name: Commit target branch
+        run: |
+          git config user.name "Rigent"
+          git config user.email "127601320+rigenttio@users.noreply.github.com"
+          git add \
+            bench/request-id-timeout/p11-g9-request-id-worker.mts \
+            bench/request-id-timeout/p11-g9-request-id-http-server.mts
+          git commit -m "fix(bench): use Hono context response path in P11-G9"
+          git push origin HEAD:work/p11-g9-request-id-competitor
