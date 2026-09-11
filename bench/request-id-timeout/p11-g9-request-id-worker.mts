@@ -220,13 +220,19 @@ function assertEquivalentResult(
   }
 
   const propagated = response.headers.get(HEADER_NAME);
-  if (observed === undefined || propagated === null || observed !== propagated) {
+  if (
+    observed === undefined ||
+    propagated === null ||
+    observed !== propagated
+  ) {
     throw new Error(`${framework}/${scenario} did not propagate handler ID`);
   }
 
   if (scenario === "trusted-valid-inbound") {
     if (observed !== TRUSTED_ID) {
-      throw new Error(`${framework}/${scenario} did not adopt trusted inbound ID`);
+      throw new Error(
+        `${framework}/${scenario} did not adopt trusted inbound ID`,
+      );
     }
     return;
   }
