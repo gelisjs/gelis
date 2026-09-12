@@ -162,10 +162,7 @@ for (const pair of PAIRS) {
   );
 }
 
-const stableRatio = ratio(
-  "radix-trailing-stable",
-  "current-trailing-stable",
-);
+const stableRatio = ratio("radix-trailing-stable", "current-trailing-stable");
 const requestRatio = ratio(
   "radix-trailing-request",
   "current-trailing-request",
@@ -174,13 +171,8 @@ const stringPipelineRatio = ratio(
   "radix-pipeline-string",
   "current-pipeline-string",
 );
-const jsonPipelineRatio = ratio(
-  "radix-pipeline-json",
-  "current-pipeline-json",
-);
-const pipelineGeomean = Math.sqrt(
-  stringPipelineRatio * jsonPipelineRatio,
-);
+const jsonPipelineRatio = ratio("radix-pipeline-json", "current-pipeline-json");
+const pipelineGeomean = Math.sqrt(stringPipelineRatio * jsonPipelineRatio);
 const mixedStaticRatio = ratio(
   "radix-mixed-static-request",
   "current-mixed-static-request",
@@ -255,7 +247,10 @@ function measurePair(
     }
   }
 
-  return [summarize(currentCell, currentValues), summarize(candidateCell, candidateValues)];
+  return [
+    summarize(currentCell, currentValues),
+    summarize(candidateCell, candidateValues),
+  ];
 }
 
 function summarize(cell: Cell, values: number[]): Summary {

@@ -227,7 +227,8 @@ function pipelineCell(
         "GET",
         pathnameFromRequestUrl(DYNAMIC_REQUEST.url),
       );
-      if (match === undefined) throw new Error("pipeline correctness route miss");
+      if (match === undefined)
+        throw new Error("pipeline correctness route miss");
       assertDynamicMatch(match, `/r/${LAST}/:id`);
       await assertResponse(run(), expectedBody, bodyKind === "json");
     },
@@ -240,9 +241,7 @@ function mixedRequestCell(
 ): PreparedCell {
   const matcher = buildMixedMatcher(implementation);
   const request = dynamic ? MIXED_DYNAMIC_REQUEST : MIXED_STATIC_REQUEST;
-  const expectedPath = dynamic
-    ? `/d/${MIXED_LAST}/:id`
-    : `/s/${MIXED_LAST}`;
+  const expectedPath = dynamic ? `/d/${MIXED_LAST}/:id` : `/s/${MIXED_LAST}`;
 
   const run = () => {
     const pathname = pathnameFromRequestUrl(request.url);
@@ -256,7 +255,9 @@ function mixedRequestCell(
       const match = run();
       return (
         match.route.path.length +
-        (dynamic ? (match.params.id?.length ?? 0) : Object.keys(match.params).length)
+        (dynamic
+          ? (match.params.id?.length ?? 0)
+          : Object.keys(match.params).length)
       );
     },
     assertCorrectness: () => {
@@ -285,10 +286,7 @@ function buildTrailingMatcher(
     implementation === "current" ? new Router() : new CandidateRouter();
 
   for (let index = 0; index < ROUTES; index++) {
-    registerMatcher(
-      matcher,
-      createRoute(`/r/${index}/:id`, bodyKind),
-    );
+    registerMatcher(matcher, createRoute(`/r/${index}/:id`, bodyKind));
   }
 
   return matcher;
@@ -322,9 +320,7 @@ function registerMatcher(matcher: Matcher, route: RuntimeRouteRecord): void {
 
 function createRoute(path: string, bodyKind: BodyKind): RuntimeRouteRecord {
   const handler: RuntimeRouteHandler =
-    bodyKind === "json"
-      ? () => ({ id: PARAM_VALUE })
-      : () => PARAM_VALUE;
+    bodyKind === "json" ? () => ({ id: PARAM_VALUE }) : () => PARAM_VALUE;
 
   return {
     method: "GET",
@@ -389,7 +385,9 @@ class CandidateRouter implements Matcher {
       finalSegment === undefined ||
       !finalSegment.startsWith(":")
     ) {
-      throw new Error(`CP3-O candidate supports trailing params only: ${route.path}`);
+      throw new Error(
+        `CP3-O candidate supports trailing params only: ${route.path}`,
+      );
     }
 
     const slash = route.path.lastIndexOf("/");
@@ -478,9 +476,7 @@ class TrailingPrefixRadix {
       };
 
       child.fragment = fragment.slice(0, common);
-      child.children = new Map([
-        [previousSuffix.charCodeAt(0), previousNode],
-      ]);
+      child.children = new Map([[previousSuffix.charCodeAt(0), previousNode]]);
       child.value = undefined;
 
       offset += common;
@@ -531,10 +527,7 @@ class TrailingPrefixRadix {
       node = child;
 
       const trailing = node.value;
-      if (
-        trailing !== undefined &&
-        pathname.indexOf("/", offset) === -1
-      ) {
+      if (trailing !== undefined && pathname.indexOf("/", offset) === -1) {
         const encodedValue = pathname.slice(offset);
         return {
           route: trailing.route,

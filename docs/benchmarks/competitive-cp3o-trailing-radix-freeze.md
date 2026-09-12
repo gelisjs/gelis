@@ -61,12 +61,12 @@ The mixed topology contains `2,500` exact static routes and `2,500` trailing-par
 
 These thresholds are frozen before local timing:
 
-| gate | candidate/current limit | rationale |
-| --- | ---: | --- |
-| request-derived dynamic matcher | `<= 0.85x` | structural complexity must buy at least a material dynamic lookup win |
-| string/JSON pipeline geomean | `<= 0.97x` | the matcher win must survive into production-shaped response pipelines |
-| mixed dynamic request | `<= 0.90x` | benefit must survive a realistic static+dynamic method table |
-| mixed static request | `<= 1.02x` | retaining static precedence must not materially regress exact static routing |
+| gate                            | candidate/current limit | rationale                                                                    |
+| ------------------------------- | ----------------------: | ---------------------------------------------------------------------------- |
+| request-derived dynamic matcher |              `<= 0.85x` | structural complexity must buy at least a material dynamic lookup win        |
+| string/JSON pipeline geomean    |              `<= 0.97x` | the matcher win must survive into production-shaped response pipelines       |
+| mixed dynamic request           |              `<= 0.90x` | benefit must survive a realistic static+dynamic method table                 |
+| mixed static request            |              `<= 1.02x` | retaining static precedence must not materially regress exact static routing |
 
 The stable-path ratio is diagnostic only, because Gelis' production request path is derived from `Request.url`; it is not a viability gate.
 
