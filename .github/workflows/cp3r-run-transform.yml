@@ -29,7 +29,9 @@ jobs:
         run: bun install --frozen-lockfile
 
       - name: Apply candidate transform
-        run: python3 .cp3r-transform.py
+        run: |
+          python3 .cp3r-transform.py
+          python3 .cp3r-fix-optional.py
 
       - name: Format candidate source and freeze
         run: |
