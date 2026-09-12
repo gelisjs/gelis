@@ -50,7 +50,8 @@ type Cell =
 
 type Operation = () => number;
 type RouteKind = "static" | "dynamic";
-type HandlerKind = "string-stable" | "string-param" | "json-stable" | "json-param";
+type HandlerKind =
+  "string-stable" | "string-param" | "json-stable" | "json-param";
 
 interface WorkerResult {
   readonly cell: Cell;
@@ -159,7 +160,11 @@ function prepareCell(cell: Cell): PreparedCell {
       };
 
     case "normalize-string-stable":
-      return responseCell(() => normalizeResponse(PARAM_VALUE), PARAM_VALUE, false);
+      return responseCell(
+        () => normalizeResponse(PARAM_VALUE),
+        PARAM_VALUE,
+        false,
+      );
 
     case "normalize-string-request-param":
       return responseCell(
@@ -243,7 +248,9 @@ function responseCell(
   return {
     operation: () => {
       const response = factory();
-      return response.status + (response.headers.get("content-type")?.length ?? 0);
+      return (
+        response.status + (response.headers.get("content-type")?.length ?? 0)
+      );
     },
     assertCorrectness: async () => {
       const response = factory();
@@ -267,14 +274,18 @@ function requestRouterCell(kind: RouteKind): PreparedCell {
   return {
     operation: () => {
       const match = run();
-      return match.route.path.length +
-        (dynamic ? (match.params.id?.length ?? 0) : 0);
+      return (
+        match.route.path.length + (dynamic ? (match.params.id?.length ?? 0) : 0)
+      );
     },
     assertCorrectness: () => assertMatch(run(), kind),
   };
 }
 
-function routeHandlerCell(kind: RouteKind, handlerKind: HandlerKind): PreparedCell {
+function routeHandlerCell(
+  kind: RouteKind,
+  handlerKind: HandlerKind,
+): PreparedCell {
   const dynamic = kind === "dynamic";
   const request = dynamic ? DYNAMIC_REQUEST : STATIC_REQUEST;
   const router = buildRouter(kind, handlerKind);
@@ -291,12 +302,14 @@ function routeHandlerCell(kind: RouteKind, handlerKind: HandlerKind): PreparedCe
   return {
     operation: () => {
       const value = run();
-      if (typeof value !== "string") throw new Error("route-handler expected string");
+      if (typeof value !== "string")
+        throw new Error("route-handler expected string");
       return value.length;
     },
     assertCorrectness: () => {
       const value = run();
-      if (value !== PARAM_VALUE) throw new Error("route-handler value mismatch");
+      if (value !== PARAM_VALUE)
+        throw new Error("route-handler value mismatch");
     },
   };
 }
@@ -305,7 +318,8 @@ function pipelineCell(kind: RouteKind, handlerKind: HandlerKind): PreparedCell {
   const dynamic = kind === "dynamic";
   const request = dynamic ? DYNAMIC_REQUEST : STATIC_REQUEST;
   const router = buildRouter(kind, handlerKind);
-  const expectJson = handlerKind === "json-stable" || handlerKind === "json-param";
+  const expectJson =
+    handlerKind === "json-stable" || handlerKind === "json-param";
   const expectedBody = expectJson
     ? JSON.stringify({ id: PARAM_VALUE })
     : PARAM_VALUE;
@@ -331,7 +345,8 @@ function appFetchCell(kind: RouteKind, handlerKind: HandlerKind): PreparedCell {
   const dynamic = kind === "dynamic";
   const request = dynamic ? DYNAMIC_REQUEST : STATIC_REQUEST;
   const app = buildApp(kind, handlerKind);
-  const expectJson = handlerKind === "json-stable" || handlerKind === "json-param";
+  const expectJson =
+    handlerKind === "json-stable" || handlerKind === "json-param";
   const expectedBody = expectJson
     ? JSON.stringify({ id: PARAM_VALUE })
     : PARAM_VALUE;
@@ -405,12 +420,14 @@ function createRoute(
   if (handlerKind === "string-stable") {
     handler = () => PARAM_VALUE;
   } else if (handlerKind === "string-param") {
-    if (kind !== "dynamic") throw new Error("string-param requires dynamic route");
+    if (kind !== "dynamic")
+      throw new Error("string-param requires dynamic route");
     handler = ({ params }) => params.id;
   } else if (handlerKind === "json-stable") {
     handler = () => ({ id: PARAM_VALUE });
   } else {
-    if (kind !== "dynamic") throw new Error("json-param requires dynamic route");
+    if (kind !== "dynamic")
+      throw new Error("json-param requires dynamic route");
     handler = ({ params }) => ({ id: params.id });
   }
 
@@ -479,7 +496,9 @@ async function assertResponse(
 
   const body = await response.text();
   if (body !== expectedBody) {
-    throw new Error(`response body mismatch: expected ${expectedBody}, got ${body}`);
+    throw new Error(
+      `response body mismatch: expected ${expectedBody}, got ${body}`,
+    );
   }
 
   if (expectJson) {

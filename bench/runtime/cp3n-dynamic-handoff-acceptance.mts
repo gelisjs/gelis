@@ -285,11 +285,14 @@ function runWorker(cell: Cell, workerProbeOnly: boolean): WorkerResult {
   }
 
   const line = result.stdout.trim().split(/\r?\n/).filter(Boolean).at(-1);
-  if (line === undefined) throw new Error(`Worker emitted no result for ${cell}`);
+  if (line === undefined)
+    throw new Error(`Worker emitted no result for ${cell}`);
 
   const parsed = JSON.parse(line) as WorkerResult;
   if (parsed.cell !== cell) {
-    throw new Error(`Worker cell mismatch: expected ${cell}, got ${parsed.cell}`);
+    throw new Error(
+      `Worker cell mismatch: expected ${cell}, got ${parsed.cell}`,
+    );
   }
   return parsed;
 }
