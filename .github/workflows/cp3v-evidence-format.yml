@@ -1,0 +1,50 @@
+name: CP3-V Evidence Format
+
+on:
+  push:
+    branches:
+      - work/competitive-cp3v-fingerprint-string-success
+
+permissions:
+  contents: write
+
+jobs:
+  format:
+    if: github.event.head_commit.message == 'CP3V_EVIDENCE_FORMAT'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Setup Bun 1.4.2
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Format evidence
+        run: bun ./node_modules/prettier/bin/prettier.cjs docs/benchmarks/competitive-cp3v-local-authoritative.md --write
+
+      - name: Commit formatted evidence
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/benchmarks/competitive-cp3v-local-authoritative.md
+          if git diff --cached --quiet; then
+            git commit --allow-empty -m "docs(competitive): format CP3-V evidence"
+          else
+            git commit -m "docs(competitive): format CP3-V evidence"
+          fi
+
+      - name: Run full repository quality gate
+        run: bun run check
+
+      - name: Push formatted evidence
+        run: git push
