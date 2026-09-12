@@ -1,0 +1,66 @@
+name: CP3-M Prepare Harness
+
+on:
+  push:
+    branches:
+      - work/competitive-cp3m-post-promotion-rebaseline
+
+permissions:
+  contents: write
+
+jobs:
+  prepare:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Setup Bun 1.4.2
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Format CP3-M harness
+        run: |
+          bun ./node_modules/prettier/bin/prettier.cjs \
+            bench/runtime/cp3m-post-promotion-rebaseline-acceptance.mts \
+            bench/runtime/cp3m-post-promotion-rebaseline-worker.mts \
+            docs/benchmarks/competitive-cp3m-post-promotion-rebaseline-freeze.md \
+            --write
+
+      - name: Commit formatted harness
+        shell: bash
+        run: |
+          if git diff --quiet; then
+            echo "Harness already formatted"
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add \
+              bench/runtime/cp3m-post-promotion-rebaseline-acceptance.mts \
+              bench/runtime/cp3m-post-promotion-rebaseline-worker.mts \
+              docs/benchmarks/competitive-cp3m-post-promotion-rebaseline-freeze.md
+            git commit -m "chore(competitive): format CP3-M harness"
+          fi
+
+      - name: Run full repository quality gate
+        run: bun run check
+
+      - name: Run CP3-M correctness probe
+        run: bun bench/runtime/cp3m-post-promotion-rebaseline-acceptance.mts --probe-only
+
+      - name: Push formatted harness
+        shell: bash
+        run: |
+          if git log -1 --pretty=%B | grep -q "chore(competitive): format CP3-M harness"; then
+            git push
+          else
+            echo "Nothing to push"
+          fi
