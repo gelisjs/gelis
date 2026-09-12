@@ -78,13 +78,13 @@ The mixed topology contains `2,500` exact static routes and `2,500` trailing-par
 
 These limits are fixed before local timing:
 
-| gate | candidate/current limit | rationale |
-| --- | ---: | --- |
-| request-derived dynamic matcher | `<= 0.90x` | added indexing complexity must buy at least a material common-path routing win |
-| string/JSON pipeline geomean | `<= 0.98x` | the lookup win must survive response construction |
-| mixed dynamic request | `<= 0.93x` | benefit must survive a realistic static+dynamic table |
-| mixed static request | `<= 1.02x` | dynamic optimization must not tax exact static hits materially |
-| forced-collision fallback | `<= 1.15x` | adversarial fingerprint collisions must remain bounded and exact |
+| gate                            | candidate/current limit | rationale                                                                      |
+| ------------------------------- | ----------------------: | ------------------------------------------------------------------------------ |
+| request-derived dynamic matcher |              `<= 0.90x` | added indexing complexity must buy at least a material common-path routing win |
+| string/JSON pipeline geomean    |              `<= 0.98x` | the lookup win must survive response construction                              |
+| mixed dynamic request           |              `<= 0.93x` | benefit must survive a realistic static+dynamic table                          |
+| mixed static request            |              `<= 1.02x` | dynamic optimization must not tax exact static hits materially                 |
+| forced-collision fallback       |              `<= 1.15x` | adversarial fingerprint collisions must remain bounded and exact               |
 
 The stable-path ratio is diagnostic only.
 

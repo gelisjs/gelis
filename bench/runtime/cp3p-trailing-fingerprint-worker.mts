@@ -22,7 +22,9 @@ const DYNAMIC_PATH = `/r/${LAST}/${PARAM_VALUE}`;
 const DYNAMIC_URL = `http://gelis.test${DYNAMIC_PATH}`;
 const DYNAMIC_REQUEST = new Request(DYNAMIC_URL);
 const MIXED_STATIC_PATH = `/s/${MIXED_LAST}`;
-const MIXED_STATIC_REQUEST = new Request(`http://gelis.test${MIXED_STATIC_PATH}`);
+const MIXED_STATIC_REQUEST = new Request(
+  `http://gelis.test${MIXED_STATIC_PATH}`,
+);
 const MIXED_DYNAMIC_PATH = `/d/${MIXED_LAST}/${PARAM_VALUE}`;
 const MIXED_DYNAMIC_REQUEST = new Request(
   `http://gelis.test${MIXED_DYNAMIC_PATH}`,
@@ -246,9 +248,7 @@ function mixedCell(
 ): PreparedCell {
   const matcher = buildMixedMatcher(implementation);
   const request = dynamic ? MIXED_DYNAMIC_REQUEST : MIXED_STATIC_REQUEST;
-  const expectedPath = dynamic
-    ? `/d/${MIXED_LAST}/:id`
-    : `/s/${MIXED_LAST}`;
+  const expectedPath = dynamic ? `/d/${MIXED_LAST}/:id` : `/s/${MIXED_LAST}`;
 
   const run = () => {
     const pathname = pathnameFromRequestUrl(request.url);
@@ -423,7 +423,8 @@ class FingerprintRouter implements Matcher {
     }
 
     const slash = route.path.lastIndexOf("/");
-    if (slash < 0) throw new Error(`Invalid trailing-param route: ${route.path}`);
+    if (slash < 0)
+      throw new Error(`Invalid trailing-param route: ${route.path}`);
 
     table.trailing.register(route.path.slice(0, slash + 1), {
       route,

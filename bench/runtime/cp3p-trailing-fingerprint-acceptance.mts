@@ -123,7 +123,9 @@ if (probeOnly) {
   }
 
   console.log();
-  console.log(`CP3-P CORRECTNESS PROBE: PASS (${CELLS.length}/${CELLS.length})`);
+  console.log(
+    `CP3-P CORRECTNESS PROBE: PASS (${CELLS.length}/${CELLS.length})`,
+  );
   process.exit(0);
 }
 
@@ -139,7 +141,8 @@ for (const pair of PAIRS) {
 
     for (const cell of order) {
       const result = runWorker(cell, false);
-      if (result.nsPerOp === null) throw new Error(`Missing timing for ${cell}`);
+      if (result.nsPerOp === null)
+        throw new Error(`Missing timing for ${cell}`);
       values.get(cell)!.push(result.nsPerOp);
     }
   }
@@ -277,10 +280,13 @@ function runWorker(cell: Cell, workerProbeOnly: boolean): WorkerResult {
   }
 
   const line = result.stdout.trim().split(/\r?\n/).filter(Boolean).at(-1);
-  if (line === undefined) throw new Error(`Worker emitted no result for ${cell}`);
+  if (line === undefined)
+    throw new Error(`Worker emitted no result for ${cell}`);
   const parsed = JSON.parse(line) as WorkerResult;
   if (parsed.cell !== cell) {
-    throw new Error(`Worker cell mismatch: expected ${cell}, got ${parsed.cell}`);
+    throw new Error(
+      `Worker cell mismatch: expected ${cell}, got ${parsed.cell}`,
+    );
   }
   return parsed;
 }
