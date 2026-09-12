@@ -19,7 +19,9 @@ const TARGET_MS = 120;
 const MIN_CALIBRATION_MS = 20;
 const PARAM_VALUE = "value-42";
 const MIXED_STATIC_PATH = `/s/${MIXED_LAST}`;
-const MIXED_STATIC_REQUEST = new Request(`http://gelis.test${MIXED_STATIC_PATH}`);
+const MIXED_STATIC_REQUEST = new Request(
+  `http://gelis.test${MIXED_STATIC_PATH}`,
+);
 const MIXED_DYNAMIC_PATH = `/d/${MIXED_LAST}/${PARAM_VALUE}`;
 const MIXED_DYNAMIC_REQUEST = new Request(
   `http://gelis.test${MIXED_DYNAMIC_PATH}`,
@@ -175,9 +177,7 @@ function prepareCell(cell: Cell): PreparedCell {
 function productionMixedCell(dynamic: boolean): PreparedCell {
   const router = buildProductionMixedRouter();
   const request = dynamic ? MIXED_DYNAMIC_REQUEST : MIXED_STATIC_REQUEST;
-  const expectedPath = dynamic
-    ? `/d/${MIXED_LAST}/:id`
-    : `/s/${MIXED_LAST}`;
+  const expectedPath = dynamic ? `/d/${MIXED_LAST}/:id` : `/s/${MIXED_LAST}`;
 
   const run = () => {
     const pathname = pathnameFromRequestUrl(request.url);
@@ -195,9 +195,7 @@ function productionMixedCell(dynamic: boolean): PreparedCell {
 function sharedMixedCell(mode: Mode, dynamic: boolean): PreparedCell {
   const router = buildSharedMixedRouter();
   const request = dynamic ? MIXED_DYNAMIC_REQUEST : MIXED_STATIC_REQUEST;
-  const expectedPath = dynamic
-    ? `/d/${MIXED_LAST}/:id`
-    : `/s/${MIXED_LAST}`;
+  const expectedPath = dynamic ? `/d/${MIXED_LAST}/:id` : `/s/${MIXED_LAST}`;
 
   const run = () => {
     const pathname = pathnameFromRequestUrl(request.url);
@@ -364,7 +362,8 @@ class SharedRouter {
     }
 
     const slash = route.path.lastIndexOf("/");
-    if (slash < 0) throw new Error(`Invalid trailing-param route: ${route.path}`);
+    if (slash < 0)
+      throw new Error(`Invalid trailing-param route: ${route.path}`);
     const prefix = route.path.slice(0, slash + 1);
 
     if (table.currentTrailing.has(prefix)) {
@@ -544,7 +543,9 @@ function assertSharedSemantics(): void {
 function consumeMatch(match: RuntimeRouteMatch, dynamic: boolean): number {
   return (
     match.route.path.length +
-    (dynamic ? (match.params.id?.length ?? 0) : Object.keys(match.params).length)
+    (dynamic
+      ? (match.params.id?.length ?? 0)
+      : Object.keys(match.params).length)
   );
 }
 

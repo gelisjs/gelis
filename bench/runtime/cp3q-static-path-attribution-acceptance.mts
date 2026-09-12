@@ -168,14 +168,28 @@ console.log();
 console.log("Derived ratios");
 console.log("| comparison | ratio |");
 console.log("| --- | ---: |");
-console.log(`| shared fingerprint/current static | ${staticCandidateRatio.toFixed(4)}x |`);
-console.log(`| shared fingerprint/current dynamic | ${dynamicCandidateRatio.toFixed(4)}x |`);
-console.log(`| shared fingerprint/current string pipeline | ${stringPipelineRatio.toFixed(4)}x |`);
-console.log(`| shared fingerprint/current JSON pipeline | ${jsonPipelineRatio.toFixed(4)}x |`);
+console.log(
+  `| shared fingerprint/current static | ${staticCandidateRatio.toFixed(4)}x |`,
+);
+console.log(
+  `| shared fingerprint/current dynamic | ${dynamicCandidateRatio.toFixed(4)}x |`,
+);
+console.log(
+  `| shared fingerprint/current string pipeline | ${stringPipelineRatio.toFixed(4)}x |`,
+);
+console.log(
+  `| shared fingerprint/current JSON pipeline | ${jsonPipelineRatio.toFixed(4)}x |`,
+);
 console.log(`| shared pipeline geomean | ${pipelineGeomean.toFixed(4)}x |`);
-console.log(`| shared forced-collision fallback | ${collisionRatio.toFixed(4)}x |`);
-console.log(`| shared-current / production static fidelity | ${staticFidelity.toFixed(4)}x |`);
-console.log(`| shared-current / production dynamic fidelity | ${dynamicFidelity.toFixed(4)}x |`);
+console.log(
+  `| shared forced-collision fallback | ${collisionRatio.toFixed(4)}x |`,
+);
+console.log(
+  `| shared-current / production static fidelity | ${staticFidelity.toFixed(4)}x |`,
+);
+console.log(
+  `| shared-current / production dynamic fidelity | ${dynamicFidelity.toFixed(4)}x |`,
+);
 
 const gates = [
   {

@@ -74,14 +74,14 @@ The mixed topology contains `2,500` exact static routes and `2,500` trailing-par
 
 These limits are fixed before local timing:
 
-| gate | limit | rationale |
-| --- | ---: | --- |
-| shared fingerprint/current static | `<= 1.02x` | with one identical static path, fingerprint sidecar must not materially tax exact hits |
-| shared fingerprint/current dynamic | `<= 0.90x` | the common request-derived dynamic win must remain material |
-| shared string/JSON pipeline geomean | `<= 0.98x` | dynamic lookup gain must survive response construction |
-| shared forced-collision fallback | `<= 1.15x` | collision correctness must remain bounded |
-| shared-current / production static fidelity | `0.90x .. 1.10x` | attribution harness must remain close to production static cost |
-| shared-current / production dynamic fidelity | `0.90x .. 1.10x` | attribution harness must remain close to production dynamic cost |
+| gate                                         |            limit | rationale                                                                              |
+| -------------------------------------------- | ---------------: | -------------------------------------------------------------------------------------- |
+| shared fingerprint/current static            |       `<= 1.02x` | with one identical static path, fingerprint sidecar must not materially tax exact hits |
+| shared fingerprint/current dynamic           |       `<= 0.90x` | the common request-derived dynamic win must remain material                            |
+| shared string/JSON pipeline geomean          |       `<= 0.98x` | dynamic lookup gain must survive response construction                                 |
+| shared forced-collision fallback             |       `<= 1.15x` | collision correctness must remain bounded                                              |
+| shared-current / production static fidelity  | `0.90x .. 1.10x` | attribution harness must remain close to production static cost                        |
+| shared-current / production dynamic fidelity | `0.90x .. 1.10x` | attribution harness must remain close to production dynamic cost                       |
 
 All six gates must pass before CP3-Q can justify engineering a real production fingerprint candidate.
 
