@@ -26,7 +26,7 @@ import {
 
 import type { ApplicationStartupTask } from "./startup";
 
-import { pathnameFromUrl } from "./runtime/url";
+import { pathnameFromRequestUrl } from "./runtime/url";
 
 import { ALL_ROUTE_METHOD } from "./http-method";
 
@@ -663,7 +663,7 @@ export class Gelis extends RouteBuilder<""> {
       }
     }
 
-    const pathname = pathnameFromUrl(request.url);
+    const pathname = pathnameFromRequestUrl(request.url);
 
     let matched = this.#state.router.match(method, pathname);
 

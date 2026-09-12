@@ -3,7 +3,7 @@ import type { OnRequest } from "../request";
 import { ALL_ROUTE_METHOD } from "../http-method";
 import type { RuntimeFetch } from "./fetch";
 import { normalizeResponseForRequest } from "./response";
-import { pathnameFromUrl } from "./url";
+import { pathnameFromRequestUrl } from "./url";
 
 export type RuntimeApplicationHttpMethodResolver = (
   pathname: string,
@@ -172,7 +172,7 @@ export function createApplicationHttpRuntime(
   return {
     matchingMethods(request) {
       return resolveAdvertisedMethods(
-        resolveMethods(pathnameFromUrl(request.url)),
+        resolveMethods(pathnameFromRequestUrl(request.url)),
       );
     },
   };
