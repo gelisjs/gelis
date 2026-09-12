@@ -13,6 +13,7 @@
     "types/results/**",
     "runtime/results/**",
     "http/results/**",
-    "http/generated/**"
+    "http/generated/**",
+    "competitive/**"
   ]
 }
