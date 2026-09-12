@@ -29,35 +29,35 @@ On the final harness:
 
 ## Authoritative timing
 
-| cell | median ns/op | p25 | p75 | min | max |
-| --- | ---: | ---: | ---: | ---: | ---: |
-| pathname-baseline-static | 70.3 | 65.6 | 70.6 | 64.5 | 79.2 |
-| pathname-candidate-static | 29.4 | 29.2 | 29.5 | 28.7 | 29.9 |
-| pathname-baseline-dynamic | 70.7 | 69.4 | 73.8 | 68.1 | 104.7 |
-| pathname-candidate-dynamic | 32.5 | 32.1 | 32.7 | 31.8 | 33.9 |
-| dispatch-baseline-static | 156.3 | 155.0 | 158.6 | 151.1 | 162.1 |
-| dispatch-candidate-static | 110.2 | 109.6 | 112.4 | 107.9 | 115.8 |
-| dispatch-baseline-dynamic | 285.2 | 279.0 | 308.7 | 267.6 | 338.6 |
-| dispatch-candidate-dynamic | 228.2 | 225.9 | 231.5 | 222.4 | 244.3 |
-| pipeline-baseline-static-json | 568.3 | 562.6 | 591.6 | 555.6 | 688.4 |
-| pipeline-candidate-static-json | 527.2 | 521.1 | 563.9 | 509.3 | 797.3 |
-| pipeline-baseline-dynamic-json | 760.1 | 746.9 | 790.0 | 741.0 | 833.9 |
-| pipeline-candidate-dynamic-json | 694.9 | 688.8 | 705.2 | 681.3 | 725.0 |
+| cell                            | median ns/op |   p25 |   p75 |   min |   max |
+| ------------------------------- | -----------: | ----: | ----: | ----: | ----: |
+| pathname-baseline-static        |         70.3 |  65.6 |  70.6 |  64.5 |  79.2 |
+| pathname-candidate-static       |         29.4 |  29.2 |  29.5 |  28.7 |  29.9 |
+| pathname-baseline-dynamic       |         70.7 |  69.4 |  73.8 |  68.1 | 104.7 |
+| pathname-candidate-dynamic      |         32.5 |  32.1 |  32.7 |  31.8 |  33.9 |
+| dispatch-baseline-static        |        156.3 | 155.0 | 158.6 | 151.1 | 162.1 |
+| dispatch-candidate-static       |        110.2 | 109.6 | 112.4 | 107.9 | 115.8 |
+| dispatch-baseline-dynamic       |        285.2 | 279.0 | 308.7 | 267.6 | 338.6 |
+| dispatch-candidate-dynamic      |        228.2 | 225.9 | 231.5 | 222.4 | 244.3 |
+| pipeline-baseline-static-json   |        568.3 | 562.6 | 591.6 | 555.6 | 688.4 |
+| pipeline-candidate-static-json  |        527.2 | 521.1 | 563.9 | 509.3 | 797.3 |
+| pipeline-baseline-dynamic-json  |        760.1 | 746.9 | 790.0 | 741.0 | 833.9 |
+| pipeline-candidate-dynamic-json |        694.9 | 688.8 | 705.2 | 681.3 | 725.0 |
 
 ## Frozen acceptance gates
 
 The following gates were frozen before authoritative timing.
 
-| diagnostic | result | gate | status |
-| --- | ---: | ---: | --- |
-| pathname candidate / baseline static | 0.4180x | <=0.9000x | PASS |
-| pathname candidate / baseline dynamic | 0.4599x | <=0.9000x | PASS |
-| dispatch candidate / baseline static | 0.7049x | <=1.0100x | PASS |
-| dispatch candidate / baseline dynamic | 0.8002x | <=1.0100x | PASS |
-| dispatch candidate / baseline geomean | 0.7511x | <=0.9700x | PASS |
-| pipeline candidate / baseline static JSON | 0.9277x | <=1.0100x | PASS |
-| pipeline candidate / baseline dynamic JSON | 0.9142x | <=1.0100x | PASS |
-| pipeline candidate / baseline geomean | 0.9209x | <=0.9900x | PASS |
+| diagnostic                                 |  result |      gate | status |
+| ------------------------------------------ | ------: | --------: | ------ |
+| pathname candidate / baseline static       | 0.4180x | <=0.9000x | PASS   |
+| pathname candidate / baseline dynamic      | 0.4599x | <=0.9000x | PASS   |
+| dispatch candidate / baseline static       | 0.7049x | <=1.0100x | PASS   |
+| dispatch candidate / baseline dynamic      | 0.8002x | <=1.0100x | PASS   |
+| dispatch candidate / baseline geomean      | 0.7511x | <=0.9700x | PASS   |
+| pipeline candidate / baseline static JSON  | 0.9277x | <=1.0100x | PASS   |
+| pipeline candidate / baseline dynamic JSON | 0.9142x | <=1.0100x | PASS   |
+| pipeline candidate / baseline geomean      | 0.9209x | <=0.9900x | PASS   |
 
 ## Engineering conclusion
 

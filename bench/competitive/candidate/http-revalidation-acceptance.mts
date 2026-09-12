@@ -10,8 +10,8 @@ const AOT_ROOT = resolve(COMPETITIVE_ROOT, "elysia-v2-aot");
 const AOT_BUILD = resolve(AOT_ROOT, "http-aot-build.mts");
 const AOT_GENERATED = resolve(AOT_ROOT, "generated", "cp2-http");
 
-const CANDIDATE_SHA = "9af3f056c004151473ef6ad5535600ba47f39e0a";
-const PREVIOUS_PRODUCTION_SHA = "1dd5f94cf0e9ad884ca44e537ee287587cd8baab";
+const CANDIDATE_SHA = "2a10e42308631fe53faba9a789b227d0a1cb241c";
+const PREVIOUS_PRODUCTION_SHA = "98d8c00bfda8913a951bdf8780e136672646a90c";
 const REQUIRED_BUN_VERSION = "1.4.2";
 const REQUIRED_OHA_VERSION = "1.16.0";
 const REQUIRED_HONO_VERSION = "4.13.7";
@@ -97,7 +97,7 @@ await assertEnvironment(probeOnly);
 await buildAotArtifacts();
 
 console.log(
-  "Competitive Performance v0.1 — CP3-D HTTP Core Crown revalidation",
+  "Competitive Performance v0.1 — CP3-K HTTP Core Crown revalidation",
 );
 console.log(`Bun:         ${Bun.version}`);
 console.log(`CPU:         ${cpus()[0]?.model ?? "unknown"}`);
@@ -112,7 +112,7 @@ console.log(`Routes:      ${ROUTES.toLocaleString("en-US")}`);
 if (probeOnly) {
   console.log("Mode:        correctness probe only (no timing)\n");
   await runCorrectnessProbe();
-  console.log("\nCP3-D CORRECTNESS PROBE: PASS");
+  console.log("\nCP3-K CORRECTNESS PROBE: PASS");
 } else {
   console.log(`oha:         ${getOhaVersion()}`);
   console.log(
@@ -122,13 +122,13 @@ if (probeOnly) {
     "Ratio:       Gelis req/s / comparator req/s (>1 means Gelis faster)\n",
   );
   await runTimedMatrix();
-  console.log("\nCP3-D LOCAL HTTP REVALIDATION RUN: COMPLETE");
+  console.log("\nCP3-K LOCAL HTTP REVALIDATION RUN: COMPLETE");
 }
 
 async function assertEnvironment(isProbeOnly: boolean): Promise<void> {
   if (Bun.version !== REQUIRED_BUN_VERSION) {
     throw new Error(
-      `CP3-D requires Bun ${REQUIRED_BUN_VERSION}, received ${Bun.version}`,
+      `CP3-K requires Bun ${REQUIRED_BUN_VERSION}, received ${Bun.version}`,
     );
   }
 
@@ -149,23 +149,23 @@ async function assertEnvironment(isProbeOnly: boolean): Promise<void> {
   );
 
   if (hono !== REQUIRED_HONO_VERSION) {
-    throw new Error(`CP3-D Hono version mismatch: ${hono}`);
+    throw new Error(`CP3-K Hono version mismatch: ${hono}`);
   }
   if (elysia !== REQUIRED_ELYSIA_VERSION) {
-    throw new Error(`CP3-D Elysia stable version mismatch: ${elysia}`);
+    throw new Error(`CP3-K Elysia stable version mismatch: ${elysia}`);
   }
   if (elysiaNext !== REQUIRED_ELYSIA_NEXT_VERSION) {
-    throw new Error(`CP3-D Elysia next version mismatch: ${elysiaNext}`);
+    throw new Error(`CP3-K Elysia next version mismatch: ${elysiaNext}`);
   }
   if (elysiaAot !== REQUIRED_ELYSIA_NEXT_VERSION) {
-    throw new Error(`CP3-D Elysia AOT version mismatch: ${elysiaAot}`);
+    throw new Error(`CP3-K Elysia AOT version mismatch: ${elysiaAot}`);
   }
 
   if (!isProbeOnly) {
     const ohaVersion = getOhaVersion();
     if (!ohaVersion.includes(REQUIRED_OHA_VERSION)) {
       throw new Error(
-        `CP3-D requires oha ${REQUIRED_OHA_VERSION}, received ${ohaVersion}`,
+        `CP3-K requires oha ${REQUIRED_OHA_VERSION}, received ${ohaVersion}`,
       );
     }
   }
@@ -180,7 +180,7 @@ async function buildAotArtifacts(): Promise<void> {
 
   const exitCode = await child.exited;
   if (exitCode !== 0) {
-    throw new Error(`CP3-D Elysia AOT build exited with ${exitCode}`);
+    throw new Error(`CP3-K Elysia AOT build exited with ${exitCode}`);
   }
 }
 
@@ -394,7 +394,7 @@ async function waitForServer(
 
   for (let attempt = 0; attempt < 400; attempt++) {
     if (server.exitCode !== null) {
-      throw new Error(`CP3-D server exited early with ${server.exitCode}`);
+      throw new Error(`CP3-K server exited early with ${server.exitCode}`);
     }
 
     try {
@@ -410,7 +410,7 @@ async function waitForServer(
     await sleep(25);
   }
 
-  throw new Error("CP3-D server did not become ready", { cause: lastError });
+  throw new Error("CP3-K server did not become ready", { cause: lastError });
 }
 
 async function verifyHttpResponse(
@@ -594,13 +594,21 @@ function assertCleanWorkingTree(): void {
 
   const status = new TextDecoder().decode(result.stdout).trim();
   if (status.length !== 0) {
-    throw new Error(`CP3-D worktree must be clean:\n${status}`);
+    throw new Error(`CP3-K worktree must be clean:\n${status}`);
   }
 }
 
 function assertProductionSourceIdentity(): void {
   const result = Bun.spawnSync(
-    ["git", "diff", "--quiet", CANDIDATE_SHA, "--", "src"],
+    [
+      "git",
+      "diff",
+      "--quiet",
+      CANDIDATE_SHA,
+      "--",
+      "src",
+      "test/runtime/url.test.ts",
+    ],
     { cwd: REPO_ROOT, stdout: "pipe", stderr: "pipe" },
   );
 
@@ -609,7 +617,7 @@ function assertProductionSourceIdentity(): void {
   }
   if (result.exitCode === 1) {
     throw new Error(
-      `CP3-D src/** differs from accepted CP3-C source ${CANDIDATE_SHA}`,
+      `CP3-K src/** differs from accepted CP3-J source ${CANDIDATE_SHA}`,
     );
   }
   throw new Error(new TextDecoder().decode(result.stderr));
@@ -629,7 +637,7 @@ function gitHead(root: string): string {
 
 function median(values: readonly number[]): number {
   if (values.length === 0) {
-    throw new Error("Cannot compute median of empty CP3-D set");
+    throw new Error("Cannot compute median of empty CP3-K set");
   }
   const sorted = [...values].sort((left, right) => left - right);
   const midpoint = Math.floor(sorted.length / 2);
