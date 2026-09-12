@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   build:
-    if: github.event.head_commit.message == 'ci(competitive): build CP3-R production-shape candidate'
+    if: ${{ github.event.head_commit.message == 'fix(ci): repair CP3-R builder condition' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 15
 
