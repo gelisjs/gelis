@@ -3,10 +3,10 @@ import { normalizeResponse, runtimeReply } from "../../src/runtime/response.ts";
 import { pathnameFromRequestUrl } from "../../src/runtime/url.ts";
 import { RUNTIME_ROUTE_PLAIN } from "../../src/runtime/types.ts";
 
+import type { RuntimeRouteMatch } from "../../src/runtime/router.ts";
 import type {
   RuntimeRouteContext,
   RuntimeRouteHandler,
-  RuntimeRouteMatch,
   RuntimeRouteRecord,
 } from "../../src/runtime/types.ts";
 
