@@ -24,25 +24,25 @@ The local run completed under the frozen CP3-W protocol and ended with `CP3-W LO
 
 Ratio is Gelis req/s divided by comparator req/s.
 
-| Comparator | static-raw | dynamic-raw | static-json | dynamic-json |
-| --- | ---: | ---: | ---: | ---: |
-| Hono | 0.9925x | 1.5693x | 1.0448x | 1.5694x |
-| Elysia stable | 1.7731x | 1.8737x | 1.7499x | 1.8382x |
-| Elysia stable precompile | 1.7824x | 1.8815x | 1.7665x | 1.8590x |
-| Elysia next | 1.0153x | 1.0108x | 0.9803x | 1.0061x |
-| Elysia next AOT | 1.0129x | 1.0129x | 0.9985x | 0.9976x |
-| raw Bun benchmark server | 1.6669x | 1.6860x | 1.6311x | 1.6522x |
+| Comparator               | static-raw | dynamic-raw | static-json | dynamic-json |
+| ------------------------ | ---------: | ----------: | ----------: | -----------: |
+| Hono                     |    0.9925x |     1.5693x |     1.0448x |      1.5694x |
+| Elysia stable            |    1.7731x |     1.8737x |     1.7499x |      1.8382x |
+| Elysia stable precompile |    1.7824x |     1.8815x |     1.7665x |      1.8590x |
+| Elysia next              |    1.0153x |     1.0108x |     0.9803x |      1.0061x |
+| Elysia next AOT          |    1.0129x |     1.0129x |     0.9985x |      0.9976x |
+| raw Bun benchmark server |    1.6669x |     1.6860x |     1.6311x |      1.6522x |
 
 Four-scenario geometric means:
 
-| Comparator | Geomean ratio |
-| --- | ---: |
-| Hono | 1.2642x |
-| Elysia stable | 1.8080x |
-| Elysia stable precompile | 1.8217x |
-| Elysia next | 1.0030x |
-| Elysia next AOT | 1.0054x |
-| raw Bun benchmark server | 1.6589x |
+| Comparator               | Geomean ratio |
+| ------------------------ | ------------: |
+| Hono                     |       1.2642x |
+| Elysia stable            |       1.8080x |
+| Elysia stable precompile |       1.8217x |
+| Elysia next              |       1.0030x |
+| Elysia next AOT          |       1.0054x |
+| raw Bun benchmark server |       1.6589x |
 
 ## Interpretation
 
