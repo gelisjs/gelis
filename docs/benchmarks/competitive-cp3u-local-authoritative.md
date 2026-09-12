@@ -15,85 +15,85 @@
 
 ## String response decomposition cells
 
-| cell | median ns/op | p25 | p75 | min | max |
-| --- | ---: | ---: | ---: | ---: | ---: |
-| production-stable-current | 823.5 | 804.6 | 846.8 | 773.5 | 981.8 |
-| candidate-stable-current | 777.1 | 760.4 | 781.1 | 747.4 | 803.9 |
-| candidate-stable-cached-status | 760.1 | 752.5 | 776.7 | 733.9 | 825.8 |
-| candidate-stable-no-status | 756.1 | 741.9 | 795.6 | 734.1 | 993.2 |
-| candidate-stable-cached-no-status | 754.7 | 745.8 | 789.8 | 733.1 | 816.9 |
-| production-handler-param | 216.5 | 214.0 | 217.8 | 211.2 | 225.1 |
-| candidate-handler-param | 185.0 | 182.2 | 186.2 | 180.0 | 198.4 |
-| candidate-handler-param-prehash | 272.6 | 268.3 | 282.1 | 263.7 | 336.1 |
-| production-param-current | 853.1 | 848.0 | 870.5 | 818.7 | 896.0 |
-| candidate-param-current | 810.6 | 804.0 | 842.2 | 802.7 | 875.0 |
-| candidate-param-cached-status | 812.6 | 802.0 | 831.2 | 784.4 | 845.7 |
-| candidate-param-no-status | 779.5 | 778.7 | 810.2 | 771.3 | 862.7 |
-| candidate-param-cached-no-status | 784.0 | 776.0 | 809.1 | 769.2 | 833.1 |
-| candidate-param-prehash-current | 921.5 | 905.5 | 974.0 | 898.3 | 1075.0 |
-| candidate-param-prehash-no-status | 909.9 | 888.3 | 928.3 | 875.9 | 952.8 |
+| cell                              | median ns/op |   p25 |   p75 |   min |    max |
+| --------------------------------- | -----------: | ----: | ----: | ----: | -----: |
+| production-stable-current         |        823.5 | 804.6 | 846.8 | 773.5 |  981.8 |
+| candidate-stable-current          |        777.1 | 760.4 | 781.1 | 747.4 |  803.9 |
+| candidate-stable-cached-status    |        760.1 | 752.5 | 776.7 | 733.9 |  825.8 |
+| candidate-stable-no-status        |        756.1 | 741.9 | 795.6 | 734.1 |  993.2 |
+| candidate-stable-cached-no-status |        754.7 | 745.8 | 789.8 | 733.1 |  816.9 |
+| production-handler-param          |        216.5 | 214.0 | 217.8 | 211.2 |  225.1 |
+| candidate-handler-param           |        185.0 | 182.2 | 186.2 | 180.0 |  198.4 |
+| candidate-handler-param-prehash   |        272.6 | 268.3 | 282.1 | 263.7 |  336.1 |
+| production-param-current          |        853.1 | 848.0 | 870.5 | 818.7 |  896.0 |
+| candidate-param-current           |        810.6 | 804.0 | 842.2 | 802.7 |  875.0 |
+| candidate-param-cached-status     |        812.6 | 802.0 | 831.2 | 784.4 |  845.7 |
+| candidate-param-no-status         |        779.5 | 778.7 | 810.2 | 771.3 |  862.7 |
+| candidate-param-cached-no-status  |        784.0 | 776.0 | 809.1 | 769.2 |  833.1 |
+| candidate-param-prehash-current   |        921.5 | 905.5 | 974.0 | 898.3 | 1075.0 |
+| candidate-param-prehash-no-status |        909.9 | 888.3 | 928.3 | 875.9 |  952.8 |
 
 ## Candidate / production ratios
 
-| comparison | ratio | delta ns |
-| --- | ---: | ---: |
-| candidate-stable-current | 0.9436x | -46.4 |
-| candidate-stable-cached-status | 0.9230x | -63.4 |
-| candidate-stable-no-status | 0.9181x | -67.4 |
-| candidate-stable-cached-no-status | 0.9165x | -68.8 |
-| candidate-handler-param | 0.8548x | -31.4 |
-| candidate-handler-param-prehash | 1.2594x | 56.2 |
-| candidate-param-current | 0.9503x | -42.4 |
-| candidate-param-cached-status | 0.9526x | -40.5 |
-| candidate-param-no-status | 0.9137x | -73.6 |
-| candidate-param-cached-no-status | 0.9190x | -69.1 |
-| candidate-param-prehash-current | 1.0802x | 68.4 |
-| candidate-param-prehash-no-status | 1.0667x | 56.9 |
+| comparison                        |   ratio | delta ns |
+| --------------------------------- | ------: | -------: |
+| candidate-stable-current          | 0.9436x |    -46.4 |
+| candidate-stable-cached-status    | 0.9230x |    -63.4 |
+| candidate-stable-no-status        | 0.9181x |    -67.4 |
+| candidate-stable-cached-no-status | 0.9165x |    -68.8 |
+| candidate-handler-param           | 0.8548x |    -31.4 |
+| candidate-handler-param-prehash   | 1.2594x |     56.2 |
+| candidate-param-current           | 0.9503x |    -42.4 |
+| candidate-param-cached-status     | 0.9526x |    -40.5 |
+| candidate-param-no-status         | 0.9137x |    -73.6 |
+| candidate-param-cached-no-status  | 0.9190x |    -69.1 |
+| candidate-param-prehash-current   | 1.0802x |     68.4 |
+| candidate-param-prehash-no-status | 1.0667x |     56.9 |
 
 ## Alternative / candidate-current ratios
 
-| comparison | ratio | delta ns |
-| --- | ---: | ---: |
-| candidate-stable-cached-status | 0.9781x | -17.0 |
-| candidate-stable-no-status | 0.9730x | -21.0 |
-| candidate-stable-cached-no-status | 0.9712x | -22.4 |
-| candidate-param-cached-status | 1.0024x | 2.0 |
-| candidate-param-no-status | 0.9616x | -31.2 |
-| candidate-param-cached-no-status | 0.9671x | -26.7 |
-| candidate-param-prehash-current | 1.1367x | 110.8 |
-| candidate-param-prehash-no-status | 1.1225x | 99.3 |
+| comparison                        |   ratio | delta ns |
+| --------------------------------- | ------: | -------: |
+| candidate-stable-cached-status    | 0.9781x |    -17.0 |
+| candidate-stable-no-status        | 0.9730x |    -21.0 |
+| candidate-stable-cached-no-status | 0.9712x |    -22.4 |
+| candidate-param-cached-status     | 1.0024x |      2.0 |
+| candidate-param-no-status         | 0.9616x |    -31.2 |
+| candidate-param-cached-no-status  | 0.9671x |    -26.7 |
+| candidate-param-prehash-current   | 1.1367x |    110.8 |
+| candidate-param-prehash-no-status | 1.1225x |     99.3 |
 
 ## Parameter response-construction increments
 
-| response path | increment above matching handler | delta vs candidate current increment |
-| --- | ---: | ---: |
-| production current | 636.6 ns | 11.0 ns |
-| candidate current | 625.6 ns | 0.0 ns |
-| candidate cached status | 627.6 ns | 2.0 ns |
-| candidate no status | 594.5 ns | -31.2 ns |
-| candidate cached no status | 598.9 ns | -26.7 ns |
-| candidate prehash current | 648.8 ns | 23.2 ns |
-| candidate prehash no status | 637.3 ns | 11.7 ns |
+| response path               | increment above matching handler | delta vs candidate current increment |
+| --------------------------- | -------------------------------: | -----------------------------------: |
+| production current          |                         636.6 ns |                              11.0 ns |
+| candidate current           |                         625.6 ns |                               0.0 ns |
+| candidate cached status     |                         627.6 ns |                               2.0 ns |
+| candidate no status         |                         594.5 ns |                             -31.2 ns |
+| candidate cached no status  |                         598.9 ns |                             -26.7 ns |
+| candidate prehash current   |                         648.8 ns |                              23.2 ns |
+| candidate prehash no status |                         637.3 ns |                              11.7 ns |
 
 ## Legacy prefix prehash diagnostics
 
-| diagnostic | value |
-| --- | ---: |
-| prehash handler overhead | 87.6 ns |
+| diagnostic                           |   value |
+| ------------------------------------ | ------: |
+| prehash handler overhead             | 87.6 ns |
 | prehash current normalization change | 23.2 ns |
 
 ## Historical CP3-S recovery diagnostic
 
 With the CP3-S JSON ratio held only as an engineering diagnostic at `0.9773x`, the historical pipeline geomean gate would require the string ratio to be approximately `<= 0.9827x`.
 
-| candidate param pipeline | ratio vs production current | meets `<= 0.9827x`? |
-| --- | ---: | --- |
-| candidate-param-current | 0.9503x | YES |
-| candidate-param-cached-status | 0.9526x | YES |
-| candidate-param-no-status | 0.9137x | YES |
-| candidate-param-cached-no-status | 0.9190x | YES |
-| candidate-param-prehash-current | 1.0802x | NO |
-| candidate-param-prehash-no-status | 1.0667x | NO |
+| candidate param pipeline          | ratio vs production current | meets `<= 0.9827x`? |
+| --------------------------------- | --------------------------: | ------------------- |
+| candidate-param-current           |                     0.9503x | YES                 |
+| candidate-param-cached-status     |                     0.9526x | YES                 |
+| candidate-param-no-status         |                     0.9137x | YES                 |
+| candidate-param-cached-no-status  |                     0.9190x | YES                 |
+| candidate-param-prehash-current   |                     1.0802x | NO                  |
+| candidate-param-prehash-no-status |                     1.0667x | NO                  |
 
 ## Interpretation
 
