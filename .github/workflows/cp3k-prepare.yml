@@ -1,0 +1,105 @@
+name: CP3-K Prepare Harness
+
+on:
+  push:
+    branches:
+      - work/competitive-cp3k-http-revalidation
+
+permissions:
+  contents: write
+
+jobs:
+  prepare:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Setup Bun 1.4.2
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+
+      - name: Install root dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Install frozen competitive dependencies
+        run: bun install --cwd bench/competitive --frozen-lockfile
+
+      - name: Install frozen Elysia AOT island
+        run: bun install --cwd bench/competitive/elysia-v2-aot --frozen-lockfile
+
+      - name: Adapt exact CP3-D harness to CP3-K
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('bench/competitive/candidate/http-revalidation-acceptance.mts')
+          text = path.read_text()
+
+          replacements = [
+              ('9af3f056c004151473ef6ad5535600ba47f39e0a', '2a10e42308631fe53faba9a789b227d0a1cb241c'),
+              ('1dd5f94cf0e9ad884ca44e537ee287587cd8baab', '98d8c00bfda8913a951bdf8780e136672646a90c'),
+              ('CP3-D', 'CP3-K'),
+              ('accepted CP3-C source', 'accepted CP3-J source'),
+          ]
+
+          for old, new in replacements:
+              if old not in text:
+                  if new in text:
+                      continue
+                  raise SystemExit(f'expected text not found: {old}')
+              text = text.replace(old, new)
+
+          old_guard = '["git", "diff", "--quiet", CANDIDATE_SHA, "--", "src"]'
+          new_guard = '[\n      "git",\n      "diff",\n      "--quiet",\n      CANDIDATE_SHA,\n      "--",\n      "src",\n      "test/runtime/url.test.ts",\n    ]'
+          if old_guard in text:
+              text = text.replace(old_guard, new_guard)
+
+          path.write_text(text)
+          PY
+
+          bun ./node_modules/prettier/bin/prettier.cjs \
+            bench/competitive/candidate/http-revalidation-acceptance.mts \
+            docs/benchmarks/competitive-cp3j-local-authoritative.md \
+            --write
+
+      - name: Commit prepared harness
+        shell: bash
+        run: |
+          if git diff --quiet -- \
+            bench/competitive/candidate/http-revalidation-acceptance.mts \
+            docs/benchmarks/competitive-cp3j-local-authoritative.md; then
+            echo "Harness already prepared"
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add \
+              bench/competitive/candidate/http-revalidation-acceptance.mts \
+              docs/benchmarks/competitive-cp3j-local-authoritative.md
+            git commit -m "chore(competitive): freeze CP3-K HTTP revalidation harness"
+          fi
+
+      - name: Run full repository quality gate
+        run: bun run check
+
+      - name: Typecheck CP3-K harness
+        run: bun ./node_modules/typescript/bin/tsc -p bench/competitive/candidate/tsconfig.json --noEmit
+
+      - name: Run CP3-K correctness probe only
+        working-directory: bench/competitive
+        run: bun candidate/http-revalidation-acceptance.mts --probe-only
+
+      - name: Push prepared harness
+        shell: bash
+        run: |
+          if git log -1 --pretty=%B | grep -q "chore(competitive): freeze CP3-K HTTP revalidation harness"; then
+            git push
+          else
+            echo "Nothing to push"
+          fi
