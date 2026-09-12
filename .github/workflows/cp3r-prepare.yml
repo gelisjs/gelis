@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   prepare:
-    if: github.event.head_commit.message == 'ci(competitive): prepare CP3-R acceptance harness'
+    if: github.event.head_commit.message == 'CP3R_PREPARE'
     runs-on: ubuntu-24.04
     timeout-minutes: 20
 
