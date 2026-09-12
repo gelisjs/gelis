@@ -108,15 +108,15 @@ Timed cells remain:
 
 The gates are intentionally unchanged from CP3-R. No threshold is relaxed after the CP3-R memory failure.
 
-| gate | candidate / production limit |
-| --- | ---: |
-| mixed static request | `<= 1.0200x` |
-| mixed trailing dynamic request | `<= 0.9000x` |
-| generic multi-param dynamic request | `<= 1.0300x` |
-| string/JSON pipeline geomean | `<= 0.9800x` |
-| forced-collision fallback | `<= 1.1500x` |
-| trailing-route registration | `<= 1.7500x` |
-| retained router heap delta | `<= 1.5000x` |
+| gate                                | candidate / production limit |
+| ----------------------------------- | ---------------------------: |
+| mixed static request                |                 `<= 1.0200x` |
+| mixed trailing dynamic request      |                 `<= 0.9000x` |
+| generic multi-param dynamic request |                 `<= 1.0300x` |
+| string/JSON pipeline geomean        |                 `<= 0.9800x` |
+| forced-collision fallback           |                 `<= 1.1500x` |
+| trailing-route registration         |                 `<= 1.7500x` |
+| retained router heap delta          |                 `<= 1.5000x` |
 
 All seven gates must pass.
 

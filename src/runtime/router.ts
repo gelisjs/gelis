@@ -151,15 +151,19 @@ export class Router {
      * the generic trie.
      */
     if (!table.usesDynamicTrie) {
+      const trailingParamFingerprints = table.trailingParamFingerprints;
+
       const trailingParamRoutes = table.trailingParamRoutes;
 
-      if (pathname !== "/" && trailingParamRoutes) {
+      if (
+        pathname !== "/" &&
+        (trailingParamFingerprints !== undefined ||
+          trailingParamRoutes !== undefined)
+      ) {
         const slash = pathname.lastIndexOf("/");
 
         if (slash >= 0) {
           const prefixEnd = slash + 1;
-
-          const trailingParamFingerprints = table.trailingParamFingerprints;
 
           let trailingRoute: TrailingParamRoute | undefined;
 
@@ -178,7 +182,7 @@ export class Router {
             } else if (entry !== undefined) {
               trailingRoute = entry.routes.get(pathname.slice(0, prefixEnd));
             }
-          } else {
+          } else if (trailingParamRoutes !== undefined) {
             trailingRoute = trailingParamRoutes.get(
               pathname.slice(0, prefixEnd),
             );
@@ -284,15 +288,19 @@ function methodTableMatchesPath(
   }
 
   if (!table.usesDynamicTrie) {
+    const trailingParamFingerprints = table.trailingParamFingerprints;
+
     const trailingParamRoutes = table.trailingParamRoutes;
 
-    if (pathname !== "/" && trailingParamRoutes !== undefined) {
+    if (
+      pathname !== "/" &&
+      (trailingParamFingerprints !== undefined ||
+        trailingParamRoutes !== undefined)
+    ) {
       const slash = pathname.lastIndexOf("/");
 
       if (slash >= 0) {
         const prefixEnd = slash + 1;
-
-        const trailingParamFingerprints = table.trailingParamFingerprints;
 
         if (trailingParamFingerprints !== undefined) {
           const entry = trailingParamFingerprints.get(
@@ -312,7 +320,10 @@ function methodTableMatchesPath(
           ) {
             return true;
           }
-        } else if (trailingParamRoutes.has(pathname.slice(0, prefixEnd))) {
+        } else if (
+          trailingParamRoutes !== undefined &&
+          trailingParamRoutes.has(pathname.slice(0, prefixEnd))
+        ) {
           return true;
         }
       }
@@ -524,27 +535,35 @@ function registerRouteIntoTable(
     if (slash >= 0) {
       const prefix = route.path.slice(0, slash + 1);
 
-      let trailingParamRoutes = table.trailingParamRoutes;
-
-      if (!trailingParamRoutes) {
-        trailingParamRoutes = new Map();
-
-        table.trailingParamRoutes = trailingParamRoutes;
-      }
-
-      if (trailingParamRoutes.has(prefix)) {
-        throw duplicateRoute(route);
-      }
-
       const trailingRoute = {
         route,
 
         paramName: trailingParamName,
       };
 
-      trailingParamRoutes.set(prefix, trailingRoute);
+      if (table.trailingParamFingerprints !== undefined) {
+        if (!registerTrailingFingerprint(table, prefix, trailingRoute)) {
+          throw duplicateRoute(route);
+        }
 
-      registerTrailingFingerprint(table, prefix, trailingRoute);
+        return;
+      }
+
+      const trailingParamRoutes = table.trailingParamRoutes;
+
+      if (trailingParamRoutes !== undefined) {
+        if (trailingParamRoutes.has(prefix)) {
+          throw duplicateRoute(route);
+        }
+
+        trailingParamRoutes.set(prefix, trailingRoute);
+
+        return;
+      }
+
+      if (!registerTrailingFingerprint(table, prefix, trailingRoute)) {
+        throw duplicateRoute(route);
+      }
 
       return;
     }
@@ -564,6 +583,28 @@ function registerRouteIntoTable(
 }
 
 function migrateTrailingRoutesToTrie(table: MethodRoutes): void {
+  const trailingParamFingerprints = table.trailingParamFingerprints;
+
+  if (trailingParamFingerprints !== undefined) {
+    for (const entry of trailingParamFingerprints.values()) {
+      if (entry.kind === "unique") {
+        registerDynamicRoute(table.dynamicRoot, entry.trailingRoute.route);
+
+        continue;
+      }
+
+      for (const trailingRoute of entry.routes.values()) {
+        registerDynamicRoute(table.dynamicRoot, trailingRoute.route);
+      }
+    }
+
+    delete table.trailingParamFingerprints;
+
+    table.trailingParamRoutes = undefined;
+
+    return;
+  }
+
   const trailingParamRoutes = table.trailingParamRoutes;
 
   if (!trailingParamRoutes) {
@@ -583,8 +624,6 @@ function migrateTrailingRoutesToTrie(table: MethodRoutes): void {
    * Release it after migration.
    */
   table.trailingParamRoutes = undefined;
-
-  delete table.trailingParamFingerprints;
 }
 
 function registerTrailingFingerprint(
@@ -593,7 +632,7 @@ function registerTrailingFingerprint(
   prefix: string,
 
   trailingRoute: TrailingParamRoute,
-): void {
+): boolean {
   let fingerprints = table.trailingParamFingerprints;
 
   if (fingerprints === undefined) {
@@ -615,10 +654,14 @@ function registerTrailingFingerprint(
       trailingRoute,
     });
 
-    return;
+    return true;
   }
 
   if (existing.kind === "unique") {
+    if (existing.prefix === prefix) {
+      return false;
+    }
+
     fingerprints.set(key, {
       kind: "collision",
 
@@ -628,10 +671,16 @@ function registerTrailingFingerprint(
       ]),
     });
 
-    return;
+    return true;
+  }
+
+  if (existing.routes.has(prefix)) {
+    return false;
   }
 
   existing.routes.set(prefix, trailingRoute);
+
+  return true;
 }
 
 function cloneTrailingParamFingerprints(
