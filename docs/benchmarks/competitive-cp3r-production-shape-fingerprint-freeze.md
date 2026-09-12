@@ -84,14 +84,14 @@ Mixed topology contains `2,500` exact static and `2,500` trailing-parameter rout
 
 These limits are fixed before local timing:
 
-| gate | limit | purpose |
-| --- | ---: | --- |
-| baseline clone / production static fidelity | `0.95x .. 1.05x` | copied production source must faithfully reproduce production static cost |
+| gate                                         |            limit | purpose                                                                    |
+| -------------------------------------------- | ---------------: | -------------------------------------------------------------------------- |
+| baseline clone / production static fidelity  | `0.95x .. 1.05x` | copied production source must faithfully reproduce production static cost  |
 | baseline clone / production dynamic fidelity | `0.95x .. 1.05x` | copied production source must faithfully reproduce production dynamic cost |
-| candidate / baseline static | `<= 1.02x` | fingerprint candidate must preserve static hot path |
-| candidate / baseline dynamic | `<= 0.90x` | dynamic win must remain material in production-shaped code |
-| candidate string/JSON pipeline geomean | `<= 0.98x` | routing gain must survive response construction |
-| candidate forced-collision fallback | `<= 1.15x` | exact collision handling must remain bounded |
+| candidate / baseline static                  |       `<= 1.02x` | fingerprint candidate must preserve static hot path                        |
+| candidate / baseline dynamic                 |       `<= 0.90x` | dynamic win must remain material in production-shaped code                 |
+| candidate string/JSON pipeline geomean       |       `<= 0.98x` | routing gain must survive response construction                            |
+| candidate forced-collision fallback          |       `<= 1.15x` | exact collision handling must remain bounded                               |
 
 All six gates must pass before engineering the fingerprint mechanism into actual `src/runtime/router.ts` is justified.
 

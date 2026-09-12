@@ -20,10 +20,29 @@ export interface TrailingParamRoute {
   readonly paramName: string;
 }
 
+interface TrailingFingerprintUniqueEntry {
+  readonly kind: "unique";
+
+  readonly prefix: string;
+
+  readonly trailingRoute: TrailingParamRoute;
+}
+
+interface TrailingFingerprintCollisionEntry {
+  readonly kind: "collision";
+
+  readonly routes: Map<string, TrailingParamRoute>;
+}
+
+type TrailingFingerprintEntry =
+  TrailingFingerprintUniqueEntry | TrailingFingerprintCollisionEntry;
+
 export interface MethodRoutes {
   readonly staticRoutes: Map<string, RuntimeRouteRecord>;
 
   trailingParamRoutes: Map<string, TrailingParamRoute> | undefined;
+
+  trailingParamFingerprints?: Map<number, TrailingFingerprintEntry>;
 
   readonly dynamicRoot: DynamicNode;
 
@@ -138,12 +157,35 @@ export class Router {
         const slash = pathname.lastIndexOf("/");
 
         if (slash >= 0) {
-          const prefix = pathname.slice(0, slash + 1);
+          const prefixEnd = slash + 1;
 
-          const trailingRoute = trailingParamRoutes.get(prefix);
+          const trailingParamFingerprints = table.trailingParamFingerprints;
+
+          let trailingRoute: TrailingParamRoute | undefined;
+
+          if (trailingParamFingerprints !== undefined) {
+            const entry = trailingParamFingerprints.get(
+              prefixFingerprint(pathname, prefixEnd),
+            );
+
+            if (entry?.kind === "unique") {
+              if (
+                entry.prefix.length === prefixEnd &&
+                pathname.startsWith(entry.prefix)
+              ) {
+                trailingRoute = entry.trailingRoute;
+              }
+            } else if (entry !== undefined) {
+              trailingRoute = entry.routes.get(pathname.slice(0, prefixEnd));
+            }
+          } else {
+            trailingRoute = trailingParamRoutes.get(
+              pathname.slice(0, prefixEnd),
+            );
+          }
 
           if (trailingRoute) {
-            const value = pathname.slice(slash + 1);
+            const value = pathname.slice(prefixEnd);
 
             return {
               route: trailingRoute.route,
@@ -248,13 +290,29 @@ function methodTableMatchesPath(
       const slash = pathname.lastIndexOf("/");
 
       if (slash >= 0) {
-        const prefix = pathname.slice(
-          0,
+        const prefixEnd = slash + 1;
 
-          slash + 1,
-        );
+        const trailingParamFingerprints = table.trailingParamFingerprints;
 
-        if (trailingParamRoutes.has(prefix)) {
+        if (trailingParamFingerprints !== undefined) {
+          const entry = trailingParamFingerprints.get(
+            prefixFingerprint(pathname, prefixEnd),
+          );
+
+          if (entry?.kind === "unique") {
+            return (
+              entry.prefix.length === prefixEnd &&
+              pathname.startsWith(entry.prefix)
+            );
+          }
+
+          if (
+            entry !== undefined &&
+            entry.routes.has(pathname.slice(0, prefixEnd))
+          ) {
+            return true;
+          }
+        } else if (trailingParamRoutes.has(pathname.slice(0, prefixEnd))) {
           return true;
         }
       }
@@ -377,6 +435,14 @@ function cloneMethodRoutes(table: MethodRoutes): MethodRoutes {
         ? undefined
         : new Map(table.trailingParamRoutes),
 
+    ...(table.trailingParamFingerprints === undefined
+      ? {}
+      : {
+          trailingParamFingerprints: cloneTrailingParamFingerprints(
+            table.trailingParamFingerprints,
+          ),
+        }),
+
     dynamicRoot: cloneDynamicNode(table.dynamicRoot),
 
     usesDynamicTrie: table.usesDynamicTrie,
@@ -470,11 +536,15 @@ function registerRouteIntoTable(
         throw duplicateRoute(route);
       }
 
-      trailingParamRoutes.set(prefix, {
+      const trailingRoute = {
         route,
 
         paramName: trailingParamName,
-      });
+      };
+
+      trailingParamRoutes.set(prefix, trailingRoute);
+
+      registerTrailingFingerprint(table, prefix, trailingRoute);
 
       return;
     }
@@ -513,6 +583,97 @@ function migrateTrailingRoutesToTrie(table: MethodRoutes): void {
    * Release it after migration.
    */
   table.trailingParamRoutes = undefined;
+
+  delete table.trailingParamFingerprints;
+}
+
+function registerTrailingFingerprint(
+  table: MethodRoutes,
+
+  prefix: string,
+
+  trailingRoute: TrailingParamRoute,
+): void {
+  let fingerprints = table.trailingParamFingerprints;
+
+  if (fingerprints === undefined) {
+    fingerprints = new Map();
+
+    table.trailingParamFingerprints = fingerprints;
+  }
+
+  const key = prefixFingerprint(prefix, prefix.length);
+
+  const existing = fingerprints.get(key);
+
+  if (existing === undefined) {
+    fingerprints.set(key, {
+      kind: "unique",
+
+      prefix,
+
+      trailingRoute,
+    });
+
+    return;
+  }
+
+  if (existing.kind === "unique") {
+    fingerprints.set(key, {
+      kind: "collision",
+
+      routes: new Map([
+        [existing.prefix, existing.trailingRoute],
+        [prefix, trailingRoute],
+      ]),
+    });
+
+    return;
+  }
+
+  existing.routes.set(prefix, trailingRoute);
+}
+
+function cloneTrailingParamFingerprints(
+  fingerprints: Map<number, TrailingFingerprintEntry>,
+): Map<number, TrailingFingerprintEntry> {
+  const cloned = new Map<number, TrailingFingerprintEntry>();
+
+  for (const [key, entry] of fingerprints) {
+    cloned.set(
+      key,
+
+      entry.kind === "unique"
+        ? entry
+        : {
+            kind: "collision",
+
+            routes: new Map(entry.routes),
+          },
+    );
+  }
+
+  return cloned;
+}
+
+function prefixFingerprint(value: string, end: number): number {
+  let hash = Math.imul(end, -1640531527);
+
+  hash = Math.imul(hash ^ codeBefore(value, end, 2), -2048144789);
+
+  hash = Math.imul(hash ^ codeBefore(value, end, 3), -1028477387);
+
+  hash = Math.imul(hash ^ codeBefore(value, end, 4), 668265263);
+
+  hash = Math.imul(hash ^ codeBefore(value, end, 5), 374761393);
+
+  return hash | 0;
+}
+
+function codeBefore(value: string, end: number, distance: number): number {
+  const index = end - distance;
+
+  return index >= 0 ? value.charCodeAt(index) : 0;
 }
 
 function registerDynamicRoute(
