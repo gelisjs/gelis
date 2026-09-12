@@ -201,7 +201,9 @@ function runTiming(): void {
 
   console.log();
   console.log("Per-variant layer increments");
-  console.log("| layer increment | production | candidate | candidate - production |");
+  console.log(
+    "| layer increment | production | candidate | candidate - production |",
+  );
   console.log("| --- | ---: | ---: | ---: |");
   printIncrement(
     summaries,
@@ -270,10 +272,10 @@ function runTiming(): void {
   ] as const) {
     const cellAdvantage = advantage(summaries, cell);
     const retention =
-      routerAdvantage === 0 ? "n/a" : `${(cellAdvantage / routerAdvantage).toFixed(4)}x`;
-    console.log(
-      `| ${cell} | ${cellAdvantage.toFixed(1)} ns | ${retention} |`,
-    );
+      routerAdvantage === 0
+        ? "n/a"
+        : `${(cellAdvantage / routerAdvantage).toFixed(4)}x`;
+    console.log(`| ${cell} | ${cellAdvantage.toFixed(1)} ns | ${retention} |`);
   }
 
   console.log();
@@ -434,11 +436,9 @@ function cleanupBaselineWorktree(): void {
     );
   }
 
-  const prune = spawnSync(
-    "git",
-    ["-C", REPOSITORY_ROOT, "worktree", "prune"],
-    { encoding: "utf8" },
-  );
+  const prune = spawnSync("git", ["-C", REPOSITORY_ROOT, "worktree", "prune"], {
+    encoding: "utf8",
+  });
   if (prune.status !== 0) {
     throw new Error(`Failed to prune worktrees:\n${prune.stderr}`);
   }

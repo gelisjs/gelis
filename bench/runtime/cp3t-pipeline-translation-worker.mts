@@ -21,10 +21,7 @@ const DYNAMIC_REQUEST = new Request(`http://gelis.test${DYNAMIC_PATH}`);
 
 type Variant = "production" | "candidate";
 type PayloadKind =
-  | "string-stable"
-  | "string-param"
-  | "json-stable"
-  | "json-param";
+  "string-stable" | "string-param" | "json-stable" | "json-param";
 type Cell =
   | "router-dynamic"
   | "handler-string-stable"
@@ -220,7 +217,9 @@ function pipelineCell(
   return {
     operation: () => {
       const response = run();
-      return response.status + (response.headers.get("content-type")?.length ?? 0);
+      return (
+        response.status + (response.headers.get("content-type")?.length ?? 0)
+      );
     },
     assertCorrectness: async () => {
       const expectJson = payloadKind.startsWith("json-");
@@ -295,7 +294,8 @@ function consumeMatch(match: RouterMatch): number {
 
 function consumeHandlerValue(value: unknown, payloadKind: PayloadKind): number {
   if (payloadKind.startsWith("string-")) {
-    if (typeof value !== "string") throw new Error("expected string handler value");
+    if (typeof value !== "string")
+      throw new Error("expected string handler value");
     return value.length;
   }
 
