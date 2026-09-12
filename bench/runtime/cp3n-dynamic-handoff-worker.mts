@@ -267,7 +267,8 @@ function requestRouterCell(kind: RouteKind): PreparedCell {
   return {
     operation: () => {
       const match = run();
-      return match.route.path.length + (dynamic ? (match.params.id?.length ?? 0) : 0);
+      return match.route.path.length +
+        (dynamic ? (match.params.id?.length ?? 0) : 0);
     },
     assertCorrectness: () => assertMatch(run(), kind),
   };
@@ -363,21 +364,30 @@ function buildApp(kind: RouteKind, handlerKind: HandlerKind): Gelis {
   const app = new Gelis();
 
   for (let index = 0; index < ROUTES; index++) {
-    const path =
-      kind === "static"
-        ? (`/r/${index}` as `/r/${number}`)
-        : (`/r/${index}/:id` as `/r/${number}/:id`);
+    if (kind === "static") {
+      const path = `/r/${index}` as `/r/${number}`;
+
+      if (handlerKind === "string-stable") {
+        app.get(path, () => PARAM_VALUE);
+      } else if (handlerKind === "json-stable") {
+        app.get(path, () => ({ id: PARAM_VALUE }));
+      } else {
+        throw new Error(`${handlerKind} requires dynamic route`);
+      }
+
+      continue;
+    }
+
+    const path = `/r/${index}/:id` as `/r/${number}/:id`;
 
     if (handlerKind === "string-stable") {
-      app.get(path as never, () => PARAM_VALUE);
+      app.get(path, () => PARAM_VALUE);
     } else if (handlerKind === "string-param") {
-      if (kind !== "dynamic") throw new Error("string-param requires dynamic route");
-      app.get(path as never, ({ params }) => params.id);
+      app.get(path, ({ params }) => params.id);
     } else if (handlerKind === "json-stable") {
-      app.get(path as never, () => ({ id: PARAM_VALUE }));
+      app.get(path, () => ({ id: PARAM_VALUE }));
     } else {
-      if (kind !== "dynamic") throw new Error("json-param requires dynamic route");
-      app.get(path as never, ({ params }) => ({ id: params.id }));
+      app.get(path, ({ params }) => ({ id: params.id }));
     }
   }
 
