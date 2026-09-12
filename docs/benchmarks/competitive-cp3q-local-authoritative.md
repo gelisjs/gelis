@@ -18,44 +18,44 @@ This is a valid unfavorable result under the frozen all-gates-must-pass rule. Th
 
 ## Timed cells
 
-| cell | median ns/op | p25 | p75 | min | max |
-| --- | ---: | ---: | ---: | ---: | ---: |
-| production-mixed-static-request | 101.7 | 99.8 | 103.8 | 96.1 | 106.8 |
-| shared-current-mixed-static-request | 114.8 | 113.5 | 115.0 | 111.6 | 119.0 |
-| shared-fingerprint-mixed-static-request | 114.9 | 111.9 | 117.7 | 111.0 | 119.5 |
-| production-mixed-dynamic-request | 216.8 | 211.0 | 220.3 | 209.6 | 288.8 |
-| shared-current-mixed-dynamic-request | 214.5 | 213.8 | 218.7 | 209.3 | 225.9 |
-| shared-fingerprint-mixed-dynamic-request | 189.3 | 185.7 | 192.8 | 184.2 | 194.4 |
-| shared-current-pipeline-string | 810.8 | 791.0 | 831.4 | 777.5 | 841.4 |
-| shared-fingerprint-pipeline-string | 781.6 | 768.2 | 799.0 | 756.8 | 920.8 |
-| shared-current-pipeline-json | 609.5 | 595.7 | 613.6 | 583.2 | 627.7 |
-| shared-fingerprint-pipeline-json | 584.8 | 579.7 | 596.5 | 563.8 | 632.9 |
-| shared-current-collision-request | 233.8 | 233.5 | 236.2 | 228.8 | 244.8 |
-| shared-fingerprint-collision-request | 263.8 | 259.1 | 268.2 | 251.7 | 272.5 |
+| cell                                     | median ns/op |   p25 |   p75 |   min |   max |
+| ---------------------------------------- | -----------: | ----: | ----: | ----: | ----: |
+| production-mixed-static-request          |        101.7 |  99.8 | 103.8 |  96.1 | 106.8 |
+| shared-current-mixed-static-request      |        114.8 | 113.5 | 115.0 | 111.6 | 119.0 |
+| shared-fingerprint-mixed-static-request  |        114.9 | 111.9 | 117.7 | 111.0 | 119.5 |
+| production-mixed-dynamic-request         |        216.8 | 211.0 | 220.3 | 209.6 | 288.8 |
+| shared-current-mixed-dynamic-request     |        214.5 | 213.8 | 218.7 | 209.3 | 225.9 |
+| shared-fingerprint-mixed-dynamic-request |        189.3 | 185.7 | 192.8 | 184.2 | 194.4 |
+| shared-current-pipeline-string           |        810.8 | 791.0 | 831.4 | 777.5 | 841.4 |
+| shared-fingerprint-pipeline-string       |        781.6 | 768.2 | 799.0 | 756.8 | 920.8 |
+| shared-current-pipeline-json             |        609.5 | 595.7 | 613.6 | 583.2 | 627.7 |
+| shared-fingerprint-pipeline-json         |        584.8 | 579.7 | 596.5 | 563.8 | 632.9 |
+| shared-current-collision-request         |        233.8 | 233.5 | 236.2 | 228.8 | 244.8 |
+| shared-fingerprint-collision-request     |        263.8 | 259.1 | 268.2 | 251.7 | 272.5 |
 
 ## Derived ratios
 
-| comparison | ratio |
-| --- | ---: |
-| shared fingerprint/current static | `1.0012x` |
-| shared fingerprint/current dynamic | `0.8828x` |
-| shared fingerprint/current string pipeline | `0.9640x` |
-| shared fingerprint/current JSON pipeline | `0.9594x` |
-| shared pipeline geomean | `0.9617x` |
-| shared forced-collision fallback | `1.1283x` |
-| shared-current / production static fidelity | `1.1286x` |
+| comparison                                   |     ratio |
+| -------------------------------------------- | --------: |
+| shared fingerprint/current static            | `1.0012x` |
+| shared fingerprint/current dynamic           | `0.8828x` |
+| shared fingerprint/current string pipeline   | `0.9640x` |
+| shared fingerprint/current JSON pipeline     | `0.9594x` |
+| shared pipeline geomean                      | `0.9617x` |
+| shared forced-collision fallback             | `1.1283x` |
+| shared-current / production static fidelity  | `1.1286x` |
 | shared-current / production dynamic fidelity | `0.9893x` |
 
 ## Frozen gates
 
-| gate | value | limit | result |
-| --- | ---: | ---: | --- |
-| shared fingerprint/current static | `1.0012x` | `<= 1.0200x` | PASS |
-| shared fingerprint/current dynamic | `0.8828x` | `<= 0.9000x` | PASS |
-| shared pipeline geomean | `0.9617x` | `<= 0.9800x` | PASS |
-| shared forced-collision fallback | `1.1283x` | `<= 1.1500x` | PASS |
-| shared-current / production static fidelity | `1.1286x` | `0.9000x .. 1.1000x` | FAIL |
-| shared-current / production dynamic fidelity | `0.9893x` | `0.9000x .. 1.1000x` | PASS |
+| gate                                         |     value |                limit | result |
+| -------------------------------------------- | --------: | -------------------: | ------ |
+| shared fingerprint/current static            | `1.0012x` |         `<= 1.0200x` | PASS   |
+| shared fingerprint/current dynamic           | `0.8828x` |         `<= 0.9000x` | PASS   |
+| shared pipeline geomean                      | `0.9617x` |         `<= 0.9800x` | PASS   |
+| shared forced-collision fallback             | `1.1283x` |         `<= 1.1500x` | PASS   |
+| shared-current / production static fidelity  | `1.1286x` | `0.9000x .. 1.1000x` | FAIL   |
+| shared-current / production dynamic fidelity | `0.9893x` | `0.9000x .. 1.1000x` | PASS   |
 
 Five of six frozen attribution gates passed. Because the protocol requires all six, CP3-Q is classified FAIL.
 
