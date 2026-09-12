@@ -51,10 +51,7 @@ type Cell =
 
 type PayloadKind = "stable" | "param";
 type ResponseKind =
-  | "current"
-  | "cached-status"
-  | "no-status"
-  | "cached-no-status";
+  "current" | "cached-status" | "no-status" | "cached-no-status";
 type Mode = "handler" | "pipeline";
 type Operation = () => number;
 type ResponseNormalizer = (value: unknown) => Response;
@@ -360,14 +357,9 @@ function buildRouter(
   return router;
 }
 
-function createRoute(
-  path: string,
-  payload: PayloadKind,
-): RuntimeRouteRecord {
+function createRoute(path: string, payload: PayloadKind): RuntimeRouteRecord {
   const handler: RuntimeRouteHandler =
-    payload === "stable"
-      ? () => PARAM_VALUE
-      : ({ params }) => params.id ?? "";
+    payload === "stable" ? () => PARAM_VALUE : ({ params }) => params.id ?? "";
 
   return {
     method: "GET",

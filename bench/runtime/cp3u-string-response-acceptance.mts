@@ -106,7 +106,9 @@ try {
 
 if (probeCompleted) {
   console.log();
-  console.log(`CP3-U CORRECTNESS PROBE: PASS (${ALL_CELLS.length}/${ALL_CELLS.length})`);
+  console.log(
+    `CP3-U CORRECTNESS PROBE: PASS (${ALL_CELLS.length}/${ALL_CELLS.length})`,
+  );
 } else if (completed) {
   console.log();
   console.log("CP3-U LOCAL STRING RESPONSE DECOMPOSITION RUN: COMPLETE");
@@ -220,7 +222,11 @@ function printRatios(summaries: Map<Cell, Summary>): void {
   }
 
   printRatioRow(summaries, "candidate-handler-param", productionHandler);
-  printRatioRow(summaries, "candidate-handler-param-prehash", productionHandler);
+  printRatioRow(
+    summaries,
+    "candidate-handler-param-prehash",
+    productionHandler,
+  );
 
   for (const cell of [
     "candidate-param-current",
@@ -269,7 +275,9 @@ function printLayerIncrements(summaries: Map<Cell, Summary>): void {
 
   console.log();
   console.log("Parameter response-construction increments");
-  console.log("| response path | increment above matching handler | delta vs candidate current increment |");
+  console.log(
+    "| response path | increment above matching handler | delta vs candidate current increment |",
+  );
   console.log("| --- | ---: | ---: |");
 
   const candidateCurrentIncrement =
@@ -333,7 +341,9 @@ function printHistoricalRecovery(summaries: Map<Cell, Summary>): void {
   console.log(
     `String ratio needed with CP3-S JSON held at 0.9773x: <= ${HISTORICAL_REQUIRED_STRING_RATIO.toFixed(4)}x`,
   );
-  console.log("| candidate param pipeline | ratio vs production current | meets <= 0.9827x? |");
+  console.log(
+    "| candidate param pipeline | ratio vs production current | meets <= 0.9827x? |",
+  );
   console.log("| --- | ---: | --- |");
 
   for (const cell of [
@@ -479,7 +489,9 @@ function createBaselineWorktree(): void {
     { encoding: "utf8" },
   );
   if (result.status !== 0) {
-    throw new Error(`Failed to create CP3-U baseline worktree:\n${result.stderr}`);
+    throw new Error(
+      `Failed to create CP3-U baseline worktree:\n${result.stderr}`,
+    );
   }
 
   const head = gitAt(BASELINE_WORKTREE, ["rev-parse", "HEAD"]);
