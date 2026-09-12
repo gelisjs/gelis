@@ -140,7 +140,8 @@ if (probeOnly) {
   console.log(JSON.stringify(result));
 } else {
   const cellOperation = prepared.operation;
-  if (cellOperation === undefined) throw new Error(`Missing operation for ${cell}`);
+  if (cellOperation === undefined)
+    throw new Error(`Missing operation for ${cell}`);
 
   let sink = 0;
   const operation = () => {
@@ -235,7 +236,9 @@ function genericCell(Router: RouterConstructor): PreparedCell {
         throw new Error(`generic path mismatch: ${match.route.path}`);
       }
       if (match.params.left !== "left" || match.params.right !== "right") {
-        throw new Error(`generic params mismatch: ${JSON.stringify(match.params)}`);
+        throw new Error(
+          `generic params mismatch: ${JSON.stringify(match.params)}`,
+        );
       }
     },
   };
@@ -313,7 +316,8 @@ function registrationCell(Router: RouterConstructor): PreparedCell {
     singleMeasure: () => {
       const warmupRouter = registerRoutes(Router, routes);
       const warmupMatch = warmupRouter.match("GET", TRAILING_PATH);
-      if (warmupMatch === undefined) throw new Error("registration warmup miss");
+      if (warmupMatch === undefined)
+        throw new Error("registration warmup miss");
       forceGc();
 
       const start = performance.now();
@@ -393,7 +397,10 @@ function registerRoutes(
 
 function assertLastTrailingMatch(router: RouterLike): void {
   const match = router.match("GET", TRAILING_PATH);
-  if (match?.route.path !== `/r/${LAST}/:id` || match.params.id !== PARAM_VALUE) {
+  if (
+    match?.route.path !== `/r/${LAST}/:id` ||
+    match.params.id !== PARAM_VALUE
+  ) {
     throw new Error("last trailing route mismatch");
   }
 }
@@ -479,7 +486,8 @@ function assertRouterSemantics(Router: RouterConstructor): void {
   } catch {
     duplicateRejected = true;
   }
-  if (!duplicateRejected) throw new Error("duplicate trailing prefix not rejected");
+  if (!duplicateRejected)
+    throw new Error("duplicate trailing prefix not rejected");
 
   const migrating = new Router();
   migrating.register(createRoute("/m/:id", "string"));
@@ -552,7 +560,9 @@ function assertMixedMatch(
 function consumeMatch(match: RouterMatch, dynamic: boolean): number {
   return (
     match.route.path.length +
-    (dynamic ? (match.params.id?.length ?? 0) : Object.keys(match.params).length)
+    (dynamic
+      ? (match.params.id?.length ?? 0)
+      : Object.keys(match.params).length)
   );
 }
 
@@ -566,7 +576,9 @@ async function assertResponse(
   }
   const body = await response.text();
   if (body !== expectedBody) {
-    throw new Error(`response body mismatch: expected ${expectedBody}, got ${body}`);
+    throw new Error(
+      `response body mismatch: expected ${expectedBody}, got ${body}`,
+    );
   }
   if (expectJson) {
     const mediaType = response.headers

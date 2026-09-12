@@ -97,15 +97,15 @@ Registration timing excludes construction of the route-record array. Memory meas
 
 These limits are fixed before local timing:
 
-| gate | candidate / production limit | purpose |
-| --- | ---: | --- |
-| mixed static request | `<= 1.02x` | dynamic optimization must preserve exact-static hot path |
-| mixed trailing-dynamic request | `<= 0.90x` | dynamic win must remain material in actual production-shaped source |
-| generic multi-param dynamic request | `<= 1.03x` | trailing optimization must not materially regress the generic trie |
-| string/JSON pipeline geomean | `<= 0.98x` | routing win must survive response construction |
-| forced-collision fallback | `<= 1.15x` | exact collision handling must remain bounded |
-| trailing-route registration | `<= 1.75x` | startup/registration overhead must remain bounded |
-| retained router heap delta | `<= 1.50x` | sidecar memory overhead must remain bounded |
+| gate                                | candidate / production limit | purpose                                                             |
+| ----------------------------------- | ---------------------------: | ------------------------------------------------------------------- |
+| mixed static request                |                   `<= 1.02x` | dynamic optimization must preserve exact-static hot path            |
+| mixed trailing-dynamic request      |                   `<= 0.90x` | dynamic win must remain material in actual production-shaped source |
+| generic multi-param dynamic request |                   `<= 1.03x` | trailing optimization must not materially regress the generic trie  |
+| string/JSON pipeline geomean        |                   `<= 0.98x` | routing win must survive response construction                      |
+| forced-collision fallback           |                   `<= 1.15x` | exact collision handling must remain bounded                        |
+| trailing-route registration         |                   `<= 1.75x` | startup/registration overhead must remain bounded                   |
+| retained router heap delta          |                   `<= 1.50x` | sidecar memory overhead must remain bounded                         |
 
 All seven gates must pass for CP3-R to justify HTTP revalidation of this candidate. Passing CP3-R does not promote the source.
 

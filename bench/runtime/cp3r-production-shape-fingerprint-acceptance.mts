@@ -63,7 +63,10 @@ interface Summary {
 const PAIRS: readonly Pair[] = [
   { cell: "mixed-static-request", label: "mixed static request" },
   { cell: "mixed-dynamic-request", label: "mixed trailing dynamic request" },
-  { cell: "generic-dynamic-request", label: "generic multi-param dynamic request" },
+  {
+    cell: "generic-dynamic-request",
+    label: "generic multi-param dynamic request",
+  },
   { cell: "pipeline-string", label: "string pipeline" },
   { cell: "pipeline-json", label: "JSON pipeline" },
   { cell: "collision-request", label: "forced fingerprint collision" },
@@ -97,7 +100,9 @@ try {
 
 if (probeCompleted) {
   console.log();
-  console.log(`CP3-R CORRECTNESS PROBE: PASS (${PAIRS.length * 2}/${PAIRS.length * 2})`);
+  console.log(
+    `CP3-R CORRECTNESS PROBE: PASS (${PAIRS.length * 2}/${PAIRS.length * 2})`,
+  );
 } else if (completed) {
   console.log();
   console.log("CP3-R LOCAL PRODUCTION-SHAPE FINGERPRINT RUN: COMPLETE");
@@ -219,11 +224,23 @@ function runTiming(): void {
 
   const gates = [
     { label: "mixed static request", value: staticRatio, limit: 1.02 },
-    { label: "mixed trailing dynamic request", value: dynamicRatio, limit: 0.9 },
-    { label: "generic multi-param dynamic request", value: genericRatio, limit: 1.03 },
+    {
+      label: "mixed trailing dynamic request",
+      value: dynamicRatio,
+      limit: 0.9,
+    },
+    {
+      label: "generic multi-param dynamic request",
+      value: genericRatio,
+      limit: 1.03,
+    },
     { label: "pipeline geomean", value: pipelineGeomean, limit: 0.98 },
     { label: "forced-collision fallback", value: collisionRatio, limit: 1.15 },
-    { label: "trailing-route registration", value: registrationRatio, limit: 1.75 },
+    {
+      label: "trailing-route registration",
+      value: registrationRatio,
+      limit: 1.75,
+    },
     { label: "retained router heap delta", value: memoryRatio, limit: 1.5 },
   ] as const;
 
@@ -241,7 +258,9 @@ function runTiming(): void {
   }
 
   console.log();
-  console.log(`CP3-R PRODUCTION-SHAPE FINGERPRINT GATE: ${passed ? "PASS" : "FAIL"}`);
+  console.log(
+    `CP3-R PRODUCTION-SHAPE FINGERPRINT GATE: ${passed ? "PASS" : "FAIL"}`,
+  );
 }
 
 function runWorker(
@@ -320,11 +339,20 @@ function preflight(): void {
 
   const candidateAncestor = spawnSync(
     "git",
-    ["-C", REPOSITORY_ROOT, "merge-base", "--is-ancestor", CANDIDATE_SOURCE, "HEAD"],
+    [
+      "-C",
+      REPOSITORY_ROOT,
+      "merge-base",
+      "--is-ancestor",
+      CANDIDATE_SOURCE,
+      "HEAD",
+    ],
     { encoding: "utf8" },
   );
   if (candidateAncestor.status !== 0) {
-    throw new Error(`Candidate source ${CANDIDATE_SOURCE} is not an ancestor of HEAD`);
+    throw new Error(
+      `Candidate source ${CANDIDATE_SOURCE} is not an ancestor of HEAD`,
+    );
   }
 }
 
@@ -358,14 +386,14 @@ function cleanupBaselineWorktree(): void {
     { encoding: "utf8" },
   );
   if (remove.status !== 0) {
-    throw new Error(`Failed to remove CP3-R baseline worktree:\n${remove.stderr}`);
+    throw new Error(
+      `Failed to remove CP3-R baseline worktree:\n${remove.stderr}`,
+    );
   }
 
-  const prune = spawnSync(
-    "git",
-    ["-C", REPOSITORY_ROOT, "worktree", "prune"],
-    { encoding: "utf8" },
-  );
+  const prune = spawnSync("git", ["-C", REPOSITORY_ROOT, "worktree", "prune"], {
+    encoding: "utf8",
+  });
   if (prune.status !== 0) {
     throw new Error(`Failed to prune worktrees:\n${prune.stderr}`);
   }
