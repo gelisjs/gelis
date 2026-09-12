@@ -38,4 +38,20 @@ if text.count(cleanup) != 1:
     raise SystemExit("expected one sidecar migration cleanup")
 text = text.replace(cleanup, "  delete table.trailingParamFingerprints;", 1)
 
+clone_helper_old = """function cloneTrailingParamFingerprints(
+  fingerprints: Map<number, TrailingFingerprintEntry> | undefined,
+): Map<number, TrailingFingerprintEntry> | undefined {
+  if (fingerprints === undefined) {
+    return undefined;
+  }
+
+  const cloned = new Map<number, TrailingFingerprintEntry>();"""
+clone_helper_new = """function cloneTrailingParamFingerprints(
+  fingerprints: Map<number, TrailingFingerprintEntry>,
+): Map<number, TrailingFingerprintEntry> {
+  const cloned = new Map<number, TrailingFingerprintEntry>();"""
+if text.count(clone_helper_old) != 1:
+    raise SystemExit("expected one broad clone helper signature")
+text = text.replace(clone_helper_old, clone_helper_new, 1)
+
 path.write_text(text)
