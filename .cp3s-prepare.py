@@ -8,6 +8,10 @@ acceptance_source = Path(
 ).read_text()
 acceptance = acceptance_source.replace("CP3-R", "CP3-S")
 acceptance = acceptance.replace("cp3r", "cp3s")
+acceptance = acceptance.replace(
+    "cp3s-production-shape-fingerprint-worker.mts",
+    "cp3s-single-index-fingerprint-worker.mts",
+)
 acceptance = acceptance.replace(OLD_CANDIDATE, NEW_CANDIDATE)
 acceptance = acceptance.replace(
     "production-shape fingerprint candidate",
