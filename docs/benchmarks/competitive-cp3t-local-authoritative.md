@@ -15,66 +15,66 @@
 
 ## Pipeline translation cells
 
-| cell | variant | median ns/op | p25 | p75 | min | max |
-| --- | --- | ---: | ---: | ---: | ---: | ---: |
-| router-dynamic | production | 219.6 | 216.5 | 234.0 | 209.5 | 244.2 |
-| router-dynamic | candidate | 183.6 | 177.3 | 188.1 | 174.9 | 194.3 |
-| handler-string-stable | production | 218.2 | 215.6 | 222.3 | 213.2 | 232.1 |
-| handler-string-stable | candidate | 181.6 | 179.8 | 184.8 | 177.3 | 191.2 |
-| handler-string-param | production | 219.4 | 216.9 | 220.4 | 213.3 | 224.3 |
-| handler-string-param | candidate | 183.1 | 182.2 | 190.3 | 181.0 | 200.9 |
-| handler-json-stable | production | 219.1 | 216.7 | 222.8 | 214.9 | 313.0 |
-| handler-json-stable | candidate | 184.0 | 180.3 | 187.5 | 177.7 | 212.2 |
-| handler-json-param | production | 235.3 | 224.4 | 260.2 | 217.0 | 367.9 |
-| handler-json-param | candidate | 195.7 | 183.8 | 232.3 | 180.8 | 297.2 |
-| pipeline-string-stable | production | 933.8 | 914.7 | 948.2 | 907.1 | 1038.6 |
-| pipeline-string-stable | candidate | 898.4 | 880.6 | 922.3 | 872.3 | 982.2 |
-| pipeline-string-param | production | 983.7 | 967.9 | 998.1 | 950.3 | 1059.4 |
-| pipeline-string-param | candidate | 968.0 | 953.7 | 985.6 | 940.8 | 1113.9 |
-| pipeline-json-stable | production | 749.8 | 726.8 | 798.4 | 707.0 | 875.6 |
-| pipeline-json-stable | candidate | 689.8 | 683.8 | 704.1 | 672.7 | 727.5 |
-| pipeline-json-param | production | 747.0 | 740.0 | 769.2 | 732.7 | 938.0 |
-| pipeline-json-param | candidate | 733.6 | 712.0 | 781.1 | 700.5 | 953.1 |
+| cell                   | variant    | median ns/op |   p25 |   p75 |   min |    max |
+| ---------------------- | ---------- | -----------: | ----: | ----: | ----: | -----: |
+| router-dynamic         | production |        219.6 | 216.5 | 234.0 | 209.5 |  244.2 |
+| router-dynamic         | candidate  |        183.6 | 177.3 | 188.1 | 174.9 |  194.3 |
+| handler-string-stable  | production |        218.2 | 215.6 | 222.3 | 213.2 |  232.1 |
+| handler-string-stable  | candidate  |        181.6 | 179.8 | 184.8 | 177.3 |  191.2 |
+| handler-string-param   | production |        219.4 | 216.9 | 220.4 | 213.3 |  224.3 |
+| handler-string-param   | candidate  |        183.1 | 182.2 | 190.3 | 181.0 |  200.9 |
+| handler-json-stable    | production |        219.1 | 216.7 | 222.8 | 214.9 |  313.0 |
+| handler-json-stable    | candidate  |        184.0 | 180.3 | 187.5 | 177.7 |  212.2 |
+| handler-json-param     | production |        235.3 | 224.4 | 260.2 | 217.0 |  367.9 |
+| handler-json-param     | candidate  |        195.7 | 183.8 | 232.3 | 180.8 |  297.2 |
+| pipeline-string-stable | production |        933.8 | 914.7 | 948.2 | 907.1 | 1038.6 |
+| pipeline-string-stable | candidate  |        898.4 | 880.6 | 922.3 | 872.3 |  982.2 |
+| pipeline-string-param  | production |        983.7 | 967.9 | 998.1 | 950.3 | 1059.4 |
+| pipeline-string-param  | candidate  |        968.0 | 953.7 | 985.6 | 940.8 | 1113.9 |
+| pipeline-json-stable   | production |        749.8 | 726.8 | 798.4 | 707.0 |  875.6 |
+| pipeline-json-stable   | candidate  |        689.8 | 683.8 | 704.1 | 672.7 |  727.5 |
+| pipeline-json-param    | production |        747.0 | 740.0 | 769.2 | 732.7 |  938.0 |
+| pipeline-json-param    | candidate  |        733.6 | 712.0 | 781.1 | 700.5 |  953.1 |
 
 ## Candidate / production ratios
 
-| comparison | ratio | candidate advantage |
-| --- | ---: | ---: |
-| router dynamic | 0.8363x | 35.9 ns |
-| handler string stable | 0.8323x | 36.6 ns |
-| handler string param | 0.8346x | 36.3 ns |
-| handler JSON stable | 0.8399x | 35.1 ns |
-| handler JSON param | 0.8317x | 39.6 ns |
-| pipeline string stable | 0.9621x | 35.4 ns |
-| pipeline string param | 0.9840x | 15.7 ns |
-| pipeline JSON stable | 0.9200x | 60.0 ns |
-| pipeline JSON param | 0.9820x | 13.5 ns |
+| comparison             |   ratio | candidate advantage |
+| ---------------------- | ------: | ------------------: |
+| router dynamic         | 0.8363x |             35.9 ns |
+| handler string stable  | 0.8323x |             36.6 ns |
+| handler string param   | 0.8346x |             36.3 ns |
+| handler JSON stable    | 0.8399x |             35.1 ns |
+| handler JSON param     | 0.8317x |             39.6 ns |
+| pipeline string stable | 0.9621x |             35.4 ns |
+| pipeline string param  | 0.9840x |             15.7 ns |
+| pipeline JSON stable   | 0.9200x |             60.0 ns |
+| pipeline JSON param    | 0.9820x |             13.5 ns |
 
 ## Layer increments
 
-| layer increment | production | candidate | candidate - production |
-| --- | ---: | ---: | ---: |
-| handler stable string - router | -1.4 ns | -2.0 ns | -0.7 ns |
-| handler param string - handler stable string | 1.2 ns | 1.5 ns | 0.3 ns |
-| handler stable JSON - router | -0.5 ns | 0.4 ns | 0.9 ns |
-| handler param JSON - handler stable JSON | 16.2 ns | 11.6 ns | -4.5 ns |
-| normalize stable string | 715.6 ns | 716.8 ns | 1.2 ns |
-| normalize param string | 764.3 ns | 784.8 ns | 20.6 ns |
-| normalize stable JSON | 530.7 ns | 505.8 ns | -24.9 ns |
-| normalize param JSON | 511.8 ns | 537.9 ns | 26.1 ns |
+| layer increment                              | production | candidate | candidate - production |
+| -------------------------------------------- | ---------: | --------: | ---------------------: |
+| handler stable string - router               |    -1.4 ns |   -2.0 ns |                -0.7 ns |
+| handler param string - handler stable string |     1.2 ns |    1.5 ns |                 0.3 ns |
+| handler stable JSON - router                 |    -0.5 ns |    0.4 ns |                 0.9 ns |
+| handler param JSON - handler stable JSON     |    16.2 ns |   11.6 ns |                -4.5 ns |
+| normalize stable string                      |   715.6 ns |  716.8 ns |                 1.2 ns |
+| normalize param string                       |   764.3 ns |  784.8 ns |                20.6 ns |
+| normalize stable JSON                        |   530.7 ns |  505.8 ns |               -24.9 ns |
+| normalize param JSON                         |   511.8 ns |  537.9 ns |                26.1 ns |
 
 ## Router-win translation diagnostics
 
-| boundary | candidate advantage | retained vs router win |
-| --- | ---: | ---: |
-| handler-string-stable | 36.6 ns | 1.0186x |
-| handler-string-param | 36.3 ns | 1.0100x |
-| handler-json-stable | 35.1 ns | 0.9760x |
-| handler-json-param | 39.6 ns | 1.1021x |
-| pipeline-string-stable | 35.4 ns | 0.9862x |
-| pipeline-string-param | 15.7 ns | 0.4376x |
-| pipeline-json-stable | 60.0 ns | 1.6687x |
-| pipeline-json-param | 13.5 ns | 0.3751x |
+| boundary               | candidate advantage | retained vs router win |
+| ---------------------- | ------------------: | ---------------------: |
+| handler-string-stable  |             36.6 ns |                1.0186x |
+| handler-string-param   |             36.3 ns |                1.0100x |
+| handler-json-stable    |             35.1 ns |                0.9760x |
+| handler-json-param     |             39.6 ns |                1.1021x |
+| pipeline-string-stable |             35.4 ns |                0.9862x |
+| pipeline-string-param  |             15.7 ns |                0.4376x |
+| pipeline-json-stable   |             60.0 ns |                1.6687x |
+| pipeline-json-param    |             13.5 ns |                0.3751x |
 
 ## Interpretation
 
