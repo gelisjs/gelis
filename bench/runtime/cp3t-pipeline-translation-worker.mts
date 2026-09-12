@@ -84,8 +84,8 @@ const requestedCell = required(args.cell, "--cell");
 assertCell(requestedCell);
 const cell = requestedCell;
 const variant = requiredVariant(args.variant);
-const routerPath = required(args.routerPath, "--router-path");
-const probeOnly = args.probeOnly === "true";
+const routerPath = required(args["router-path"], "--router-path");
+const probeOnly = args["probe-only"] === "true";
 
 const routerModule = (await import(
   `${pathToFileURL(routerPath).href}?cp3t=${process.pid}-${Date.now()}`
