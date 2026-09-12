@@ -4,39 +4,53 @@
 
 CP3-P showed a material request-derived dynamic win from a fixed-cost trailing-prefix fingerprint, but its alternate router class regressed mixed static hits. CP3-Q then showed that when current and fingerprint variants share one identical static lookup path, fingerprint adds effectively no static-hit cost (`1.0012x`) and retains the dynamic/pipeline win. CP3-Q nevertheless failed because its shared-current abstraction was about `12.9%` slower than the actual production router on static hits.
 
-CP3-R removes that attribution weakness by comparing the actual production `Router` with a benchmark-local baseline clone whose `router.ts` source is copied byte-for-byte from the frozen production source, plus a candidate clone created by the smallest practical trailing-fingerprint changes to that production-shape implementation.
+CP3-R removes that attribution weakness completely: the baseline is the exact frozen production source checked out into a temporary detached Git worktree, while the candidate is the actual production-shaped `src/runtime/router.ts` on the CP3-R branch.
 
-The frozen production source is:
+Frozen production source:
 
 `8e43aad09759d60378b3fc174292850057ccfba3`
 
-No `src/**` changes are allowed in CP3-R.
+Frozen candidate source:
 
-## Source-shape rules
+`bda7c0668c38b45bb37afaea72f0b923eb37d64b`
 
-The CP3-R preparation step must create:
+No further `src/**` changes are allowed after the candidate source SHA above.
 
-- `bench/runtime/cp3r/baseline/router.ts`: byte-for-byte copy of frozen `src/runtime/router.ts`;
-- `bench/runtime/cp3r/baseline/types.ts`: a type re-export shim only, so the baseline router implementation itself is unchanged;
-- `bench/runtime/cp3r/candidate/router.ts`: production-shape clone differing only where necessary to replace the trailing-prefix string `Map` fast path with the fingerprint index;
-- `bench/runtime/cp3r/candidate/types.ts`: the same type re-export shim.
+## Candidate mechanics
 
-The candidate must keep the exact-static lookup block logically and textually unchanged from production. Fingerprint work may execute only after an exact-static miss.
+The candidate keeps the canonical `trailingParamRoutes: Map<string, ...>` for compatibility, migration, AOT/snapshot construction, and fallback semantics. It adds an optional fingerprint sidecar populated by ordinary route registration.
 
-The fingerprint candidate must remain exact, not probabilistic:
+The exact-static lookup remains first and unchanged. Fingerprint work executes only after an exact-static miss.
+
+For the trailing-parameter fast path:
 
 1. find the final slash;
-2. compute the frozen fixed-cost integer fingerprint from prefix length plus four nearby character codes;
+2. compute a fixed-cost integer fingerprint from prefix length plus four nearby character codes;
 3. look up the integer key;
-4. on a unique key, verify prefix length and `pathname.startsWith(prefix)`;
-5. on a collided key, fall back to an exact `Map<string, ...>`;
+4. on a unique key, verify exact prefix length and `pathname.startsWith(prefix)`;
+5. on a collided key, fall back to an exact `Map<string, ...>` lookup;
 6. slice/decode the final parameter exactly as production does.
 
-Generic multi-parameter routes remain on the existing production trie semantics.
+If a method table was created by an AOT/snapshot path without a fingerprint sidecar, routing falls back to the canonical trailing-prefix string `Map`.
+
+Generic multi-parameter routes remain on the existing production trie. Migration remains canonical-Map driven and releases the fingerprint sidecar when generic-trie mode takes over.
+
+## Exact baseline methodology
+
+The acceptance harness must create one temporary detached worktree from production SHA `8e43aad09759d60378b3fc174292850057ccfba3` outside the active repository directory.
+
+Fresh worker processes dynamically import:
+
+- baseline router: `<temporary-production-worktree>/src/runtime/router.ts`;
+- candidate router: active CP3-R branch `src/runtime/router.ts`.
+
+This means the baseline is not a reimplementation, clone, or benchmark-local router abstraction. It is the exact production router source.
+
+The acceptance harness must remove the exact temporary worktree in `finally`, run `git worktree prune`, and must not leave benchmark worktrees behind after probe, successful timing, or failure.
 
 ## Correctness scope
 
-Before timing, the probe must verify for production, baseline clone, and candidate where applicable:
+Before timing, baseline and candidate probes must verify:
 
 - exact static precedence over a trailing parameter;
 - trailing parameter extraction;
@@ -47,57 +61,58 @@ Before timing, the probe must verify for production, baseline clone, and candida
 - generic multi-parameter routing;
 - migration from trailing-only mode to generic trie mode;
 - `matchingMethods()` behavior;
-- batch registration behavior used by `registerBatchAtomic()`;
-- forced fingerprint collision exactness.
+- transactional `registerBatchAtomic()` success and duplicate rollback behavior;
+- forced fingerprint-collision topology remains exact;
+- string and JSON response pipeline correctness.
 
-The baseline clone must also be source-identical to frozen production `router.ts` apart from the adjacent type-shim resolution environment.
+The repository `bun run check` must also pass on the frozen candidate source, covering package/type/runtime/AOT integration.
 
 ## Protocol
 
 - Runtime: Bun `1.4.2`
 - Bun revision: `744846f844374847c902b5e7fd59b4342a51ef99`
 - Routes: `5,000`
-- Samples: `11` fresh-worker samples per cell with rotated order
-- Warmup: `20,000` operations per worker
-- Timed target: approximately `120 ms` after calibration
-- Worktree must be clean
-- `src/**` must be byte-equivalent to frozen production source `8e43aad09759d60378b3fc174292850057ccfba3`
+- Samples: `11` mirrored fresh-worker samples per baseline/candidate pair
+- Pair order alternates baseline-first and candidate-first
+- Warmup for hot-path cells: `20,000` operations per worker
+- Timed target for hot-path cells: approximately `120 ms` after calibration
+- Mixed topology: `2,500` exact static routes + `2,500` trailing-parameter routes
+- Worktree must be clean before the harness creates its temporary baseline worktree
+- `src/**` must be byte-equivalent to frozen candidate SHA `bda7c0668c38b45bb37afaea72f0b923eb37d64b`
 
-## Timed cells
+## Timed pairs
 
-Mixed topology contains `2,500` exact static and `2,500` trailing-parameter routes.
+1. mixed static request
+2. mixed trailing-dynamic request
+3. generic multi-parameter dynamic request
+4. trailing string pipeline
+5. trailing JSON pipeline
+6. forced fingerprint-collision request
+7. registration of `5,000` trailing-parameter routes
+8. retained router heap delta after registering `5,000` trailing-parameter routes
 
-1. production mixed static request
-2. baseline-clone mixed static request
-3. candidate mixed static request
-4. production mixed dynamic request
-5. baseline-clone mixed dynamic request
-6. candidate mixed dynamic request
-7. baseline-clone string pipeline
-8. candidate string pipeline
-9. baseline-clone JSON pipeline
-10. candidate JSON pipeline
-11. baseline-clone forced-collision request
-12. candidate forced-collision request
+Registration timing excludes construction of the route-record array. Memory measurement keeps the same prebuilt route array alive before and after router construction, invokes `Bun.gc(true)` when available, and measures `process.memoryUsage().heapUsed` delta so route-record payload memory is not attributed to the router index.
 
 ## Frozen gates
 
 These limits are fixed before local timing:
 
-| gate                                         |            limit | purpose                                                                    |
-| -------------------------------------------- | ---------------: | -------------------------------------------------------------------------- |
-| baseline clone / production static fidelity  | `0.95x .. 1.05x` | copied production source must faithfully reproduce production static cost  |
-| baseline clone / production dynamic fidelity | `0.95x .. 1.05x` | copied production source must faithfully reproduce production dynamic cost |
-| candidate / baseline static                  |       `<= 1.02x` | fingerprint candidate must preserve static hot path                        |
-| candidate / baseline dynamic                 |       `<= 0.90x` | dynamic win must remain material in production-shaped code                 |
-| candidate string/JSON pipeline geomean       |       `<= 0.98x` | routing gain must survive response construction                            |
-| candidate forced-collision fallback          |       `<= 1.15x` | exact collision handling must remain bounded                               |
+| gate | candidate / production limit | purpose |
+| --- | ---: | --- |
+| mixed static request | `<= 1.02x` | dynamic optimization must preserve exact-static hot path |
+| mixed trailing-dynamic request | `<= 0.90x` | dynamic win must remain material in actual production-shaped source |
+| generic multi-param dynamic request | `<= 1.03x` | trailing optimization must not materially regress the generic trie |
+| string/JSON pipeline geomean | `<= 0.98x` | routing win must survive response construction |
+| forced-collision fallback | `<= 1.15x` | exact collision handling must remain bounded |
+| trailing-route registration | `<= 1.75x` | startup/registration overhead must remain bounded |
+| retained router heap delta | `<= 1.50x` | sidecar memory overhead must remain bounded |
 
-All six gates must pass before engineering the fingerprint mechanism into actual `src/runtime/router.ts` is justified.
+All seven gates must pass for CP3-R to justify HTTP revalidation of this candidate. Passing CP3-R does not promote the source.
 
 ## Interpretation rules
 
-- A valid unfavorable result is retained and not rerun because a gate fails.
-- If either baseline-clone fidelity gate fails, performance comparisons against the candidate are not sufficient to justify a production source candidate even if candidate ratios are favorable.
-- PASS does not promote any code. It only permits the next phase to implement the mechanism in actual production source and run full correctness, registration/memory, runtime, HTTP, package/type, and competitive revalidation gates.
-- FAIL means the source-shape hypothesis is not sufficiently established and the remaining discrepancy must be decomposed further.
+- A valid unfavorable result is preserved and not rerun merely because a gate fails.
+- A probe/harness/worktree failure before valid timing is `INVALID`, not a performance FAIL.
+- PASS permits the next phase to perform HTTP competitive revalidation of the exact candidate source.
+- FAIL rejects this exact candidate under the frozen gates; favorable sub-results may still guide a narrower redesign.
+- No universal framework-performance claim follows from this direct-runtime gate.
