@@ -1,0 +1,26 @@
+name: CP4-L Correctness Probe
+
+on:
+  push:
+    branches:
+      - work/competitive-cp4l-static-capability-elision
+    paths:
+      - .cp4l-probe-trigger
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: work/competitive-cp4l-static-capability-elision
+          fetch-depth: 0
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+      - run: bun install --frozen-lockfile
+      - name: CP4-L correctness probe only
+        run: bun bench/runtime/cp4l-static-capability-elision-acceptance.mts --probe-only
