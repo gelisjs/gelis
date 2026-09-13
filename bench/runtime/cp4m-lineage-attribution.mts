@@ -150,7 +150,9 @@ function runProbe(): void {
     for (const source of SOURCES) {
       const result = runWorker(spec.cell, source.label, true);
       if (!result.probeOnly || result.cell !== spec.cell) {
-        throw new Error(`Invalid probe result for ${source.label} ${spec.cell}`);
+        throw new Error(
+          `Invalid probe result for ${source.label} ${spec.cell}`,
+        );
       }
       console.log(`PASS ${source.label}-${spec.cell}`);
     }
@@ -192,7 +194,9 @@ function runTiming(): void {
     for (const source of SOURCES) {
       const input = values.get(key(spec.cell, source.label));
       if (input === undefined || input.length !== SAMPLES) {
-        throw new Error(`Incomplete timing set for ${source.label} ${spec.cell}`);
+        throw new Error(
+          `Incomplete timing set for ${source.label} ${spec.cell}`,
+        );
       }
       summaries.set(
         key(spec.cell, source.label),
@@ -225,7 +229,9 @@ function runTiming(): void {
 
   console.log();
   console.log("Adjacent lineage ratios");
-  console.log("| comparison | production -> CP4-B | CP4-B -> CP4-F | CP4-F -> CP4-I |");
+  console.log(
+    "| comparison | production -> CP4-B | CP4-B -> CP4-F | CP4-F -> CP4-I |",
+  );
   console.log("| --- | ---: | ---: | ---: |");
   for (const cell of ["static-only-raw", "mixed-static-raw"] as const) {
     console.log(
@@ -234,7 +240,9 @@ function runTiming(): void {
   }
 
   console.log();
-  console.log(`Frozen static attribution boundary: > ${STATIC_BOUNDARY.toFixed(4)}x vs production`);
+  console.log(
+    `Frozen static attribution boundary: > ${STATIC_BOUNDARY.toFixed(4)}x vs production`,
+  );
   console.log(
     `Static-only first crossing: ${firstCrossing(summaries, "static-only-raw")}`,
   );
@@ -440,9 +448,13 @@ function gitAt(cwd: string, args: readonly string[]): string {
 process.on("exit", () => {
   for (const path of worktrees.values()) {
     if (basename(path).startsWith("gelis-cp4m-")) {
-      spawnSync("git", ["-C", REPOSITORY_ROOT, "worktree", "remove", "--force", path], {
-        encoding: "utf8",
-      });
+      spawnSync(
+        "git",
+        ["-C", REPOSITORY_ROOT, "worktree", "remove", "--force", path],
+        {
+          encoding: "utf8",
+        },
+      );
     }
   }
 });
