@@ -272,16 +272,6 @@ export class Router {
       return undefined;
     }
 
-    /*
-     * Generic trie matching already requires a materialized pathname.
-     * Reuse the method table resolved above instead of dispatching through
-     * match(), which would perform a second method-map lookup and capability
-     * branch before entering the generic trie.
-     */
-    if (table.usesDynamicTrie) {
-      return matchGenericMethodTable(table, pathnameFromRequestUrl(url));
-    }
-
     let authorityStart: number;
 
     if (
@@ -401,35 +391,7 @@ export class Router {
 
     pathname ??= url.slice(pathStart, pathEnd);
 
-    const captures: number[] = [];
-    const dynamicRoute = matchDynamicPath(
-      table.dynamicRoot,
-      pathname,
-      captures,
-    );
-
-    if (!dynamicRoute) {
-      return undefined;
-    }
-
-    const params: Record<string, string> = {};
-
-    for (let index = 0; index < dynamicRoute.paramNames.length; index++) {
-      const name = dynamicRoute.paramNames[index];
-      const start = captures[index * 2];
-      const end = captures[index * 2 + 1];
-
-      if (name === undefined || start === undefined || end === undefined) {
-        continue;
-      }
-
-      params[name] = decodeParam(pathname.slice(start, end));
-    }
-
-    return {
-      route: dynamicRoute.route,
-      params,
-    };
+    return matchGenericDynamicTable(table, pathname);
   }
 
   matchingMethods(pathname: string): string[] {
@@ -459,19 +421,10 @@ export class Router {
   }
 }
 
-function matchGenericMethodTable(
+function matchGenericDynamicTable(
   table: MethodRoutes,
   pathname: string,
 ): RuntimeRouteMatch | undefined {
-  const staticRoute = table.staticRoutes.get(pathname);
-
-  if (staticRoute) {
-    return {
-      route: staticRoute,
-      params: EMPTY_PARAMS,
-    };
-  }
-
   const captures: number[] = [];
   const dynamicRoute = matchDynamicPath(table.dynamicRoot, pathname, captures);
 
