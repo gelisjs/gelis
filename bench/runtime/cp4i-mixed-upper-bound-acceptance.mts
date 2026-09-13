@@ -409,7 +409,7 @@ function cleanupWorktree(): void {
 
   const list = git(["worktree", "list", "--porcelain"]);
   if (list.includes(basename(CONTROL_WORKTREE)) && cleanupError === undefined) {
-    cleanupError = new Error("CP4-F control worktree remained after cleanup");
+    cleanupError = new Error("CP4-I control worktree remained after cleanup");
   }
 
   if (cleanupError !== undefined) throw cleanupError;
