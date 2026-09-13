@@ -11,7 +11,10 @@ const KIND_ONLY_SOURCE = "408f9856f814184ca0204aa49d3812af8660f077";
 const ROUTES = 5_000;
 const SAMPLES = 12;
 const HERE = dirname(fileURLToPath(import.meta.url));
-const WORKER = join(HERE, "cp4ad-dead-metadata-component-attribution-worker.mts");
+const WORKER = join(
+  HERE,
+  "cp4ad-dead-metadata-component-attribution-worker.mts",
+);
 const REPOSITORY_ROOT = resolve(HERE, "../..");
 const RUN_TOKEN = `${process.pid}-${Date.now()}`;
 const CP4Z_WORKTREE = resolve(
