@@ -266,20 +266,10 @@ export class Router {
   }
 
   matchRequestUrl(method: string, url: string): RuntimeRouteMatch | undefined {
-    let table = this.#methods.get(method);
+    const table = this.#methods.get(method);
 
     if (!table) {
-      if (method === "*") {
-        return undefined;
-      }
-
-      table = this.#methods.get("*");
-
-      if (!table) {
-        return undefined;
-      }
-
-      method = "*";
+      return undefined;
     }
 
     /*
