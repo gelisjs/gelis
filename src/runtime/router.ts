@@ -53,6 +53,8 @@ export interface MethodRoutes {
 
   staticPathLengthMin?: number;
 
+  staticPathLeadMask?: number;
+
   staticPathLengthMax?: number;
 
   trailingParamRoutes: Map<string, TrailingParamRoute> | undefined;
@@ -350,17 +352,32 @@ export class Router {
     let pathname: string | undefined;
 
     /*
-     * Preserve CP4-I's upper-bound negative discrimination, but restore the
-     * CP4-E ordering for the exact-static lane. This isolates request-dispatch
-     * control flow from the already-frozen registration metadata shape.
+     * Runtime-created tables carry a conservative bitmask derived from the
+     * first UTF-16 code unit after the leading slash of each static path. A
+     * missing bit proves that no exact static route can match this request,
+     * so dynamic requests may skip substring allocation + Map lookup. When
+     * the bit is present, perform the canonical exact lookup directly without
+     * paying the upper-bound discriminator on the static-hit path.
+     *
+     * Legacy/AOT/prebuilt tables without this metadata retain CP4-AI's
+     * conservative static-length upper-bound behavior. Bit collisions are
+     * harmless false positives and only cause the canonical lookup.
      */
     if (table.staticRoutes.size !== 0) {
-      const staticPathLengthMax = table.staticPathLengthMax;
+      const staticPathLeadMask = table.staticPathLeadMask;
+      let mayMatchStatic: boolean;
 
-      if (
-        staticPathLengthMax === undefined ||
-        pathEnd - pathStart <= staticPathLengthMax
-      ) {
+      if (staticPathLeadMask === undefined) {
+        const staticPathLengthMax = table.staticPathLengthMax;
+        mayMatchStatic =
+          staticPathLengthMax === undefined ||
+          pathEnd - pathStart <= staticPathLengthMax;
+      } else {
+        const leadBit = 1 << (url.charCodeAt(pathStart + 1) & 31);
+        mayMatchStatic = (staticPathLeadMask & leadBit) !== 0;
+      }
+
+      if (mayMatchStatic) {
         pathname = url.slice(pathStart, pathEnd);
 
         const staticRoute = table.staticRoutes.get(pathname);
@@ -669,7 +686,7 @@ function createMethodRoutes(): MethodRoutes {
 
     fastMapKind: FAST_MAP_STATIC_ONLY,
 
-    staticPathLengthMin: Number.POSITIVE_INFINITY,
+    staticPathLeadMask: 0,
 
     staticPathLengthMax: Number.NEGATIVE_INFINITY,
 
@@ -692,6 +709,10 @@ function cloneMethodRoutes(table: MethodRoutes): MethodRoutes {
     ...(table.staticPathLengthMin === undefined
       ? {}
       : { staticPathLengthMin: table.staticPathLengthMin }),
+
+    ...(table.staticPathLeadMask === undefined
+      ? {}
+      : { staticPathLeadMask: table.staticPathLeadMask }),
 
     ...(table.staticPathLengthMax === undefined
       ? {}
@@ -781,10 +802,16 @@ function registerRouteIntoTable(
 
     const pathLength = route.path.length;
     const staticPathLengthMin = table.staticPathLengthMin;
+    const staticPathLeadMask = table.staticPathLeadMask;
     const staticPathLengthMax = table.staticPathLengthMax;
 
     if (staticPathLengthMin !== undefined && pathLength < staticPathLengthMin) {
       table.staticPathLengthMin = pathLength;
+    }
+
+    if (staticPathLeadMask !== undefined) {
+      const leadCode = route.path.charCodeAt(1) & 31;
+      table.staticPathLeadMask = staticPathLeadMask | (1 << leadCode);
     }
 
     if (staticPathLengthMax !== undefined && pathLength > staticPathLengthMax) {
