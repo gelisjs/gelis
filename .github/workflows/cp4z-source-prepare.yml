@@ -1,0 +1,37 @@
+name: CP4-Z Source Prepare
+
+on:
+  push:
+    branches:
+      - work/competitive-cp4z-mixed-static-first-generic-table
+    paths:
+      - .cp4z-source-trigger
+
+permissions:
+  contents: write
+
+jobs:
+  prepare:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: work/competitive-cp4z-mixed-static-first-generic-table
+          fetch-depth: 0
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+      - run: bun install --frozen-lockfile
+      - name: Apply mixed-static-first generic table specialization
+        run: python .github/scripts/cp4z_mixed_static_first_generic_table.py
+      - name: Format source
+        run: bunx prettier --write src/runtime/router.ts
+      - name: Full quality
+        run: bun run check
+      - name: Commit source candidate
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/runtime/router.ts
+          git commit -m "perf(router): preserve static URL fast path in mixed tables"
+          git push origin HEAD:work/competitive-cp4z-mixed-static-first-generic-table
