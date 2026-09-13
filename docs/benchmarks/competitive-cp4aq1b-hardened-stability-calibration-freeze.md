@@ -1,8 +1,8 @@
-# CP4-AQ1 hardened benchmark stability calibration freeze
+# CP4-AQ1B hardened benchmark stability calibration freeze
 
 ## Purpose
 
-CP4-AQ1 calibrates a hardened local benchmark runner before any further Gelis performance acceptance work. It compares byte-identical production source against itself and therefore measures environment/estimator stability only.
+CP4-AQ1B calibrates a hardened local benchmark runner before any further Gelis performance acceptance work. It compares byte-identical production source against itself and therefore measures environment/estimator stability only.
 
 This phase cannot reclassify CP4-AO, CP4-AP, or any Gelis source performance result.
 
@@ -40,6 +40,8 @@ The worker is byte-identical to the CP4-AO/CP4-AQ0 worker and covers the same 12
 - each block contains `4 A→B` and `4 B→A` pairs
 - both A and B use detached worktrees pointing to the same source SHA
 - timed workers on Windows run at `HIGH` process priority
+- Windows workers are launched through PowerShell `Start-Process`; affinity and priority are set on the child process before its measured warmup/calibration completes
+- `cmd start /wait` is explicitly not used because AQ1 infrastructure testing showed it can fail or hang on the authoritative local Windows environment
 - timed workers are pinned to one logical CPU: `logicalCpuCount - 2`
 - on the authoritative 12-logical-CPU host this is logical CPU `10`, affinity mask `0x400`
 - correctness probes do not apply affinity/priority and may run on CI
@@ -95,14 +97,18 @@ Every hotpath cell must satisfy all of:
 
 All 12 cells must pass for:
 
-`CP4-AQ1 HARDENED BENCHMARK 2%-GATE READINESS: PASS`
+`CP4-AQ1B HARDENED BENCHMARK 2%-GATE READINESS: PASS`
 
 Any failure means this exact hardened runner is not yet accepted for future 2% performance gates. There is no rerun of an unchanged failed calibration to search for a passing result; a new calibration requires a changed mechanism and a new frozen phase.
 
 ## Interpretation contract
 
-- CP4-AQ1 is calibration-only.
+- CP4-AQ1B is calibration-only.
 - No historical performance ratio is recomputed or chained from this result.
 - CP4-AO remains classified by its first valid frozen run under its own protocol.
 - CP4-AQ remains paused until a hardened benchmark protocol is accepted.
-- The first valid completed local timed CP4-AQ1 run is authoritative for this calibration phase.
+- The first valid completed local timed CP4-AQ1B run is authoritative for this calibration phase.
+
+## AQ1B launcher-only delta
+
+AQ1B changes only the Windows worker launcher implementation. Source SHA, worker measurement kernel, workloads, block structure, sample count, estimators, bootstrap procedure, readiness thresholds, CPU affinity target, and `HIGH` priority requirement are unchanged from AQ1. The failed AQ1 local timing attempt produced no completed worker measurement and therefore was not authoritative.

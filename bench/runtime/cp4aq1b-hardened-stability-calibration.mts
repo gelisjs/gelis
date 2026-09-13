@@ -15,19 +15,19 @@ const EXPECTED_LOCAL_LOGICAL_CPUS = 12;
 const HERE = dirname(fileURLToPath(import.meta.url));
 const WORKER = resolve(
   HERE,
-  "cp4aq1-hardened-stability-calibration-worker.mts",
+  "cp4aq1b-hardened-stability-calibration-worker.mts",
 );
 const REPOSITORY_ROOT = resolve(HERE, "../..");
 const RUN_TOKEN = `${process.pid}-${Date.now()}`;
 const WORKTREE_A = resolve(
   REPOSITORY_ROOT,
   "..",
-  `gelis-cp4aq1-a-${RUN_TOKEN}`,
+  `gelis-cp4aq1b-a-${RUN_TOKEN}`,
 );
 const WORKTREE_B = resolve(
   REPOSITORY_ROOT,
   "..",
-  `gelis-cp4aq1-b-${RUN_TOKEN}`,
+  `gelis-cp4aq1b-b-${RUN_TOKEN}`,
 );
 
 type Source = "a" | "b";
@@ -169,16 +169,16 @@ try {
 if (probeCompleted) {
   console.log();
   console.log(
-    `CP4-AQ1 CORRECTNESS PROBE: PASS (${CELLS.length * SOURCES.length}/${CELLS.length * SOURCES.length})`,
+    `CP4-AQ1B CORRECTNESS PROBE: PASS (${CELLS.length * SOURCES.length}/${CELLS.length * SOURCES.length})`,
   );
 } else if (completed) {
   console.log();
-  console.log("CP4-AQ1 LOCAL HARDENED STABILITY CALIBRATION RUN: COMPLETE");
+  console.log("CP4-AQ1B LOCAL HARDENED STABILITY CALIBRATION RUN: COMPLETE");
 }
 
 function printHeader(): void {
   console.log(
-    "Competitive Performance v0.1 — CP4-AQ1 hardened benchmark stability calibration",
+    "Competitive Performance v0.1 — CP4-AQ1B hardened benchmark stability calibration",
   );
   console.log(`Bun:             ${Bun.version}`);
   console.log(`Revision:        ${Bun.revision}`);
@@ -373,7 +373,7 @@ function printReadiness(diagnostics: ReadonlyMap<Cell, CellDiagnostics>): void {
   let ready = true;
 
   console.log();
-  console.log("Frozen CP4-AQ1 benchmark-readiness criteria");
+  console.log("Frozen CP4-AQ1B benchmark-readiness criteria");
   console.log(
     "| comparison | aggregate bias | bootstrap CI | order spread | block deviation | result |",
   );
@@ -400,7 +400,7 @@ function printReadiness(diagnostics: ReadonlyMap<Cell, CellDiagnostics>): void {
 
   console.log();
   console.log(
-    `CP4-AQ1 HARDENED BENCHMARK 2%-GATE READINESS: ${ready ? "PASS" : "FAIL"}`,
+    `CP4-AQ1B HARDENED BENCHMARK 2%-GATE READINESS: ${ready ? "PASS" : "FAIL"}`,
   );
   console.log(
     "AQ1 is environment/estimator calibration only; this readiness result does not reclassify Gelis source performance.",
@@ -511,19 +511,27 @@ function runWorker(
 }
 
 function spawnPinnedWindowsWorker(args: readonly string[]) {
+  const bunPath = quotePowerShell(process.execPath);
+  const argumentList = args.map(quotePowerShell).join(", ");
   const command = [
-    "start",
-    '""',
-    "/b",
-    "/wait",
-    "/high",
-    "/affinity",
-    affinityMaskHex,
-    quoteCmd(process.execPath),
-    ...args.map(quoteCmd),
-  ].join(" ");
+    "$ErrorActionPreference = 'Stop'",
+    "$out = [IO.Path]::GetTempFileName()",
+    "$err = [IO.Path]::GetTempFileName()",
+    `try { $p = Start-Process -FilePath ${bunPath} -ArgumentList @(${argumentList}) -PassThru -WindowStyle Hidden -RedirectStandardOutput $out -RedirectStandardError $err`,
+    `$p.ProcessorAffinity = [IntPtr]0x${affinityMaskHex}`,
+    "$p.PriorityClass = 'High'",
+    "$p.WaitForExit()",
+    "$code = $p.ExitCode",
+    "if (Test-Path $out) { [Console]::Out.Write([IO.File]::ReadAllText($out)) }",
+    "if (Test-Path $err) { [Console]::Error.Write([IO.File]::ReadAllText($err)) }",
+    "exit $code } finally { Remove-Item -LiteralPath $out,$err -Force -ErrorAction SilentlyContinue }",
+  ].join("; ");
 
-  return spawnSync("cmd.exe", ["/d", "/s", "/c", command], workerOptions());
+  return spawnSync(
+    "powershell.exe",
+    ["-NoLogo", "-NoProfile", "-NonInteractive", "-Command", command],
+    workerOptions(),
+  );
 }
 
 function workerOptions() {
@@ -535,37 +543,36 @@ function workerOptions() {
   };
 }
 
-function quoteCmd(value: string): string {
-  if (value.includes('"')) {
-    throw new Error(`Unsupported quote in Windows command argument: ${value}`);
-  }
-  return `"${value}"`;
+function quotePowerShell(value: string): string {
+  return `'${value.replaceAll("'", "''")}'`;
 }
 
 function preflight(): void {
   if (Bun.version !== EXPECTED_BUN) {
-    throw new Error(`CP4-AQ1 requires Bun ${EXPECTED_BUN}, got ${Bun.version}`);
+    throw new Error(
+      `CP4-AQ1B requires Bun ${EXPECTED_BUN}, got ${Bun.version}`,
+    );
   }
   if (Bun.revision !== EXPECTED_BUN_REVISION) {
     throw new Error(
-      `CP4-AQ1 requires Bun revision ${EXPECTED_BUN_REVISION}, got ${Bun.revision}`,
+      `CP4-AQ1B requires Bun revision ${EXPECTED_BUN_REVISION}, got ${Bun.revision}`,
     );
   }
 
   const dirty = git(["status", "--porcelain"]);
   if (dirty !== "") {
-    throw new Error(`CP4-AQ1 requires a clean worktree:\n${dirty}`);
+    throw new Error(`CP4-AQ1B requires a clean worktree:\n${dirty}`);
   }
 
   if (!probeOnly) {
     if (process.platform !== "win32") {
       throw new Error(
-        "CP4-AQ1 timed calibration is authoritative only on Windows",
+        "CP4-AQ1B timed calibration is authoritative only on Windows",
       );
     }
     if (logicalCpuCount !== EXPECTED_LOCAL_LOGICAL_CPUS) {
       throw new Error(
-        `CP4-AQ1 timed calibration requires ${EXPECTED_LOCAL_LOGICAL_CPUS} logical CPUs, got ${logicalCpuCount}`,
+        `CP4-AQ1B timed calibration requires ${EXPECTED_LOCAL_LOGICAL_CPUS} logical CPUs, got ${logicalCpuCount}`,
       );
     }
   }
