@@ -1,0 +1,26 @@
+name: CP4-M Correctness Probe
+
+on:
+  push:
+    branches:
+      - work/competitive-cp4m-lineage-attribution
+    paths:
+      - .cp4m-probe-trigger
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: work/competitive-cp4m-lineage-attribution
+          fetch-depth: 0
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+      - run: bun install --frozen-lockfile
+      - name: CP4-M correctness probe only
+        run: bun bench/runtime/cp4m-lineage-attribution.mts --probe-only
