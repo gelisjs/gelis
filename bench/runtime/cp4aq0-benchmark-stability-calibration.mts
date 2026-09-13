@@ -11,11 +11,22 @@ const BLOCKS = 5;
 const PAIRS_PER_BLOCK = 8;
 const PAIRS = BLOCKS * PAIRS_PER_BLOCK;
 const HERE = dirname(fileURLToPath(import.meta.url));
-const WORKER = resolve(HERE, "cp4aq0-benchmark-stability-calibration-worker.mts");
+const WORKER = resolve(
+  HERE,
+  "cp4aq0-benchmark-stability-calibration-worker.mts",
+);
 const REPOSITORY_ROOT = resolve(HERE, "../..");
 const RUN_TOKEN = `${process.pid}-${Date.now()}`;
-const WORKTREE_A = resolve(REPOSITORY_ROOT, "..", `gelis-cp4aq0-a-${RUN_TOKEN}`);
-const WORKTREE_B = resolve(REPOSITORY_ROOT, "..", `gelis-cp4aq0-b-${RUN_TOKEN}`);
+const WORKTREE_A = resolve(
+  REPOSITORY_ROOT,
+  "..",
+  `gelis-cp4aq0-a-${RUN_TOKEN}`,
+);
+const WORKTREE_B = resolve(
+  REPOSITORY_ROOT,
+  "..",
+  `gelis-cp4aq0-b-${RUN_TOKEN}`,
+);
 
 type Source = "a" | "b";
 type Order = "a-b" | "b-a";
@@ -252,15 +263,21 @@ function printPairedNoise(results: ReadonlyMap<Cell, PairResult[]>): void {
   for (const spec of CELLS) {
     const ratios = getPairs(results, spec.cell).map((pair) => pair.ratio);
     const summary = summarizeRatios(ratios);
-    const outside1 = ratios.filter((ratio) => Math.abs(ratio - 1) > 0.01).length;
-    const outside2 = ratios.filter((ratio) => Math.abs(ratio - 1) > 0.02).length;
+    const outside1 = ratios.filter(
+      (ratio) => Math.abs(ratio - 1) > 0.01,
+    ).length;
+    const outside2 = ratios.filter(
+      (ratio) => Math.abs(ratio - 1) > 0.02,
+    ).length;
     console.log(
       `| ${spec.label} | ${summary.median.toFixed(4)}x | ${summary.p05.toFixed(4)}x | ${summary.p25.toFixed(4)}x | ${summary.p75.toFixed(4)}x | ${summary.p95.toFixed(4)}x | ${summary.min.toFixed(4)}x | ${summary.max.toFixed(4)}x | ${outside1}/${PAIRS} | ${outside2}/${PAIRS} |`,
     );
   }
 }
 
-function printOrderConditioning(results: ReadonlyMap<Cell, PairResult[]>): void {
+function printOrderConditioning(
+  results: ReadonlyMap<Cell, PairResult[]>,
+): void {
   console.log();
   console.log("Order-conditioned paired B / A medians");
   console.log("| comparison | A→B | B→A | absolute median spread |");
@@ -309,7 +326,9 @@ function printBlockwiseRatios(results: ReadonlyMap<Cell, PairResult[]>): void {
   }
 }
 
-function printGlobalDiagnostics(results: ReadonlyMap<Cell, PairResult[]>): void {
+function printGlobalDiagnostics(
+  results: ReadonlyMap<Cell, PairResult[]>,
+): void {
   let worstP05Deflation = 0;
   let worstP95Inflation = 0;
   let worstCell = "";
