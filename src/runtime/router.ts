@@ -272,6 +272,8 @@ export class Router {
       return undefined;
     }
 
+    const fastMapKind = table.fastMapKind;
+
     let authorityStart: number;
 
     if (
@@ -311,11 +313,28 @@ export class Router {
     let pathname: string | undefined;
 
     /*
-     * Preserve CP4-I's upper-bound negative discrimination, but restore the
-     * CP4-E ordering for the exact-static lane. This isolates request-dispatch
-     * control flow from the already-frozen registration metadata shape.
+     * Runtime-created fast-map tables already carry a registration-time kind.
+     * Use it only as a read-only specialization hint while preserving CP4-Z's
+     * exact-static-before-generic ordering. Legacy/prebuilt tables without
+     * the metadata retain the conservative CP4-Z path below.
      */
-    if (table.staticRoutes.size !== 0) {
+    if (fastMapKind === FAST_MAP_STATIC_ONLY) {
+      const staticRoute = table.staticRoutes.get(url.slice(pathStart, pathEnd));
+
+      if (staticRoute) {
+        return {
+          route: staticRoute,
+          params: EMPTY_PARAMS,
+        };
+      }
+
+      return undefined;
+    }
+
+    if (
+      fastMapKind !== FAST_MAP_TRAILING_ONLY &&
+      table.staticRoutes.size !== 0
+    ) {
       const staticPathLengthMax = table.staticPathLengthMax;
 
       if (
@@ -338,7 +357,7 @@ export class Router {
     const trailingParamFingerprints = table.trailingParamFingerprints;
     const trailingParamRoutes = table.trailingParamRoutes;
 
-    if (!table.usesDynamicTrie) {
+    if (fastMapKind !== undefined || !table.usesDynamicTrie) {
       if (
         pathEnd - pathStart > 1 &&
         (trailingParamFingerprints !== undefined ||
