@@ -138,7 +138,9 @@ if (probeCompleted) {
 }
 
 function printHeader(): void {
-  console.log("Competitive Performance v0.1 — CP4-N mixed-static sub-lineage attribution");
+  console.log(
+    "Competitive Performance v0.1 — CP4-N mixed-static sub-lineage attribution",
+  );
   console.log(`Bun:            ${Bun.version}`);
   console.log(`Revision:       ${Bun.revision}`);
   console.log(`CPU:            ${cpu}`);

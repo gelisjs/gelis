@@ -22,34 +22,34 @@ The first valid local timed run is authoritative as-is. It must not be rerun mer
 
 ## Lineage medians
 
-| Cell | Production | CP4-B | CP4-F | CP4-I | Unit |
-| --- | ---: | ---: | ---: | ---: | --- |
-| static-only raw | 822.2 | 796.9 | 828.7 | 806.7 | ns/op |
-| mixed static raw | 789.9 | 799.3 | 815.3 | 808.6 | ns/op |
-| mixed dynamic raw | 946.6 | 962.4 | 875.7 | 888.1 | ns/op |
-| mixed dynamic JSON | 735.7 | 731.1 | 683.1 | 675.9 | ns/op |
-| pure trailing dynamic raw | 974.8 | 868.9 | 884.2 | 890.6 | ns/op |
-| generic dynamic raw | 1178.7 | 1170.3 | 1195.3 | 1177.4 | ns/op |
-| ALL dynamic raw | 963.0 | 877.1 | 881.0 | 899.6 | ns/op |
+| Cell                      | Production |  CP4-B |  CP4-F |  CP4-I | Unit  |
+| ------------------------- | ---------: | -----: | -----: | -----: | ----- |
+| static-only raw           |      822.2 |  796.9 |  828.7 |  806.7 | ns/op |
+| mixed static raw          |      789.9 |  799.3 |  815.3 |  808.6 | ns/op |
+| mixed dynamic raw         |      946.6 |  962.4 |  875.7 |  888.1 | ns/op |
+| mixed dynamic JSON        |      735.7 |  731.1 |  683.1 |  675.9 | ns/op |
+| pure trailing dynamic raw |      974.8 |  868.9 |  884.2 |  890.6 | ns/op |
+| generic dynamic raw       |     1178.7 | 1170.3 | 1195.3 | 1177.4 | ns/op |
+| ALL dynamic raw           |      963.0 |  877.1 |  881.0 |  899.6 | ns/op |
 
 ## Direct ratios versus production
 
-| Comparison | CP4-B | CP4-F | CP4-I |
-| --- | ---: | ---: | ---: |
-| static-only raw | 0.9693x | 1.0079x | 0.9812x |
-| mixed static raw | 1.0119x | 1.0321x | 1.0237x |
-| mixed dynamic raw | 1.0167x | 0.9251x | 0.9383x |
-| mixed dynamic JSON | 0.9937x | 0.9286x | 0.9188x |
+| Comparison                |   CP4-B |   CP4-F |   CP4-I |
+| ------------------------- | ------: | ------: | ------: |
+| static-only raw           | 0.9693x | 1.0079x | 0.9812x |
+| mixed static raw          | 1.0119x | 1.0321x | 1.0237x |
+| mixed dynamic raw         | 1.0167x | 0.9251x | 0.9383x |
+| mixed dynamic JSON        | 0.9937x | 0.9286x | 0.9188x |
 | pure trailing dynamic raw | 0.8914x | 0.9071x | 0.9137x |
-| generic dynamic raw | 0.9929x | 1.0141x | 0.9989x |
-| ALL dynamic raw | 0.9108x | 0.9148x | 0.9342x |
+| generic dynamic raw       | 0.9929x | 1.0141x | 0.9989x |
+| ALL dynamic raw           | 0.9108x | 0.9148x | 0.9342x |
 
 ## Adjacent lineage ratios
 
-| Comparison | Production -> CP4-B | CP4-B -> CP4-F | CP4-F -> CP4-I |
-| --- | ---: | ---: | ---: |
-| static-only raw | 0.9693x | 1.0399x | 0.9735x |
-| mixed static raw | 1.0119x | 1.0199x | 0.9919x |
+| Comparison       | Production -> CP4-B | CP4-B -> CP4-F | CP4-F -> CP4-I |
+| ---------------- | ------------------: | -------------: | -------------: |
+| static-only raw  |             0.9693x |        1.0399x |        0.9735x |
+| mixed static raw |             1.0119x |        1.0199x |        0.9919x |
 
 ## Frozen attribution boundary
 
