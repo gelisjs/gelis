@@ -15,19 +15,19 @@ const EXPECTED_LOCAL_LOGICAL_CPUS = 12;
 const HERE = dirname(fileURLToPath(import.meta.url));
 const WORKER = resolve(
   HERE,
-  "cp4aq1b-hardened-stability-calibration-worker.mts",
+  "cp4aq1c-hardened-stability-calibration-worker.mts",
 );
 const REPOSITORY_ROOT = resolve(HERE, "../..");
 const RUN_TOKEN = `${process.pid}-${Date.now()}`;
 const WORKTREE_A = resolve(
   REPOSITORY_ROOT,
   "..",
-  `gelis-cp4aq1b-a-${RUN_TOKEN}`,
+  `gelis-cp4aq1c-a-${RUN_TOKEN}`,
 );
 const WORKTREE_B = resolve(
   REPOSITORY_ROOT,
   "..",
-  `gelis-cp4aq1b-b-${RUN_TOKEN}`,
+  `gelis-cp4aq1c-b-${RUN_TOKEN}`,
 );
 
 type Source = "a" | "b";
@@ -135,6 +135,7 @@ const CELLS: readonly CellSpec[] = [
 
 const SOURCES: readonly Source[] = ["a", "b"];
 const probeOnly = process.argv.includes("--probe-only");
+const launcherProbeOnly = process.argv.includes("--launcher-probe");
 const harnessSha = git(["rev-parse", "HEAD"]);
 const cpu = cpus()[0]?.model ?? "unknown";
 const logicalCpuCount = cpus().length;
@@ -143,6 +144,7 @@ const affinityMaskHex = (1n << BigInt(affinityLogicalCpu)).toString(16);
 let worktreeACreated = false;
 let worktreeBCreated = false;
 let probeCompleted = false;
+let launcherProbeCompleted = false;
 let completed = false;
 
 preflight();
@@ -158,6 +160,9 @@ try {
   if (probeOnly) {
     runProbe();
     probeCompleted = true;
+  } else if (launcherProbeOnly) {
+    runLauncherProbe();
+    launcherProbeCompleted = true;
   } else {
     runTiming();
     completed = true;
@@ -169,16 +174,19 @@ try {
 if (probeCompleted) {
   console.log();
   console.log(
-    `CP4-AQ1B CORRECTNESS PROBE: PASS (${CELLS.length * SOURCES.length}/${CELLS.length * SOURCES.length})`,
+    `CP4-AQ1C CORRECTNESS PROBE: PASS (${CELLS.length * SOURCES.length}/${CELLS.length * SOURCES.length})`,
   );
+} else if (launcherProbeCompleted) {
+  console.log();
+  console.log("CP4-AQ1C WINDOWS LAUNCHER PROBE: PASS (2/2)");
 } else if (completed) {
   console.log();
-  console.log("CP4-AQ1B LOCAL HARDENED STABILITY CALIBRATION RUN: COMPLETE");
+  console.log("CP4-AQ1C LOCAL HARDENED STABILITY CALIBRATION RUN: COMPLETE");
 }
 
 function printHeader(): void {
   console.log(
-    "Competitive Performance v0.1 — CP4-AQ1B hardened benchmark stability calibration",
+    "Competitive Performance v0.1 — CP4-AQ1C hardened benchmark stability calibration",
   );
   console.log(`Bun:             ${Bun.version}`);
   console.log(`Revision:        ${Bun.revision}`);
@@ -190,6 +198,12 @@ function printHeader(): void {
   console.log(`Routes:          ${ROUTES.toLocaleString("en-US")}`);
   if (probeOnly) {
     console.log("Mode:            correctness probe only");
+  } else if (launcherProbeOnly) {
+    console.log("Mode:            Windows launcher infrastructure probe only");
+    console.log(
+      `Windows affinity: logical CPU ${affinityLogicalCpu} (0x${affinityMaskHex})`,
+    );
+    console.log("Worker priority: HIGH");
   } else {
     console.log(`Blocks:          ${BLOCKS}`);
     console.log(`Pairs/block:     ${PAIRS_PER_BLOCK}`);
@@ -216,6 +230,24 @@ function runProbe(): void {
       console.log(`PASS ${source}-${spec.cell}`);
     }
   }
+}
+
+function runLauncherProbe(): void {
+  const hotpath = runWorker("static-only-raw", "a", false);
+  if (
+    hotpath.probeOnly ||
+    hotpath.metric === null ||
+    hotpath.unit !== "ns/op"
+  ) {
+    throw new Error("Invalid AQ1C hotpath launcher probe result");
+  }
+  console.log("PASS pinned-high-priority-worker static-only-raw");
+
+  const memory = runWorker("static-memory", "b", false);
+  if (memory.probeOnly || memory.metric === null || memory.unit !== "bytes") {
+    throw new Error("Invalid AQ1C memory launcher probe result");
+  }
+  console.log("PASS pinned-high-priority-worker static-memory");
 }
 
 function runTiming(): void {
@@ -373,7 +405,7 @@ function printReadiness(diagnostics: ReadonlyMap<Cell, CellDiagnostics>): void {
   let ready = true;
 
   console.log();
-  console.log("Frozen CP4-AQ1B benchmark-readiness criteria");
+  console.log("Frozen CP4-AQ1C benchmark-readiness criteria");
   console.log(
     "| comparison | aggregate bias | bootstrap CI | order spread | block deviation | result |",
   );
@@ -400,7 +432,7 @@ function printReadiness(diagnostics: ReadonlyMap<Cell, CellDiagnostics>): void {
 
   console.log();
   console.log(
-    `CP4-AQ1B HARDENED BENCHMARK 2%-GATE READINESS: ${ready ? "PASS" : "FAIL"}`,
+    `CP4-AQ1C HARDENED BENCHMARK 2%-GATE READINESS: ${ready ? "PASS" : "FAIL"}`,
   );
   console.log(
     "AQ1 is environment/estimator calibration only; this readiness result does not reclassify Gelis source performance.",
@@ -517,14 +549,20 @@ function spawnPinnedWindowsWorker(args: readonly string[]) {
     "$ErrorActionPreference = 'Stop'",
     "$out = [IO.Path]::GetTempFileName()",
     "$err = [IO.Path]::GetTempFileName()",
-    `try { $p = Start-Process -FilePath ${bunPath} -ArgumentList @(${argumentList}) -PassThru -WindowStyle Hidden -RedirectStandardOutput $out -RedirectStandardError $err`,
+    "$gate = [IO.Path]::GetTempFileName()",
+    "Remove-Item -LiteralPath $gate -Force -ErrorAction SilentlyContinue",
+    `try { $arguments = @(${argumentList}); $arguments += ('--launch-gate=' + $gate); $p = Start-Process -FilePath ${bunPath} -ArgumentList $arguments -PassThru -WindowStyle Hidden -RedirectStandardOutput $out -RedirectStandardError $err`,
+    "Start-Sleep -Milliseconds 25",
+    "$p.Refresh()",
     `$p.ProcessorAffinity = [IntPtr]0x${affinityMaskHex}`,
     "$p.PriorityClass = 'High'",
+    "[IO.File]::WriteAllText($gate, 'go')",
     "$p.WaitForExit()",
     "$code = $p.ExitCode",
+    "for ($i = 0; $i -lt 200; $i++) { $outLength = if (Test-Path $out) { (Get-Item -LiteralPath $out).Length } else { 0 }; $errLength = if (Test-Path $err) { (Get-Item -LiteralPath $err).Length } else { 0 }; if ($outLength -gt 0 -or $errLength -gt 0 -or $code -ne 0) { break }; Start-Sleep -Milliseconds 10 }",
     "if (Test-Path $out) { [Console]::Out.Write([IO.File]::ReadAllText($out)) }",
     "if (Test-Path $err) { [Console]::Error.Write([IO.File]::ReadAllText($err)) }",
-    "exit $code } finally { Remove-Item -LiteralPath $out,$err -Force -ErrorAction SilentlyContinue }",
+    "exit $code } finally { Remove-Item -LiteralPath $out,$err,$gate -Force -ErrorAction SilentlyContinue }",
   ].join("; ");
 
   return spawnSync(
@@ -550,29 +588,29 @@ function quotePowerShell(value: string): string {
 function preflight(): void {
   if (Bun.version !== EXPECTED_BUN) {
     throw new Error(
-      `CP4-AQ1B requires Bun ${EXPECTED_BUN}, got ${Bun.version}`,
+      `CP4-AQ1C requires Bun ${EXPECTED_BUN}, got ${Bun.version}`,
     );
   }
   if (Bun.revision !== EXPECTED_BUN_REVISION) {
     throw new Error(
-      `CP4-AQ1B requires Bun revision ${EXPECTED_BUN_REVISION}, got ${Bun.revision}`,
+      `CP4-AQ1C requires Bun revision ${EXPECTED_BUN_REVISION}, got ${Bun.revision}`,
     );
   }
 
   const dirty = git(["status", "--porcelain"]);
   if (dirty !== "") {
-    throw new Error(`CP4-AQ1B requires a clean worktree:\n${dirty}`);
+    throw new Error(`CP4-AQ1C requires a clean worktree:\n${dirty}`);
   }
 
   if (!probeOnly) {
     if (process.platform !== "win32") {
       throw new Error(
-        "CP4-AQ1B timed calibration is authoritative only on Windows",
+        "CP4-AQ1C timed calibration is authoritative only on Windows",
       );
     }
     if (logicalCpuCount !== EXPECTED_LOCAL_LOGICAL_CPUS) {
       throw new Error(
-        `CP4-AQ1B timed calibration requires ${EXPECTED_LOCAL_LOGICAL_CPUS} logical CPUs, got ${logicalCpuCount}`,
+        `CP4-AQ1C timed calibration requires ${EXPECTED_LOCAL_LOGICAL_CPUS} logical CPUs, got ${logicalCpuCount}`,
       );
     }
   }

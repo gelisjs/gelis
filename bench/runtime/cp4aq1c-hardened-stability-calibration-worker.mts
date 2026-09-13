@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 
@@ -107,6 +108,10 @@ const cell = requestedCell;
 const variant = requiredVariant(args.variant);
 const sourceRoot = required(args.sourceRoot, "--source-root");
 const probeOnly = args.probeOnly === "true";
+const launchGate = args.launchGate;
+if (launchGate !== undefined) {
+  await waitForLaunchGate(launchGate);
+}
 
 const appPath = join(sourceRoot, "src/app.ts");
 const routerPath = join(sourceRoot, "src/runtime/router.ts");
@@ -516,6 +521,20 @@ interface ParsedArgs {
   readonly variant: string | undefined;
   readonly sourceRoot: string | undefined;
   readonly probeOnly: string | undefined;
+  readonly launchGate: string | undefined;
+}
+
+async function waitForLaunchGate(path: string): Promise<void> {
+  const deadline = Date.now() + 10_000;
+  while (Date.now() < deadline) {
+    try {
+      if (readFileSync(path, "utf8") === "go") return;
+    } catch {
+      // Parent creates the gate only after affinity and priority are applied.
+    }
+    await Bun.sleep(2);
+  }
+  throw new Error(`launch gate timeout: ${path}`);
 }
 
 function readArgs(values: readonly string[]): ParsedArgs {
@@ -532,6 +551,7 @@ function readArgs(values: readonly string[]): ParsedArgs {
     variant: entries.get("variant"),
     sourceRoot: entries.get("source-root"),
     probeOnly: entries.get("probe-only"),
+    launchGate: entries.get("launch-gate"),
   };
 }
 

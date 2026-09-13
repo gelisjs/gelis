@@ -1,8 +1,8 @@
-# CP4-AQ1B hardened benchmark stability calibration freeze
+# CP4-AQ1C hardened benchmark stability calibration freeze
 
 ## Purpose
 
-CP4-AQ1B calibrates a hardened local benchmark runner before any further Gelis performance acceptance work. It compares byte-identical production source against itself and therefore measures environment/estimator stability only.
+CP4-AQ1C calibrates a hardened local benchmark runner before any further Gelis performance acceptance work. It compares byte-identical production source against itself and therefore measures environment/estimator stability only.
 
 This phase cannot reclassify CP4-AO, CP4-AP, or any Gelis source performance result.
 
@@ -97,18 +97,32 @@ Every hotpath cell must satisfy all of:
 
 All 12 cells must pass for:
 
-`CP4-AQ1B HARDENED BENCHMARK 2%-GATE READINESS: PASS`
+`CP4-AQ1C HARDENED BENCHMARK 2%-GATE READINESS: PASS`
 
 Any failure means this exact hardened runner is not yet accepted for future 2% performance gates. There is no rerun of an unchanged failed calibration to search for a passing result; a new calibration requires a changed mechanism and a new frozen phase.
 
 ## Interpretation contract
 
-- CP4-AQ1B is calibration-only.
+- CP4-AQ1C is calibration-only.
 - No historical performance ratio is recomputed or chained from this result.
 - CP4-AO remains classified by its first valid frozen run under its own protocol.
 - CP4-AQ remains paused until a hardened benchmark protocol is accepted.
-- The first valid completed local timed CP4-AQ1B run is authoritative for this calibration phase.
+- The first valid completed local timed CP4-AQ1C run is authoritative for this calibration phase.
 
 ## AQ1B launcher-only delta
 
 AQ1B changes only the Windows worker launcher implementation. Source SHA, worker measurement kernel, workloads, block structure, sample count, estimators, bootstrap procedure, readiness thresholds, CPU affinity target, and `HIGH` priority requirement are unchanged from AQ1. The failed AQ1 local timing attempt produced no completed worker measurement and therefore was not authoritative.
+
+## AQ1C launcher correction
+
+AQ1B did not complete: the PowerShell launcher returned exit status `0` but an empty stdout capture for a `static-memory` worker before the final dataset and completion marker were produced. Therefore AQ1B created no authoritative timed calibration result.
+
+AQ1C preserves AQ1B's frozen workloads, block structure, sample counts, estimators, bootstrap procedure, and readiness criteria. It changes only launcher infrastructure:
+
+- timed workers receive a unique launch-gate path;
+- the worker waits at the gate before importing Gelis source or preparing the workload;
+- the parent starts the worker, applies logical-CPU affinity and `HIGH` priority, and only then writes `go` to the gate;
+- after process exit, stdout/stderr capture receives up to `2,000 ms` grace for redirected-file visibility before it is read;
+- temporary stdout, stderr, and gate files are removed after every worker.
+
+Before the first full timed AQ1C run, `--launcher-probe` may be run once on the authoritative local host. It executes one `static-only-raw` worker and one `static-memory` worker through the exact final gated launcher. Their metrics are discarded and are infrastructure-only; they are not Gelis performance evidence. A failed launcher probe is not a timed calibration run.
