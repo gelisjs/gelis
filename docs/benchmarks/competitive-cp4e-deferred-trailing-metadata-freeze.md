@@ -11,7 +11,7 @@ CP4-E keeps the CP4-D range representation and routing semantics but defers trai
 ## Frozen identities
 
 - Previous production source: `af4e5102046def1b163435333563b8d08f919bf5`
-- CP4-E candidate source: `f18e1131379f644ecdaf11132dceb2a8965fa430`
+- CP4-E candidate source: `f18e43623eeafe6356248b174b3ae2112bcc8e82`
 - Bun: `1.4.2`
 - Bun revision: `744846f844374847c902b5e7fd59b4342a51ef99`
 - Routes per workload: `5,000`

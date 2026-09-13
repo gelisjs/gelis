@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 const EXPECTED_BUN = "1.4.2";
 const EXPECTED_BUN_REVISION = "744846f844374847c902b5e7fd59b4342a51ef99";
 const PRODUCTION_SOURCE = "af4e5102046def1b163435333563b8d08f919bf5";
-const CANDIDATE_SOURCE = "f18e1131379f644ecdaf11132dceb2a8965fa430";
+const CANDIDATE_SOURCE = "f18e43623eeafe6356248b174b3ae2112bcc8e82";
 const ROUTES = 5_000;
 const SAMPLES = 11;
 const HERE = dirname(fileURLToPath(import.meta.url));
