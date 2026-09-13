@@ -23,21 +23,19 @@ CP4-AE must compare the exact candidate source directly against the frozen produ
 
 The gates and thresholds are identical to CP4-Z and CP4-AB direct production acceptance:
 
-| gate                          | limit      |
-| ----------------------------- | ---------- |
-| static-only raw               | `<=1.0200x` |
-| mixed static raw              | `<=1.0200x` |
-| mixed dynamic raw guard       | `<=1.0200x` |
-| mixed dynamic JSON guard      | `<=1.0200x` |
-| mixed dynamic geomean         | `<=0.9800x` |
-| mixed same-length dynamic raw | `<=1.0200x` |
-| pure trailing dynamic raw     | `<=0.9400x` |
-| pure trailing dynamic JSON    | `<=0.9500x` |
-| generic dynamic raw           | `<=1.0300x` |
-| forced collision raw          | `<=1.1500x` |
-| ALL dynamic raw               | `<=1.0500x` |
-| static registration           | `<=1.0500x` |
-| static retained heap          | `<=1.0500x` |
+- static-only raw: `<= 1.0200x`
+- mixed static raw: `<= 1.0200x`
+- mixed dynamic raw guard: `<= 1.0200x`
+- mixed dynamic JSON guard: `<= 1.0200x`
+- mixed dynamic geomean: `<= 0.9800x`
+- mixed same-length dynamic raw: `<= 1.0200x`
+- pure trailing dynamic raw: `<= 0.9400x`
+- pure trailing dynamic JSON: `<= 0.9500x`
+- generic dynamic raw: `<= 1.0300x`
+- forced collision raw: `<= 1.1500x`
+- ALL dynamic raw: `<= 1.0500x`
+- static registration: `<= 1.0500x`
+- static retained heap: `<= 1.0500x`
 
 Every gate must pass. No threshold may be changed after observing CP4-AE timing.
 
