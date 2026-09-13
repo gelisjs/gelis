@@ -1,0 +1,40 @@
+name: CP4-AB Freeze Acceptance
+
+on:
+  push:
+    branches:
+      - work/competitive-cp4ab-dead-routing-metadata-elimination
+
+permissions:
+  contents: write
+
+jobs:
+  freeze:
+    if: contains(github.event.head_commit.message, 'CP4AB_FREEZE_TRIGGER')
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: work/competitive-cp4ab-dead-routing-metadata-elimination
+          fetch-depth: 0
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+      - run: bun install --frozen-lockfile
+      - name: Verify frozen source identity
+        run: |
+          git merge-base --is-ancestor 2114489c11d555edfc13db2a6336435fd4879931 HEAD
+          git diff --quiet 2114489c11d555edfc13db2a6336435fd4879931 HEAD -- src
+      - name: Generate CP4-AB acceptance artifacts
+        run: python .github/scripts/cp4ab_freeze_acceptance.py
+      - name: Format permanent artifacts
+        run: bunx prettier --write bench/runtime/cp4ab-dead-routing-metadata-production-acceptance.mts bench/runtime/cp4ab-dead-routing-metadata-production-acceptance-worker.mts docs/benchmarks/competitive-cp4ab-dead-routing-metadata-production-acceptance-freeze.md
+      - name: Full quality
+        run: bun run check
+      - name: Commit permanent freeze artifacts
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add bench/runtime/cp4ab-dead-routing-metadata-production-acceptance.mts bench/runtime/cp4ab-dead-routing-metadata-production-acceptance-worker.mts docs/benchmarks/competitive-cp4ab-dead-routing-metadata-production-acceptance-freeze.md
+          git commit -m "bench: freeze CP4-AB direct production acceptance"
+          git push origin HEAD:work/competitive-cp4ab-dead-routing-metadata-elimination
