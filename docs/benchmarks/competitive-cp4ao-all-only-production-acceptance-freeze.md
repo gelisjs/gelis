@@ -55,21 +55,21 @@ CP4-AK is attribution-only. Candidate acceptance is determined exclusively by di
 
 All candidate/production gates must pass:
 
-| gate | limit |
-| --- | ---: |
-| static-only raw | <= 1.0200x |
-| mixed static raw | <= 1.0200x |
-| mixed dynamic raw guard | <= 1.0200x |
-| mixed dynamic JSON guard | <= 1.0200x |
+| gate                           |      limit |
+| ------------------------------ | ---------: |
+| static-only raw                | <= 1.0200x |
+| mixed static raw               | <= 1.0200x |
+| mixed dynamic raw guard        | <= 1.0200x |
+| mixed dynamic JSON guard       | <= 1.0200x |
 | mixed dynamic raw/JSON geomean | <= 0.9800x |
-| mixed same-length dynamic raw | <= 1.0200x |
-| pure trailing dynamic raw | <= 0.9400x |
-| pure trailing dynamic JSON | <= 0.9500x |
-| generic dynamic raw | <= 1.0300x |
-| forced collision raw | <= 1.1500x |
-| ALL dynamic raw | <= 1.0500x |
-| static registration | <= 1.0500x |
-| static retained heap | <= 1.0500x |
+| mixed same-length dynamic raw  | <= 1.0200x |
+| pure trailing dynamic raw      | <= 0.9400x |
+| pure trailing dynamic JSON     | <= 0.9500x |
+| generic dynamic raw            | <= 1.0300x |
+| forced collision raw           | <= 1.1500x |
+| ALL dynamic raw                | <= 1.0500x |
+| static registration            | <= 1.0500x |
+| static retained heap           | <= 1.0500x |
 
 These are the existing CP4 direct-production gates. They must not be relaxed after timing.
 
