@@ -1,0 +1,26 @@
+name: CP4-W Correctness Probe
+
+on:
+  push:
+    branches:
+      - work/competitive-cp4w-guardless-all-url-specialization
+    paths:
+      - .cp4w-probe-trigger
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: work/competitive-cp4w-guardless-all-url-specialization
+          fetch-depth: 0
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+      - run: bun install --frozen-lockfile
+      - name: CP4-W correctness probe only
+        run: bun bench/runtime/cp4w-guardless-all-url-specialization-acceptance.mts --probe-only
