@@ -22,18 +22,18 @@ This is the first valid completed local timed CP4-X run and is authoritative as-
 
 ## Direct CP4-X / CP4-I ratios
 
-| gate | ratio | limit | result |
-| --- | ---: | ---: | --- |
-| static-only guard | 0.9988x | <= 1.0200x | PASS |
-| mixed-static recovery | 0.9853x | <= 0.9963x | PASS |
-| mixed dynamic raw guard | 1.0071x | <= 1.0200x | PASS |
-| mixed dynamic JSON guard | 1.0054x | <= 1.0200x | PASS |
-| mixed same-length dynamic raw guard | 0.9935x | <= 1.0200x | PASS |
-| pure trailing dynamic raw guard | 1.0141x | <= 1.0200x | PASS |
-| pure trailing dynamic JSON guard | 1.0084x | <= 1.0200x | PASS |
-| generic dynamic raw guard | 1.0156x | <= 1.0200x | PASS |
-| forced collision raw guard | 0.9805x | <= 1.0200x | PASS |
-| ALL dynamic raw guard | 0.9948x | <= 1.0200x | PASS |
+| gate                                |   ratio |      limit | result |
+| ----------------------------------- | ------: | ---------: | ------ |
+| static-only guard                   | 0.9988x | <= 1.0200x | PASS   |
+| mixed-static recovery               | 0.9853x | <= 0.9963x | PASS   |
+| mixed dynamic raw guard             | 1.0071x | <= 1.0200x | PASS   |
+| mixed dynamic JSON guard            | 1.0054x | <= 1.0200x | PASS   |
+| mixed same-length dynamic raw guard | 0.9935x | <= 1.0200x | PASS   |
+| pure trailing dynamic raw guard     | 1.0141x | <= 1.0200x | PASS   |
+| pure trailing dynamic JSON guard    | 1.0084x | <= 1.0200x | PASS   |
+| generic dynamic raw guard           | 1.0156x | <= 1.0200x | PASS   |
+| forced collision raw guard          | 0.9805x | <= 1.0200x | PASS   |
+| ALL dynamic raw guard               | 0.9948x | <= 1.0200x | PASS   |
 
 Acceptance marker:
 
