@@ -24,27 +24,29 @@ Local correctness probe before timing: `PASS (21/21)`.
 
 ## Authoritative medians
 
-| cell | production | CP4-Z | KIND-only | unit |
-| --- | ---: | ---: | ---: | --- |
-| static-only raw | 780.0 | 812.3 | 792.0 | ns/op |
-| mixed static raw | 793.6 | 807.0 | 808.6 | ns/op |
-| mixed dynamic raw | 962.0 | 876.5 | 876.5 | ns/op |
-| pure trailing dynamic raw | 957.0 | 873.7 | 870.6 | ns/op |
-| generic dynamic raw | 1162.7 | 1154.4 | 1185.1 | ns/op |
-| ALL dynamic raw | 944.2 | 881.0 | 872.0 | ns/op |
-| static registration | 1.261 | 1.248 | 1.278 | ms |
+```text
+cell                           production   CP4-Z    KIND-only   unit
+static-only raw                780.0        812.3    792.0       ns/op
+mixed static raw               793.6        807.0    808.6       ns/op
+mixed dynamic raw              962.0        876.5    876.5       ns/op
+pure trailing dynamic raw      957.0        873.7    870.6       ns/op
+generic dynamic raw            1162.7       1154.4   1185.1      ns/op
+ALL dynamic raw                944.2        881.0    872.0       ns/op
+static registration            1.261        1.248    1.278       ms
+```
 
 ## Direct attribution ratios
 
-| comparison | Z / production | KIND / production | KIND / Z |
-| --- | ---: | ---: | ---: |
-| static-only raw | 1.0415x | 1.0155x | 0.9750x |
-| mixed static raw | 1.0169x | 1.0189x | 1.0020x |
-| mixed dynamic raw | 0.9112x | 0.9112x | 1.0000x |
-| pure trailing dynamic raw | 0.9130x | 0.9098x | 0.9965x |
-| generic dynamic raw | 0.9929x | 1.0192x | 1.0266x |
-| ALL dynamic raw | 0.9331x | 0.9235x | 0.9897x |
-| static registration | 0.9898x | 1.0134x | 1.0238x |
+```text
+comparison                     Z / production   KIND / production   KIND / Z
+static-only raw                1.0415x          1.0155x             0.9750x
+mixed static raw               1.0169x          1.0189x             1.0020x
+mixed dynamic raw              0.9112x          0.9112x             1.0000x
+pure trailing dynamic raw      0.9130x          0.9098x             0.9965x
+generic dynamic raw            0.9929x          1.0192x             1.0266x
+ALL dynamic raw                0.9331x          0.9235x             0.9897x
+static registration            0.9898x          1.0134x             1.0238x
+```
 
 ## Interpretation
 
