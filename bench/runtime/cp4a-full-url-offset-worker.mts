@@ -19,10 +19,7 @@ const DYNAMIC_PATH = `/r/${LAST}/${PARAM_VALUE}`;
 const DYNAMIC_REQUEST = new Request(`http://gelis.test${DYNAMIC_PATH}`);
 
 type PayloadKind =
-  | "string-stable"
-  | "string-param"
-  | "json-stable"
-  | "json-param";
+  "string-stable" | "string-param" | "json-stable" | "json-param";
 
 type Cell =
   | "current-router"
@@ -344,7 +341,9 @@ class OffsetTrailingRouter {
   register(route: RuntimeRouteRecord): void {
     const slash = route.path.lastIndexOf("/");
     if (slash < 0 || route.path.charCodeAt(slash + 1) !== 58) {
-      throw new Error(`CP4-A offset router only accepts trailing params: ${route.path}`);
+      throw new Error(
+        `CP4-A offset router only accepts trailing params: ${route.path}`,
+      );
     }
 
     const prefix = route.path.slice(0, slash + 1);
@@ -534,7 +533,9 @@ function assertOffsetExtraCorrectness(router: OffsetTrailingRouter): void {
     throw new Error("offset encoded param match failed");
   }
 
-  if (router.matchUrl("GET", "http://gelis.test/missing/value-42") !== undefined) {
+  if (
+    router.matchUrl("GET", "http://gelis.test/missing/value-42") !== undefined
+  ) {
     throw new Error("offset unknown route unexpectedly matched");
   }
 }

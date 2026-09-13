@@ -94,7 +94,9 @@ printHeader();
 if (probeOnly) {
   runProbe();
   console.log();
-  console.log(`CP4-A CORRECTNESS PROBE: PASS (${PAIRS.length * 2}/${PAIRS.length * 2})`);
+  console.log(
+    `CP4-A CORRECTNESS PROBE: PASS (${PAIRS.length * 2}/${PAIRS.length * 2})`,
+  );
 } else {
   runTiming();
   console.log();
@@ -102,9 +104,7 @@ if (probeOnly) {
 }
 
 function printHeader(): void {
-  console.log(
-    "Competitive Performance v0.1 — CP4-A full URL offset viability",
-  );
+  console.log("Competitive Performance v0.1 — CP4-A full URL offset viability");
   console.log(`Bun:         ${Bun.version}`);
   console.log(`Revision:    ${Bun.revision}`);
   console.log(`CPU:         ${cpu}`);
@@ -301,7 +301,9 @@ function preflight(): void {
     { encoding: "utf8" },
   );
   if (sourceDiff.status !== 0) {
-    throw new Error(`src/** differs from frozen production ${PRODUCTION_SOURCE}`);
+    throw new Error(
+      `src/** differs from frozen production ${PRODUCTION_SOURCE}`,
+    );
   }
 
   const sourceAncestor = spawnSync(
@@ -317,7 +319,9 @@ function preflight(): void {
     { encoding: "utf8" },
   );
   if (sourceAncestor.status !== 0) {
-    throw new Error(`Frozen production ${PRODUCTION_SOURCE} is not an ancestor of HEAD`);
+    throw new Error(
+      `Frozen production ${PRODUCTION_SOURCE} is not an ancestor of HEAD`,
+    );
   }
 }
 
@@ -353,7 +357,9 @@ function advantage(
   current: Cell,
   offset: Cell,
 ): number {
-  return getSummary(summaries, current).median - getSummary(summaries, offset).median;
+  return (
+    getSummary(summaries, current).median - getSummary(summaries, offset).median
+  );
 }
 
 function git(args: readonly string[]): string {
