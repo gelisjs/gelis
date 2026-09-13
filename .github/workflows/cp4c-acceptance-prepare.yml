@@ -1,0 +1,51 @@
+name: CP4-C Acceptance Prepare
+
+on:
+  push:
+    branches:
+      - work/competitive-cp4c-static-length-discriminator
+
+permissions:
+  contents: write
+
+jobs:
+  prepare:
+    if: github.event.head_commit.message == 'CP4C_ACCEPTANCE_TRIGGER'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: work/competitive-cp4c-static-length-discriminator
+          fetch-depth: 0
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+      - run: bun install --frozen-lockfile
+      - name: Format CP4-C decomposition files
+        run: |
+          bunx prettier --write \
+            bench/runtime/cp4c-static-length-discriminator-worker.mts \
+            bench/runtime/cp4c-static-length-discriminator-acceptance.mts \
+            docs/benchmarks/competitive-cp4c-static-length-discriminator-freeze.md
+          if ! git diff --quiet; then
+            git config user.name github-actions[bot]
+            git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+            git add \
+              bench/runtime/cp4c-static-length-discriminator-worker.mts \
+              bench/runtime/cp4c-static-length-discriminator-acceptance.mts \
+              docs/benchmarks/competitive-cp4c-static-length-discriminator-freeze.md
+            git commit -m "chore(competitive): format CP4-C decomposition harness"
+            git push origin HEAD:work/competitive-cp4c-static-length-discriminator
+          fi
+      - name: Full quality
+        run: bun run check
+      - name: CP4-C correctness probe
+        run: bun bench/runtime/cp4c-static-length-discriminator-acceptance.mts --probe-only
+      - name: Verify frozen source guard
+        run: git diff --quiet f6a1345ca5bee07870fbaa3d42321ed84439bf67 HEAD -- src
+      - name: Verify no CP4-C temporary worktree remains
+        run: |
+          if git worktree list --porcelain | grep -q 'gelis-cp4c-'; then
+            echo 'CP4-C temporary worktree remained after probe'
+            exit 1
+          fi
