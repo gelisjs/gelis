@@ -1,0 +1,37 @@
+name: CP4-AL Source Prepare
+
+on:
+  push:
+    branches:
+      - work/cp4al-all-dynamic-specialization-source
+    paths:
+      - .cp4al-source-trigger
+
+permissions:
+  contents: write
+
+jobs:
+  prepare:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: work/cp4al-all-dynamic-specialization-source
+          fetch-depth: 0
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+      - run: bun install --frozen-lockfile
+      - name: Apply ALL dynamic specialization
+        run: python .github/scripts/cp4al_all_dynamic_specialization.py
+      - name: Format candidate source
+        run: bunx prettier --write src/runtime/router.ts src/runtime/router-all.ts
+      - name: Full quality
+        run: bun run check
+      - name: Commit source candidate
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/runtime/router.ts src/runtime/router-all.ts
+          git commit -m "perf(router): isolate dynamic-only ALL request URL path"
+          git push origin HEAD:work/cp4al-all-dynamic-specialization-source
