@@ -240,7 +240,7 @@ function runTiming(): void {
   }
 
   console.log();
-  console.log("Blockwise candidate / AI control ratios");
+  console.log("Blockwise candidate / AK control ratios");
   console.log(
     "| comparison | block 1 | block 2 | block 3 | block 4 | candidate-faster blocks |",
   );
@@ -274,7 +274,7 @@ function runTiming(): void {
 
   console.log();
   console.log("Frozen CP4-AL ALL dynamic specialization viability gates");
-  console.log("| gate | candidate / AI control | limit | result |");
+  console.log("| gate | candidate / AK control | limit | result |");
   console.log("| --- | ---: | ---: | --- |");
 
   const limits = new Map<Cell, number>([
