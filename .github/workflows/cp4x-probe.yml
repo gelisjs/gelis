@@ -1,0 +1,26 @@
+name: CP4-X Correctness Probe
+
+on:
+  push:
+    branches:
+      - work/competitive-cp4x-generic-table-request-specialization
+    paths:
+      - .cp4x-probe-trigger
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: work/competitive-cp4x-generic-table-request-specialization
+          fetch-depth: 0
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+      - run: bun install --frozen-lockfile
+      - name: CP4-X correctness probe only
+        run: bun bench/runtime/cp4x-generic-table-request-specialization-acceptance.mts --probe-only
