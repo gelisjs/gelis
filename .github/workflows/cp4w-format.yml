@@ -1,0 +1,31 @@
+name: CP4-W Format
+
+on:
+  push:
+    branches:
+      - work/competitive-cp4w-guardless-all-url-specialization
+    paths:
+      - .cp4w-format-trigger
+
+permissions:
+  contents: write
+
+jobs:
+  format:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: work/competitive-cp4w-guardless-all-url-specialization
+          fetch-depth: 0
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+      - run: bun install --frozen-lockfile
+      - run: bunx prettier --write bench/runtime/cp4w-guardless-all-url-specialization-acceptance.mts docs/benchmarks/competitive-cp4w-guardless-all-url-specialization-freeze.md
+      - run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add bench/runtime/cp4w-guardless-all-url-specialization-acceptance.mts docs/benchmarks/competitive-cp4w-guardless-all-url-specialization-freeze.md
+          git commit -m "bench(competitive): format CP4-W balanced acceptance artifacts"
+          git push origin HEAD:work/competitive-cp4w-guardless-all-url-specialization
