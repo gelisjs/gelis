@@ -26,39 +26,42 @@ Local correctness probe before timing: `PASS (14/14)`.
 
 ## Overall medians
 
-| cell                      |   CP4-Z | KIND-only | unit  |
-| ------------------------- | ------: | --------: | ----- |
-| static-only raw           |   810.7 |     809.0 | ns/op |
-| mixed static raw          |   816.4 |     804.7 | ns/op |
-| mixed dynamic raw         |   870.0 |     892.0 | ns/op |
-| pure trailing dynamic raw |   872.7 |     889.0 | ns/op |
-| generic dynamic raw       |  1166.2 |    1174.5 | ns/op |
-| ALL dynamic raw           |   887.3 |     885.1 | ns/op |
-| static registration       |   1.248 |     1.271 | ms    |
+```text
+cell                           CP4-Z     KIND-only   unit
+static-only raw                810.7     809.0       ns/op
+mixed static raw               816.4     804.7       ns/op
+mixed dynamic raw              870.0     892.0       ns/op
+pure trailing dynamic raw      872.7     889.0       ns/op
+generic dynamic raw            1166.2    1174.5      ns/op
+ALL dynamic raw                887.3     885.1       ns/op
+static registration            1.248     1.271       ms
+```
 
 ## Overall KIND / Z ratios
 
-| comparison                | KIND / Z |
-| ------------------------- | -------: |
-| static-only raw           |  0.9979x |
-| mixed static raw          |  0.9857x |
-| mixed dynamic raw         |  1.0252x |
-| pure trailing dynamic raw |  1.0186x |
-| generic dynamic raw       |  1.0071x |
-| ALL dynamic raw           |  0.9975x |
-| static registration       |  1.0185x |
+```text
+comparison                     KIND / Z
+static-only raw                0.9979x
+mixed static raw               0.9857x
+mixed dynamic raw              1.0252x
+pure trailing dynamic raw      1.0186x
+generic dynamic raw            1.0071x
+ALL dynamic raw                0.9975x
+static registration            1.0185x
+```
 
 ## Blockwise KIND / Z ratios
 
-| comparison                | block 1 | block 2 | block 3 | block 4 | KIND-faster blocks |
-| ------------------------- | ------: | ------: | ------: | ------: | -----------------: |
-| static-only raw           | 0.9814x | 0.9956x | 0.9943x | 0.9937x |                4/4 |
-| mixed static raw          | 0.9809x | 0.9967x | 0.9802x | 0.9852x |                4/4 |
-| mixed dynamic raw         | 1.0359x | 1.0488x | 1.0496x | 1.0177x |                0/4 |
-| pure trailing dynamic raw | 1.0371x | 1.0184x | 1.0063x | 1.0171x |                0/4 |
-| generic dynamic raw       | 0.9832x | 1.0216x | 1.0181x | 1.0155x |                1/4 |
-| ALL dynamic raw           | 0.9905x | 0.9854x | 1.0179x | 1.0009x |                2/4 |
-| static registration       | 0.9989x | 1.0287x | 1.0409x | 1.0185x |                1/4 |
+```text
+comparison                     block 1   block 2   block 3   block 4   KIND-faster blocks
+static-only raw                0.9814x   0.9956x   0.9943x   0.9937x   4/4
+mixed static raw               0.9809x   0.9967x   0.9802x   0.9852x   4/4
+mixed dynamic raw              1.0359x   1.0488x   1.0496x   1.0177x   0/4
+pure trailing dynamic raw      1.0371x   1.0184x   1.0063x   1.0171x   0/4
+generic dynamic raw            0.9832x   1.0216x   1.0181x   1.0155x   1/4
+ALL dynamic raw                0.9905x   0.9854x   1.0179x   1.0009x   2/4
+static registration            0.9989x   1.0287x   1.0409x   1.0185x   1/4
+```
 
 ## Interpretation
 
