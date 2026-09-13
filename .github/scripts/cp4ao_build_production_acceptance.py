@@ -45,28 +45,8 @@ replacements = [
     ('candidate / Z', 'candidate / AK'),
     ('CP4-AI', 'CP4-AO'),
     (
-        'lazy request-URL capability direct production acceptance',
-        'ALL-only method-miss elision direct production acceptance',
-    ),
-    (
-        'lazy request-URL capability direct production acceptance gates',
-        'ALL-only method-miss elision direct production acceptance gates',
-    ),
-    (
-        'LAZY-CAPABILITY DIRECT PRODUCTION ACCEPTANCE GATE',
-        'ALL-ONLY METHOD-MISS ELISION DIRECT PRODUCTION ACCEPTANCE GATE',
-    ),
-    (
-        'LOCAL LAZY-CAPABILITY PRODUCTION ACCEPTANCE RUN: COMPLETE',
-        'LOCAL ALL-ONLY PRODUCTION ACCEPTANCE RUN: COMPLETE',
-    ),
-    (
         'if (sourceNames !== "src/runtime/router.ts") {',
         'if (sourceNames !== "src/runtime/router-all.ts\\nsrc/runtime/router.ts") {',
-    ),
-    (
-        'Unexpected CP4-AK -> CP4-AO src/** delta:',
-        'Unexpected CP4-AK -> CP4-AO src/** delta:',
     ),
 ]
 
@@ -75,22 +55,25 @@ for old, new in replacements:
         raise SystemExit(f"missing replacement token: {old}")
     text = text.replace(old, new, 1)
 
-# Replace remaining phase-specific labels that are expected to occur more than once.
+text = text.replace(
+    "Competitive Performance v0.1 — CP4-AO lazy request-URL capability direct production acceptance",
+    "Competitive Performance v0.1 — CP4-AO ALL-only method-miss elision direct production acceptance",
+)
 text = text.replace(
     "Frozen CP4-AO lazy request-URL capability direct production acceptance gates",
     "Frozen CP4-AO ALL-only method-miss elision direct production acceptance gates",
 )
 text = text.replace(
-    "Competitive Performance v0.1 — CP4-AO lazy request-URL capability direct production acceptance",
-    "Competitive Performance v0.1 — CP4-AO ALL-only method-miss elision direct production acceptance",
+    "CP4-AO LAZY-CAPABILITY DIRECT PRODUCTION ACCEPTANCE GATE",
+    "CP4-AO ALL-ONLY METHOD-MISS ELISION DIRECT PRODUCTION ACCEPTANCE GATE",
 )
 text = text.replace(
     "CP4-AO LOCAL LAZY-CAPABILITY PRODUCTION ACCEPTANCE RUN: COMPLETE",
     "CP4-AO LOCAL ALL-ONLY PRODUCTION ACCEPTANCE RUN: COMPLETE",
 )
 text = text.replace(
-    "CP4-AO LAZY-CAPABILITY DIRECT PRODUCTION ACCEPTANCE GATE",
-    "CP4-AO ALL-ONLY METHOD-MISS ELISION DIRECT PRODUCTION ACCEPTANCE GATE",
+    "Unexpected CP4-AK -> CP4-AO src/** delta:",
+    "Unexpected CP4-AK -> CP4-AO src/** delta:",
 )
 
 required = [
