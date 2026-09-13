@@ -1,0 +1,63 @@
+name: CP4-Q Freeze via Git REST
+
+on:
+  push:
+    branches:
+      - work/competitive-cp4q-deferred-upper-bound-dispatch
+    paths:
+      - .cp4q-rest-trigger
+
+permissions:
+  contents: write
+
+jobs:
+  freeze:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: work/competitive-cp4q-deferred-upper-bound-dispatch
+          fetch-depth: 0
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+      - run: bun install --frozen-lockfile
+      - name: Generate frozen artifacts
+        run: python .github/scripts/cp4q_harness_generate.py
+      - name: Format frozen artifacts
+        run: bunx prettier --write bench/runtime/cp4q-deferred-upper-bound-dispatch-acceptance.mts bench/runtime/cp4q-deferred-upper-bound-dispatch-worker.mts docs/benchmarks/competitive-cp4q-deferred-upper-bound-dispatch-freeze.md
+      - name: Full quality
+        run: bun run check
+      - name: Commit artifacts through Git REST
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          BRANCH: work/competitive-cp4q-deferred-upper-bound-dispatch
+        run: |
+          set -euo pipefail
+          base_sha="$(gh api "repos/$REPO/git/ref/heads/$BRANCH" --jq .object.sha)"
+          base_tree="$(gh api "repos/$REPO/git/commits/$base_sha" --jq .tree.sha)"
+
+          a_blob="$(jq -Rs '{content: ., encoding: "utf-8"}' bench/runtime/cp4q-deferred-upper-bound-dispatch-acceptance.mts | gh api --method POST "repos/$REPO/git/blobs" --input - --jq .sha)"
+          w_blob="$(jq -Rs '{content: ., encoding: "utf-8"}' bench/runtime/cp4q-deferred-upper-bound-dispatch-worker.mts | gh api --method POST "repos/$REPO/git/blobs" --input - --jq .sha)"
+          d_blob="$(jq -Rs '{content: ., encoding: "utf-8"}' docs/benchmarks/competitive-cp4q-deferred-upper-bound-dispatch-freeze.md | gh api --method POST "repos/$REPO/git/blobs" --input - --jq .sha)"
+
+          tree_sha="$(jq -n \
+            --arg base "$base_tree" \
+            --arg a "$a_blob" \
+            --arg w "$w_blob" \
+            --arg d "$d_blob" \
+            '{base_tree:$base,tree:[
+              {path:"bench/runtime/cp4q-deferred-upper-bound-dispatch-acceptance.mts",mode:"100644",type:"blob",sha:$a},
+              {path:"bench/runtime/cp4q-deferred-upper-bound-dispatch-worker.mts",mode:"100644",type:"blob",sha:$w},
+              {path:"docs/benchmarks/competitive-cp4q-deferred-upper-bound-dispatch-freeze.md",mode:"100644",type:"blob",sha:$d}
+            ]}' | gh api --method POST "repos/$REPO/git/trees" --input - --jq .sha)"
+
+          commit_sha="$(jq -n \
+            --arg message "bench(competitive): freeze CP4-Q deferred upper-bound dispatch viability" \
+            --arg tree "$tree_sha" \
+            --arg parent "$base_sha" \
+            '{message:$message,tree:$tree,parents:[$parent]}' | gh api --method POST "repos/$REPO/git/commits" --input - --jq .sha)"
+
+          jq -n --arg sha "$commit_sha" '{sha:$sha,force:false}' | gh api --method PATCH "repos/$REPO/git/refs/heads/$BRANCH" --input - >/dev/null
+          echo "CP4-Q frozen artifact commit: $commit_sha"
