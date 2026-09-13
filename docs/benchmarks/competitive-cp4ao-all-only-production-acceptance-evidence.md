@@ -24,20 +24,20 @@ Local correctness probe before timing: **PASS (36/36)**.
 
 ## Authoritative direct-production timing
 
-| cell | production median | CP4-AK median | candidate median | candidate / production | frozen limit | result |
-| --- | ---: | ---: | ---: | ---: | ---: | --- |
-| static-only raw | 784.0 ns/op | 801.8 ns/op | 788.6 ns/op | 1.0058x | <= 1.0200x | PASS |
-| mixed static raw | 801.2 ns/op | 823.1 ns/op | 806.8 ns/op | 1.0070x | <= 1.0200x | PASS |
-| mixed dynamic raw | 986.8 ns/op | 878.4 ns/op | 878.4 ns/op | 0.8901x | <= 1.0200x | PASS |
-| mixed dynamic JSON | 732.1 ns/op | 682.5 ns/op | 688.0 ns/op | 0.9398x | <= 1.0200x | PASS |
-| mixed same-length dynamic raw | 946.5 ns/op | 869.7 ns/op | 875.6 ns/op | 0.9251x | <= 1.0200x | PASS |
-| pure trailing dynamic raw | 964.2 ns/op | 882.9 ns/op | 882.0 ns/op | 0.9148x | <= 0.9400x | PASS |
-| pure trailing dynamic JSON | 743.8 ns/op | 670.9 ns/op | 674.1 ns/op | 0.9062x | <= 0.9500x | PASS |
-| generic dynamic raw | 1175.1 ns/op | 1153.5 ns/op | 1160.2 ns/op | 0.9873x | <= 1.0300x | PASS |
-| forced collision raw | 1045.1 ns/op | 977.6 ns/op | 970.9 ns/op | 0.9289x | <= 1.1500x | PASS |
-| ALL dynamic raw | 959.4 ns/op | 878.1 ns/op | 874.7 ns/op | 0.9117x | <= 1.0500x | PASS |
-| static registration | 1.275 ms | 1.256 ms | 1.236 ms | 0.9690x | <= 1.0500x | PASS |
-| static retained heap | 619117 bytes | 618519 bytes | 618368 bytes | 0.9988x | <= 1.0500x | PASS |
+| cell                          | production median | CP4-AK median | candidate median | candidate / production | frozen limit | result |
+| ----------------------------- | ----------------: | ------------: | ---------------: | ---------------------: | -----------: | ------ |
+| static-only raw               |       784.0 ns/op |   801.8 ns/op |      788.6 ns/op |                1.0058x |   <= 1.0200x | PASS   |
+| mixed static raw              |       801.2 ns/op |   823.1 ns/op |      806.8 ns/op |                1.0070x |   <= 1.0200x | PASS   |
+| mixed dynamic raw             |       986.8 ns/op |   878.4 ns/op |      878.4 ns/op |                0.8901x |   <= 1.0200x | PASS   |
+| mixed dynamic JSON            |       732.1 ns/op |   682.5 ns/op |      688.0 ns/op |                0.9398x |   <= 1.0200x | PASS   |
+| mixed same-length dynamic raw |       946.5 ns/op |   869.7 ns/op |      875.6 ns/op |                0.9251x |   <= 1.0200x | PASS   |
+| pure trailing dynamic raw     |       964.2 ns/op |   882.9 ns/op |      882.0 ns/op |                0.9148x |   <= 0.9400x | PASS   |
+| pure trailing dynamic JSON    |       743.8 ns/op |   670.9 ns/op |      674.1 ns/op |                0.9062x |   <= 0.9500x | PASS   |
+| generic dynamic raw           |      1175.1 ns/op |  1153.5 ns/op |     1160.2 ns/op |                0.9873x |   <= 1.0300x | PASS   |
+| forced collision raw          |      1045.1 ns/op |   977.6 ns/op |      970.9 ns/op |                0.9289x |   <= 1.1500x | PASS   |
+| ALL dynamic raw               |       959.4 ns/op |   878.1 ns/op |      874.7 ns/op |                0.9117x |   <= 1.0500x | PASS   |
+| static registration           |          1.275 ms |      1.256 ms |         1.236 ms |                0.9690x |   <= 1.0500x | PASS   |
+| static retained heap          |      619117 bytes |  618519 bytes |     618368 bytes |                0.9988x |   <= 1.0500x | PASS   |
 
 Mixed dynamic raw/JSON geomean: `0.9146x` against frozen limit `<= 0.9800x` — **PASS**.
 
@@ -45,20 +45,20 @@ Mixed dynamic raw/JSON geomean: `0.9146x` against frozen limit `<= 0.9800x` — 
 
 ## Same-run attribution
 
-| comparison | AK / production | candidate / production | candidate / AK |
-| --- | ---: | ---: | ---: |
-| static-only raw | 1.0227x | 1.0058x | 0.9835x |
-| mixed static raw | 1.0273x | 1.0070x | 0.9802x |
-| mixed dynamic raw | 0.8901x | 0.8901x | 1.0000x |
-| mixed dynamic JSON | 0.9323x | 0.9398x | 1.0080x |
-| mixed same-length dynamic raw | 0.9189x | 0.9251x | 1.0068x |
-| pure trailing dynamic raw | 0.9158x | 0.9148x | 0.9989x |
-| pure trailing dynamic JSON | 0.9019x | 0.9062x | 1.0048x |
-| generic dynamic raw | 0.9816x | 0.9873x | 1.0058x |
-| forced collision raw | 0.9354x | 0.9289x | 0.9931x |
-| ALL dynamic raw | 0.9153x | 0.9117x | 0.9961x |
-| static registration | 0.9851x | 0.9690x | 0.9836x |
-| static retained heap delta | 0.9990x | 0.9988x | 0.9998x |
+| comparison                    | AK / production | candidate / production | candidate / AK |
+| ----------------------------- | --------------: | ---------------------: | -------------: |
+| static-only raw               |         1.0227x |                1.0058x |        0.9835x |
+| mixed static raw              |         1.0273x |                1.0070x |        0.9802x |
+| mixed dynamic raw             |         0.8901x |                0.8901x |        1.0000x |
+| mixed dynamic JSON            |         0.9323x |                0.9398x |        1.0080x |
+| mixed same-length dynamic raw |         0.9189x |                0.9251x |        1.0068x |
+| pure trailing dynamic raw     |         0.9158x |                0.9148x |        0.9989x |
+| pure trailing dynamic JSON    |         0.9019x |                0.9062x |        1.0048x |
+| generic dynamic raw           |         0.9816x |                0.9873x |        1.0058x |
+| forced collision raw          |         0.9354x |                0.9289x |        0.9931x |
+| ALL dynamic raw               |         0.9153x |                0.9117x |        0.9961x |
+| static registration           |         0.9851x |                0.9690x |        0.9836x |
+| static retained heap delta    |         0.9990x |                0.9988x |        0.9998x |
 
 ## Interpretation
 
