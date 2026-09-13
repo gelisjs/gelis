@@ -91,21 +91,21 @@ For each cell pair:
 
 All gates are required.
 
-| gate | candidate / production limit | rationale |
-| --- | ---: | --- |
-| static-only raw | `<= 1.0200x` | pure-static routing must not materially regress |
-| mixed static raw | `<= 1.0200x` | mixed-table static exact hits must remain practical |
-| mixed dynamic raw guard | `<= 1.0200x` | no material raw regression |
-| mixed dynamic JSON guard | `<= 1.0200x` | no material JSON regression |
-| mixed dynamic geomean | `<= 0.9800x` | mixed tables must gain materially on average |
-| mixed same-length dynamic raw | `<= 1.0200x` | exact-static precedence fallback must remain near parity |
-| pure trailing dynamic raw | `<= 0.9400x` | retain a substantial real-app raw offset win |
-| pure trailing dynamic JSON | `<= 0.9500x` | retain a substantial real-app JSON offset win |
-| generic dynamic raw | `<= 1.0300x` | generic-trie fallback guard |
-| forced collision raw | `<= 1.1500x` | collision fallback guard |
-| ALL dynamic raw | `<= 1.0500x` | method-semantics fallback guard |
-| static registration | `<= 1.0500x` | constant-size range maintenance must stay cheap |
-| static retained heap | `<= 1.0500x` | new method-table metadata must stay memory-neutral in practice |
+| gate                          | candidate / production limit | rationale                                                      |
+| ----------------------------- | ---------------------------: | -------------------------------------------------------------- |
+| static-only raw               |                 `<= 1.0200x` | pure-static routing must not materially regress                |
+| mixed static raw              |                 `<= 1.0200x` | mixed-table static exact hits must remain practical            |
+| mixed dynamic raw guard       |                 `<= 1.0200x` | no material raw regression                                     |
+| mixed dynamic JSON guard      |                 `<= 1.0200x` | no material JSON regression                                    |
+| mixed dynamic geomean         |                 `<= 0.9800x` | mixed tables must gain materially on average                   |
+| mixed same-length dynamic raw |                 `<= 1.0200x` | exact-static precedence fallback must remain near parity       |
+| pure trailing dynamic raw     |                 `<= 0.9400x` | retain a substantial real-app raw offset win                   |
+| pure trailing dynamic JSON    |                 `<= 0.9500x` | retain a substantial real-app JSON offset win                  |
+| generic dynamic raw           |                 `<= 1.0300x` | generic-trie fallback guard                                    |
+| forced collision raw          |                 `<= 1.1500x` | collision fallback guard                                       |
+| ALL dynamic raw               |                 `<= 1.0500x` | method-semantics fallback guard                                |
+| static registration           |                 `<= 1.0500x` | constant-size range maintenance must stay cheap                |
+| static retained heap          |                 `<= 1.0500x` | new method-table metadata must stay memory-neutral in practice |
 
 The mixed dynamic geomean is `sqrt(mixedRawRatio * mixedJsonRatio)`.
 

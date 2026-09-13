@@ -368,7 +368,9 @@ function preflight(): void {
     { encoding: "utf8" },
   );
   if (sourceDiff.status !== 0) {
-    throw new Error(`src/** differs from frozen CP4-D source ${CANDIDATE_SOURCE}`);
+    throw new Error(
+      `src/** differs from frozen CP4-D source ${CANDIDATE_SOURCE}`,
+    );
   }
 
   const sourceAncestor = spawnSync(
@@ -384,7 +386,9 @@ function preflight(): void {
     { encoding: "utf8" },
   );
   if (sourceAncestor.status !== 0) {
-    throw new Error(`CP4-D source ${CANDIDATE_SOURCE} is not an ancestor of HEAD`);
+    throw new Error(
+      `CP4-D source ${CANDIDATE_SOURCE} is not an ancestor of HEAD`,
+    );
   }
 }
 
@@ -427,7 +431,9 @@ function cleanupWorktree(): void {
     list.includes(basename(PRODUCTION_WORKTREE)) &&
     cleanupError === undefined
   ) {
-    cleanupError = new Error("CP4-D production worktree remained after cleanup");
+    cleanupError = new Error(
+      "CP4-D production worktree remained after cleanup",
+    );
   }
 
   if (cleanupError !== undefined) throw cleanupError;
