@@ -27,20 +27,20 @@ Local correctness probe passed `24/24` before timing.
 
 These values are recomputed as `median(B) / median(A)` from the authoritative absolute-metric table.
 
-| cell | median(B) / median(A) |
-| --- | ---: |
-| static-only raw | 0.9967x |
-| mixed static raw | 1.0028x |
-| mixed dynamic raw | 1.0037x |
-| mixed dynamic JSON | 1.0030x |
-| mixed same-length dynamic raw | 1.0049x |
-| pure trailing dynamic raw | 0.9930x |
-| pure trailing dynamic JSON | 0.9950x |
-| generic dynamic raw | 0.9987x |
-| forced collision raw | 1.0088x |
-| ALL dynamic raw | 1.0041x |
-| static registration | 1.0080x |
-| static retained heap delta | 1.0000x |
+| cell                          | median(B) / median(A) |
+| ----------------------------- | --------------------: |
+| static-only raw               |               0.9967x |
+| mixed static raw              |               1.0028x |
+| mixed dynamic raw             |               1.0037x |
+| mixed dynamic JSON            |               1.0030x |
+| mixed same-length dynamic raw |               1.0049x |
+| pure trailing dynamic raw     |               0.9930x |
+| pure trailing dynamic JSON    |               0.9950x |
+| generic dynamic raw           |               0.9987x |
+| forced collision raw          |               1.0088x |
+| ALL dynamic raw               |               1.0041x |
+| static registration           |               1.0080x |
+| static retained heap delta    |               1.0000x |
 
 All hotpath/registration aggregate median ratios stayed within approximately `-0.70%` to `+0.88%` despite byte-identical sources.
 
@@ -48,20 +48,20 @@ All hotpath/registration aggregate median ratios stayed within approximately `-0
 
 Individual fresh-worker pair ratios were substantially noisier than aggregate medians.
 
-| cell | paired median | p05 | p95 | outside ±2% |
-| --- | ---: | ---: | ---: | ---: |
-| static-only raw | 0.9994x | 0.9289x | 1.0468x | 21/40 |
-| mixed static raw | 1.0008x | 0.9371x | 1.0830x | 23/40 |
-| mixed dynamic raw | 1.0123x | 0.9214x | 1.0937x | 24/40 |
-| mixed dynamic JSON | 1.0039x | 0.9311x | 1.0802x | 21/40 |
-| mixed same-length dynamic raw | 1.0018x | 0.9534x | 1.0998x | 23/40 |
-| pure trailing dynamic raw | 0.9838x | 0.8918x | 1.0562x | 27/40 |
-| pure trailing dynamic JSON | 0.9992x | 0.8980x | 1.0961x | 22/40 |
-| generic dynamic raw | 1.0076x | 0.9100x | 1.0831x | 30/40 |
-| forced collision raw | 1.0066x | 0.9222x | 1.1758x | 21/40 |
-| ALL dynamic raw | 1.0074x | 0.9499x | 1.1117x | 21/40 |
-| static registration | 0.9961x | 0.8993x | 1.1041x | 31/40 |
-| static retained heap delta | 1.0000x | 0.9993x | 1.0008x | 0/40 |
+| cell                          | paired median |     p05 |     p95 | outside ±2% |
+| ----------------------------- | ------------: | ------: | ------: | ----------: |
+| static-only raw               |       0.9994x | 0.9289x | 1.0468x |       21/40 |
+| mixed static raw              |       1.0008x | 0.9371x | 1.0830x |       23/40 |
+| mixed dynamic raw             |       1.0123x | 0.9214x | 1.0937x |       24/40 |
+| mixed dynamic JSON            |       1.0039x | 0.9311x | 1.0802x |       21/40 |
+| mixed same-length dynamic raw |       1.0018x | 0.9534x | 1.0998x |       23/40 |
+| pure trailing dynamic raw     |       0.9838x | 0.8918x | 1.0562x |       27/40 |
+| pure trailing dynamic JSON    |       0.9992x | 0.8980x | 1.0961x |       22/40 |
+| generic dynamic raw           |       1.0076x | 0.9100x | 1.0831x |       30/40 |
+| forced collision raw          |       1.0066x | 0.9222x | 1.1758x |       21/40 |
+| ALL dynamic raw               |       1.0074x | 0.9499x | 1.1117x |       21/40 |
+| static registration           |       0.9961x | 0.8993x | 1.1041x |       31/40 |
+| static retained heap delta    |       1.0000x | 0.9993x | 1.0008x |        0/40 |
 
 Global descriptive diagnostics from the frozen harness:
 
