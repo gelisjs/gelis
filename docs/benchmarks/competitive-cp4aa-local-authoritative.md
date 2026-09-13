@@ -18,15 +18,15 @@ This run is attribution-only. It does not alter the prior CP4-X or CP4-Z accepta
 
 ## Direct ratios vs production
 
-| Cell | CP4-X | CP4-Z | Z / X |
-| --- | ---: | ---: | ---: |
-| static-only raw | 1.0197x | 1.0132x | 0.9936x |
-| mixed static raw | 1.0426x | 1.0039x | 0.9629x |
-| mixed dynamic raw | 0.9161x | 0.9230x | 1.0076x |
+| Cell                      |   CP4-X |   CP4-Z |   Z / X |
+| ------------------------- | ------: | ------: | ------: |
+| static-only raw           | 1.0197x | 1.0132x | 0.9936x |
+| mixed static raw          | 1.0426x | 1.0039x | 0.9629x |
+| mixed dynamic raw         | 0.9161x | 0.9230x | 1.0076x |
 | pure trailing dynamic raw | 0.9206x | 0.9040x | 0.9820x |
-| generic dynamic raw | 1.0045x | 1.0177x | 1.0131x |
-| ALL dynamic raw | 0.9049x | 0.9077x | 1.0031x |
-| static registration | 0.9766x | 0.9700x | 0.9933x |
+| generic dynamic raw       | 1.0045x | 1.0177x | 1.0131x |
+| ALL dynamic raw           | 0.9049x | 0.9077x | 1.0031x |
+| static registration       | 0.9766x | 0.9700x | 0.9933x |
 
 ## Interpretation
 
