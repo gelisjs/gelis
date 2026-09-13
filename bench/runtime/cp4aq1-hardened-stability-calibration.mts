@@ -13,11 +13,22 @@ const SAMPLES = BLOCKS * PAIRS_PER_BLOCK;
 const BOOTSTRAP_REPS = 5_000;
 const EXPECTED_LOCAL_LOGICAL_CPUS = 12;
 const HERE = dirname(fileURLToPath(import.meta.url));
-const WORKER = resolve(HERE, "cp4aq1-hardened-stability-calibration-worker.mts");
+const WORKER = resolve(
+  HERE,
+  "cp4aq1-hardened-stability-calibration-worker.mts",
+);
 const REPOSITORY_ROOT = resolve(HERE, "../..");
 const RUN_TOKEN = `${process.pid}-${Date.now()}`;
-const WORKTREE_A = resolve(REPOSITORY_ROOT, "..", `gelis-cp4aq1-a-${RUN_TOKEN}`);
-const WORKTREE_B = resolve(REPOSITORY_ROOT, "..", `gelis-cp4aq1-b-${RUN_TOKEN}`);
+const WORKTREE_A = resolve(
+  REPOSITORY_ROOT,
+  "..",
+  `gelis-cp4aq1-a-${RUN_TOKEN}`,
+);
+const WORKTREE_B = resolve(
+  REPOSITORY_ROOT,
+  "..",
+  `gelis-cp4aq1-b-${RUN_TOKEN}`,
+);
 
 type Source = "a" | "b";
 type Order = "a-b" | "b-a";
@@ -99,7 +110,11 @@ const CELLS: readonly CellSpec[] = [
     label: "pure trailing dynamic JSON",
     kind: "hotpath",
   },
-  { cell: "generic-dynamic-raw", label: "generic dynamic raw", kind: "hotpath" },
+  {
+    cell: "generic-dynamic-raw",
+    label: "generic dynamic raw",
+    kind: "hotpath",
+  },
   {
     cell: "collision-dynamic-raw",
     label: "forced collision raw",
@@ -180,9 +195,13 @@ function printHeader(): void {
     console.log(`Pairs/block:     ${PAIRS_PER_BLOCK}`);
     console.log(`Samples/source:  ${SAMPLES} fresh-worker measurements/cell`);
     console.log("Order:           4 A→B + 4 B→A pairs per block");
-    console.log(`Windows affinity: logical CPU ${affinityLogicalCpu} (0x${affinityMaskHex})`);
+    console.log(
+      `Windows affinity: logical CPU ${affinityLogicalCpu} (0x${affinityMaskHex})`,
+    );
     console.log("Worker priority: HIGH");
-    console.log(`Bootstrap:       ${BOOTSTRAP_REPS.toLocaleString("en-US")} deterministic block resamples`);
+    console.log(
+      `Bootstrap:       ${BOOTSTRAP_REPS.toLocaleString("en-US")} deterministic block resamples`,
+    );
   }
   console.log();
 }
@@ -335,25 +354,29 @@ function printBlockwiseTable(
   console.log(
     "| comparison | b1 | b2 | b3 | b4 | b5 | b6 | b7 | b8 | max deviation |",
   );
-  console.log("| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |");
+  console.log(
+    "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
+  );
 
   for (const spec of CELLS) {
     const value = getDiagnostics(diagnostics, spec.cell);
-    const blocks = value.blockRatios.map((ratio) => `${ratio.toFixed(4)}x`).join(" | ");
+    const blocks = value.blockRatios
+      .map((ratio) => `${ratio.toFixed(4)}x`)
+      .join(" | ");
     console.log(
       `| ${spec.label} | ${blocks} | ${(value.maxBlockDeviation * 100).toFixed(2)}% |`,
     );
   }
 }
 
-function printReadiness(
-  diagnostics: ReadonlyMap<Cell, CellDiagnostics>,
-): void {
+function printReadiness(diagnostics: ReadonlyMap<Cell, CellDiagnostics>): void {
   let ready = true;
 
   console.log();
   console.log("Frozen CP4-AQ1 benchmark-readiness criteria");
-  console.log("| comparison | aggregate bias | bootstrap CI | order spread | block deviation | result |");
+  console.log(
+    "| comparison | aggregate bias | bootstrap CI | order spread | block deviation | result |",
+  );
   console.log("| --- | ---: | ---: | ---: | ---: | --- |");
 
   for (const spec of CELLS) {
@@ -446,7 +469,9 @@ function blockBootstrapInterval(
 }
 
 function ratioOfMedians(pairs: readonly PairResult[]): number {
-  return median(pairs.map((pair) => pair.b)) / median(pairs.map((pair) => pair.a));
+  return (
+    median(pairs.map((pair) => pair.b)) / median(pairs.map((pair) => pair.a))
+  );
 }
 
 function runWorker(
@@ -534,7 +559,9 @@ function preflight(): void {
 
   if (!probeOnly) {
     if (process.platform !== "win32") {
-      throw new Error("CP4-AQ1 timed calibration is authoritative only on Windows");
+      throw new Error(
+        "CP4-AQ1 timed calibration is authoritative only on Windows",
+      );
     }
     if (logicalCpuCount !== EXPECTED_LOCAL_LOGICAL_CPUS) {
       throw new Error(
@@ -602,7 +629,10 @@ function summarize(values: readonly number[]): Summary {
 }
 
 function median(values: readonly number[]): number {
-  return percentileSorted([...values].sort((a, b) => a - b), 0.5);
+  return percentileSorted(
+    [...values].sort((a, b) => a - b),
+    0.5,
+  );
 }
 
 function percentileSorted(values: readonly number[], quantile: number): number {
