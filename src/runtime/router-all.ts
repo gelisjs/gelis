@@ -42,7 +42,7 @@ export function activateAllFallback(router: Router): void {
       ): RuntimeRouteMatch | undefined => {
         const exact = exactMatchRequestUrl.call(router, method, url);
 
-        if (exact !== undefined) {
+        if (exact !== undefined || method === ALL_ROUTE_METHOD) {
           return exact;
         }
 
