@@ -90,18 +90,18 @@ For each cell pair:
 
 All gates are required.
 
-| gate | candidate / production limit | rationale |
-| --- | ---: | --- |
-| static-only raw | `<= 1.0200x` | no material regression on pure static routing |
-| mixed static raw | `<= 1.0200x` | preserve exact static-first performance in mixed tables |
-| mixed dynamic raw guard | `<= 1.0200x` | no material raw regression |
-| mixed dynamic JSON guard | `<= 1.0200x` | no material JSON regression |
-| mixed dynamic geomean | `<= 0.9800x` | mixed tables must gain materially on average |
-| pure trailing dynamic raw | `<= 0.9400x` | CP4-A must translate into a substantial real-app raw win |
-| pure trailing dynamic JSON | `<= 0.9500x` | CP4-A must translate into a substantial real-app JSON win |
-| generic dynamic raw | `<= 1.0300x` | generic-trie fallback guard |
-| forced collision raw | `<= 1.1500x` | collision fallback guard |
-| ALL dynamic raw | `<= 1.0500x` | method-semantics fallback guard |
+| gate                       | candidate / production limit | rationale                                                 |
+| -------------------------- | ---------------------------: | --------------------------------------------------------- |
+| static-only raw            |                 `<= 1.0200x` | no material regression on pure static routing             |
+| mixed static raw           |                 `<= 1.0200x` | preserve exact static-first performance in mixed tables   |
+| mixed dynamic raw guard    |                 `<= 1.0200x` | no material raw regression                                |
+| mixed dynamic JSON guard   |                 `<= 1.0200x` | no material JSON regression                               |
+| mixed dynamic geomean      |                 `<= 0.9800x` | mixed tables must gain materially on average              |
+| pure trailing dynamic raw  |                 `<= 0.9400x` | CP4-A must translate into a substantial real-app raw win  |
+| pure trailing dynamic JSON |                 `<= 0.9500x` | CP4-A must translate into a substantial real-app JSON win |
+| generic dynamic raw        |                 `<= 1.0300x` | generic-trie fallback guard                               |
+| forced collision raw       |                 `<= 1.1500x` | collision fallback guard                                  |
+| ALL dynamic raw            |                 `<= 1.0500x` | method-semantics fallback guard                           |
 
 The mixed-dynamic geomean is `sqrt(mixedRawRatio * mixedJsonRatio)`.
 

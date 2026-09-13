@@ -258,9 +258,7 @@ function runTiming(): void {
   }
 
   console.log();
-  console.log(
-    `CP4-B PRODUCTION URL-OFFSET GATE: ${passed ? "PASS" : "FAIL"}`,
-  );
+  console.log(`CP4-B PRODUCTION URL-OFFSET GATE: ${passed ? "PASS" : "FAIL"}`);
 }
 
 function runWorker(
@@ -393,11 +391,9 @@ function cleanupBaselineWorktree(): void {
     );
   }
 
-  const prune = spawnSync(
-    "git",
-    ["-C", REPOSITORY_ROOT, "worktree", "prune"],
-    { encoding: "utf8" },
-  );
+  const prune = spawnSync("git", ["-C", REPOSITORY_ROOT, "worktree", "prune"], {
+    encoding: "utf8",
+  });
   if (prune.status !== 0) {
     throw new Error(`Failed to prune worktrees:\n${prune.stderr}`);
   }

@@ -28,14 +28,8 @@ type HandlerContext = {
 };
 
 interface GelisLike {
-  get(
-    path: string,
-    handler: (context: HandlerContext) => unknown,
-  ): unknown;
-  all(
-    path: string,
-    handler: (context: HandlerContext) => unknown,
-  ): unknown;
+  get(path: string, handler: (context: HandlerContext) => unknown): unknown;
+  all(path: string, handler: (context: HandlerContext) => unknown): unknown;
   fetch(request: Request): Response | PromiseLike<Response>;
 }
 
@@ -153,9 +147,7 @@ function staticOnlyCell(Gelis: GelisConstructor): PreparedCell {
     app.get(`/s/${index}`, () => "static");
   }
 
-  const request = new Request(
-    `http://gelis.test/s/${LAST}?source=cp4b`,
-  );
+  const request = new Request(`http://gelis.test/s/${LAST}?source=cp4b`);
   return responseCell(app, request, "static", false);
 }
 
