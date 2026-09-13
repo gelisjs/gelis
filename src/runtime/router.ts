@@ -42,7 +42,9 @@ type TrailingFingerprintEntry =
 export interface MethodRoutes {
   readonly staticRoutes: Map<string, RuntimeRouteRecord>;
 
-  staticPathLengths?: Set<number>;
+  staticPathLengthMin?: number;
+
+  staticPathLengthMax?: number;
 
   trailingParamRoutes: Map<string, TrailingParamRoute> | undefined;
 
@@ -270,6 +272,9 @@ export class Router {
       return this.match(method, pathnameFromRequestUrl(url));
     }
 
+    const trailingParamFingerprints = table.trailingParamFingerprints;
+    const trailingParamRoutes = table.trailingParamRoutes;
+
     let authorityStart: number;
 
     if (
@@ -311,17 +316,41 @@ export class Router {
     let pathname: string | undefined;
 
     /*
-     * Exact static precedence is only possible when at least one installed
-     * static route has the same pathname length. Legacy/prebuilt tables that
-     * do not carry the optional discriminator conservatively take the old
-     * exact-static slice path.
+     * A pure-static method table does not need the dynamic discriminator at
+     * all. Preserve the direct CP4-B static lookup path.
+     */
+    if (
+      trailingParamFingerprints === undefined &&
+      trailingParamRoutes === undefined
+    ) {
+      pathname = url.slice(pathStart, pathEnd);
+
+      const staticRoute = table.staticRoutes.get(pathname);
+
+      if (staticRoute) {
+        return {
+          route: staticRoute,
+          params: EMPTY_PARAMS,
+        };
+      }
+
+      return undefined;
+    }
+
+    /*
+     * Exact static precedence can be skipped only when the request pathname
+     * length lies outside the complete runtime-created static length range.
+     * Legacy/prebuilt tables without this metadata conservatively perform the
+     * canonical substring + Map lookup.
      */
     if (table.staticRoutes.size !== 0) {
-      const staticPathLengths = table.staticPathLengths;
+      const staticPathLengthMin = table.staticPathLengthMin;
+      const staticPathLengthMax = table.staticPathLengthMax;
 
       if (
-        staticPathLengths === undefined ||
-        staticPathLengths.has(pathLength)
+        staticPathLengthMin === undefined ||
+        staticPathLengthMax === undefined ||
+        (pathLength >= staticPathLengthMin && pathLength <= staticPathLengthMax)
       ) {
         pathname = url.slice(pathStart, pathEnd);
 
@@ -337,9 +366,6 @@ export class Router {
     }
 
     if (!table.usesDynamicTrie) {
-      const trailingParamFingerprints = table.trailingParamFingerprints;
-      const trailingParamRoutes = table.trailingParamRoutes;
-
       if (
         pathEnd - pathStart > 1 &&
         (trailingParamFingerprints !== undefined ||
@@ -601,7 +627,9 @@ function createMethodRoutes(): MethodRoutes {
   return {
     staticRoutes: new Map(),
 
-    staticPathLengths: new Set(),
+    staticPathLengthMin: Number.POSITIVE_INFINITY,
+
+    staticPathLengthMax: Number.NEGATIVE_INFINITY,
 
     trailingParamRoutes: undefined,
 
@@ -615,9 +643,13 @@ function cloneMethodRoutes(table: MethodRoutes): MethodRoutes {
   return {
     staticRoutes: new Map(table.staticRoutes),
 
-    ...(table.staticPathLengths === undefined
+    ...(table.staticPathLengthMin === undefined
       ? {}
-      : { staticPathLengths: new Set(table.staticPathLengths) }),
+      : { staticPathLengthMin: table.staticPathLengthMin }),
+
+    ...(table.staticPathLengthMax === undefined
+      ? {}
+      : { staticPathLengthMax: table.staticPathLengthMax }),
 
     trailingParamRoutes:
       table.trailingParamRoutes === undefined
@@ -696,7 +728,18 @@ function registerRouteIntoTable(
     }
 
     table.staticRoutes.set(route.path, route);
-    table.staticPathLengths?.add(route.path.length);
+
+    const pathLength = route.path.length;
+    const staticPathLengthMin = table.staticPathLengthMin;
+    const staticPathLengthMax = table.staticPathLengthMax;
+
+    if (staticPathLengthMin !== undefined && pathLength < staticPathLengthMin) {
+      table.staticPathLengthMin = pathLength;
+    }
+
+    if (staticPathLengthMax !== undefined && pathLength > staticPathLengthMax) {
+      table.staticPathLengthMax = pathLength;
+    }
 
     return;
   }
