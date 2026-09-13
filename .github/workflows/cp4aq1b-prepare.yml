@@ -1,0 +1,123 @@
+name: CP4-AQ1B prepare
+
+on:
+  push:
+    branches:
+      - work/competitive-cp4aq1b-powershell-launcher-stability-calibration
+
+permissions:
+  contents: write
+
+jobs:
+  prepare:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Transform AQ1 into AQ1B
+        shell: python
+        run: |
+          from pathlib import Path
+
+          old_harness = Path('bench/runtime/cp4aq1-hardened-stability-calibration.mts')
+          old_worker = Path('bench/runtime/cp4aq1-hardened-stability-calibration-worker.mts')
+          old_freeze = Path('docs/benchmarks/competitive-cp4aq1-hardened-stability-calibration-freeze.md')
+          new_harness = Path('bench/runtime/cp4aq1b-hardened-stability-calibration.mts')
+          new_worker = Path('bench/runtime/cp4aq1b-hardened-stability-calibration-worker.mts')
+          new_freeze = Path('docs/benchmarks/competitive-cp4aq1b-hardened-stability-calibration-freeze.md')
+
+          harness = old_harness.read_text()
+          worker = old_worker.read_text()
+          freeze = old_freeze.read_text()
+
+          harness = harness.replace('CP4-AQ1', 'CP4-AQ1B').replace('cp4aq1', 'cp4aq1b')
+          freeze = freeze.replace('CP4-AQ1', 'CP4-AQ1B').replace('cp4aq1', 'cp4aq1b')
+
+          old_launcher = '''function spawnPinnedWindowsWorker(args: readonly string[]) {
+            const command = [
+              "start",
+              '\"\"',
+              "/b",
+              "/wait",
+              "/high",
+              "/affinity",
+              affinityMaskHex,
+              quoteCmd(process.execPath),
+              ...args.map(quoteCmd),
+            ].join(" ");
+
+            return spawnSync("cmd.exe", ["/d", "/s", "/c", command], workerOptions());
+          }
+          '''
+
+          new_launcher = '''function spawnPinnedWindowsWorker(args: readonly string[]) {
+            const bunPath = quotePowerShell(process.execPath);
+            const argumentList = args.map(quotePowerShell).join(", ");
+            const command = [
+              "$ErrorActionPreference = 'Stop'",
+              "$out = [IO.Path]::GetTempFileName()",
+              "$err = [IO.Path]::GetTempFileName()",
+              `try { $p = Start-Process -FilePath ${bunPath} -ArgumentList @(${argumentList}) -PassThru -WindowStyle Hidden -RedirectStandardOutput $out -RedirectStandardError $err`,
+              `$p.ProcessorAffinity = [IntPtr]0x${affinityMaskHex}`,
+              "$p.PriorityClass = 'High'",
+              "$p.WaitForExit()",
+              "$code = $p.ExitCode",
+              "if (Test-Path $out) { [Console]::Out.Write([IO.File]::ReadAllText($out)) }",
+              "if (Test-Path $err) { [Console]::Error.Write([IO.File]::ReadAllText($err)) }",
+              "exit $code } finally { Remove-Item -LiteralPath $out,$err -Force -ErrorAction SilentlyContinue }",
+            ].join("; ");
+
+            return spawnSync(
+              "powershell.exe",
+              ["-NoLogo", "-NoProfile", "-NonInteractive", "-Command", command],
+              workerOptions(),
+            );
+          }
+          '''
+
+          old_quote = '''function quoteCmd(value: string): string {
+            if (value.includes('\"')) {
+              throw new Error(`Unsupported quote in Windows command argument: ${value}`);
+            }
+            return `\"${value}\"`;
+          }
+          '''
+
+          new_quote = '''function quotePowerShell(value: string): string {
+            return `'${value.replaceAll("'", "''")}'`;
+          }
+          '''
+
+          if old_launcher not in harness:
+            raise SystemExit('old launcher block not found')
+          if old_quote not in harness:
+            raise SystemExit('old quote block not found')
+
+          harness = harness.replace(old_launcher, new_launcher).replace(old_quote, new_quote)
+          freeze = freeze.replace(
+            '- timed workers on Windows run at `HIGH` process priority\n',
+            '- timed workers on Windows run at `HIGH` process priority\n- Windows workers are launched through PowerShell `Start-Process`; affinity and priority are set on the child process before its measured warmup/calibration completes\n- `cmd start /wait` is explicitly not used because AQ1 infrastructure testing showed it can fail or hang on the authoritative local Windows environment\n',
+          )
+          freeze += '\n## AQ1B launcher-only delta\n\nAQ1B changes only the Windows worker launcher implementation. Source SHA, worker measurement kernel, workloads, block structure, sample count, estimators, bootstrap procedure, readiness thresholds, CPU affinity target, and `HIGH` priority requirement are unchanged from AQ1. The failed AQ1 local timing attempt produced no completed worker measurement and therefore was not authoritative.\n'
+
+          new_harness.write_text(harness)
+          new_worker.write_text(worker)
+          new_freeze.write_text(freeze)
+          old_harness.unlink()
+          old_worker.unlink()
+          old_freeze.unlink()
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+      - run: bun install --frozen-lockfile
+      - run: bunx prettier --write bench/runtime/cp4aq1b-hardened-stability-calibration.mts docs/benchmarks/competitive-cp4aq1b-hardened-stability-calibration-freeze.md
+      - name: Commit AQ1B
+        shell: bash
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add -A
+          git commit -m "bench(competitive): harden CP4-AQ1B Windows launcher"
+          git push
