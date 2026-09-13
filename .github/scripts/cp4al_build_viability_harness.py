@@ -101,12 +101,12 @@ for old, new in strict:
         raise SystemExit(f"missing replacement token: {old}")
     text = text.replace(old, new, 1)
 
-text = text.replace("CP4-AK", "CP4-AL")
-
 if 'const CONTROL_SOURCE = "658c22c0d12322e278d996f47c4373831d61ba9b";' not in text:
     raise SystemExit("control source replacement failed")
 if 'const CANDIDATE_SOURCE = "2a01866678b296a9618e17c245a897752f4d640a";' not in text:
     raise SystemExit("candidate source replacement failed")
+if 'CP4-AK source:' not in text:
+    raise SystemExit("control label replacement failed")
 if '["mixed-static-raw", 1.01]' not in text:
     raise SystemExit("mixed-static guard replacement failed")
 if '["all-dynamic-raw", 0.985]' not in text:
