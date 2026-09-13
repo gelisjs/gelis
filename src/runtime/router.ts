@@ -450,6 +450,63 @@ export class Router {
     return matchGenericDynamicTable(table, pathname);
   }
 
+  matchAllRequestUrl(url: string): RuntimeRouteMatch | undefined {
+    const table = this.#methods.get(ALL_ROUTE_METHOD);
+
+    if (!table) {
+      return undefined;
+    }
+
+    /*
+     * Preserve the canonical CP4-AK matcher whenever the ALL table contains
+     * static routes. The specialization below is only for dynamic-only ALL
+     * tables, where static discrimination is semantically unreachable but its
+     * shared-function code shape still affected the CP4-AK ALL lane.
+     */
+    if (table.staticRoutes.size !== 0) {
+      return this.matchRequestUrl(ALL_ROUTE_METHOD, url);
+    }
+
+    let authorityStart: number;
+
+    if (
+      url.charCodeAt(0) !== 104 ||
+      url.charCodeAt(1) !== 116 ||
+      url.charCodeAt(2) !== 116 ||
+      url.charCodeAt(3) !== 112
+    ) {
+      return this.match(ALL_ROUTE_METHOD, pathnameFromRequestUrl(url));
+    }
+
+    if (
+      url.charCodeAt(4) === 58 &&
+      url.charCodeAt(5) === 47 &&
+      url.charCodeAt(6) === 47
+    ) {
+      authorityStart = 7;
+    } else if (
+      url.charCodeAt(4) === 115 &&
+      url.charCodeAt(5) === 58 &&
+      url.charCodeAt(6) === 47 &&
+      url.charCodeAt(7) === 47
+    ) {
+      authorityStart = 8;
+    } else {
+      return this.match(ALL_ROUTE_METHOD, pathnameFromRequestUrl(url));
+    }
+
+    const pathStart = url.indexOf("/", authorityStart);
+
+    if (pathStart === -1) {
+      return this.match(ALL_ROUTE_METHOD, "/");
+    }
+
+    const queryStart = url.indexOf("?", pathStart + 1);
+    const pathEnd = queryStart === -1 ? url.length : queryStart;
+
+    return matchDynamicOnlyRequestUrlTable(table, url, pathStart, pathEnd);
+  }
+
   matchingMethods(pathname: string): string[] {
     const methods: string[] = [];
 
@@ -475,6 +532,69 @@ export class Router {
 
     return created;
   }
+}
+
+function matchDynamicOnlyRequestUrlTable(
+  table: MethodRoutes,
+  url: string,
+  pathStart: number,
+  pathEnd: number,
+): RuntimeRouteMatch | undefined {
+  const trailingParamFingerprints = table.trailingParamFingerprints;
+  const trailingParamRoutes = table.trailingParamRoutes;
+
+  if (!table.usesDynamicTrie) {
+    if (
+      pathEnd - pathStart > 1 &&
+      (trailingParamFingerprints !== undefined ||
+        trailingParamRoutes !== undefined)
+    ) {
+      const slash = url.lastIndexOf("/", pathEnd - 1);
+
+      if (slash >= pathStart) {
+        const prefixEnd = slash + 1;
+        const prefixLength = prefixEnd - pathStart;
+
+        let trailingRoute: TrailingParamRoute | undefined;
+
+        if (trailingParamFingerprints !== undefined) {
+          const entry = trailingParamFingerprints.get(
+            prefixFingerprintRange(url, prefixEnd, prefixLength),
+          );
+
+          if (entry?.kind === "unique") {
+            if (
+              entry.prefix.length === prefixLength &&
+              url.startsWith(entry.prefix, pathStart)
+            ) {
+              trailingRoute = entry.trailingRoute;
+            }
+          } else if (entry !== undefined) {
+            trailingRoute = entry.routes.get(url.slice(pathStart, prefixEnd));
+          }
+        } else if (trailingParamRoutes !== undefined) {
+          trailingRoute = trailingParamRoutes.get(
+            url.slice(pathStart, prefixEnd),
+          );
+        }
+
+        if (trailingRoute) {
+          const value = url.slice(prefixEnd, pathEnd);
+
+          return {
+            route: trailingRoute.route,
+            params: {
+              [trailingRoute.paramName]: decodeParam(value),
+            },
+          };
+        }
+      }
+    }
+
+    return undefined;
+  }
+
+  return matchGenericDynamicTable(table, url.slice(pathStart, pathEnd));
 }
 
 function matchGenericDynamicTable(

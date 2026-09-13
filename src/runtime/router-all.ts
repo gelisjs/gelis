@@ -3,6 +3,7 @@ import { ALL_ROUTE_METHOD } from "../http-method";
 import { Router, type RuntimeRouteMatch } from "./router";
 
 const exactMatchRequestUrl = Router.prototype.matchRequestUrl;
+const exactMatchAllRequestUrl = Router.prototype.matchAllRequestUrl;
 
 export function activateAllFallback(router: Router): void {
   if (!Object.prototype.hasOwnProperty.call(router, "match")) {
@@ -46,7 +47,7 @@ export function activateAllFallback(router: Router): void {
           return exact;
         }
 
-        return exactMatchRequestUrl.call(router, ALL_ROUTE_METHOD, url);
+        return exactMatchAllRequestUrl.call(router, url);
       },
     });
   }
