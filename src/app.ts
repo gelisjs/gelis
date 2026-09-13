@@ -243,8 +243,43 @@ export interface GelisInternalRouter {
   matchingMethods(pathname: string): string[];
 }
 
+type GelisRuntimeRouter = GelisInternalRouter & {
+  matchRequestUrl(
+    method: string,
+
+    url: string,
+  ): RuntimeRouteMatch | undefined;
+};
+
+function resolveRuntimeRouter(router: GelisInternalRouter): GelisRuntimeRouter {
+  if (router.matchRequestUrl !== undefined) {
+    return router as GelisRuntimeRouter;
+  }
+
+  const registerBatchAtomic = router.registerBatchAtomic;
+
+  return {
+    register: router.register.bind(router),
+
+    ...(registerBatchAtomic === undefined
+      ? {}
+      : { registerBatchAtomic: registerBatchAtomic.bind(router) }),
+
+    match: router.match.bind(router),
+
+    matchRequestUrl(
+      method: string,
+      url: string,
+    ): RuntimeRouteMatch | undefined {
+      return router.match(method, pathnameFromRequestUrl(url));
+    },
+
+    matchingMethods: router.matchingMethods.bind(router),
+  };
+}
+
 interface AppRuntimeState {
-  router: GelisInternalRouter;
+  router: GelisRuntimeRouter;
 
   /*
    * Plain applications keep only their actual
@@ -508,7 +543,7 @@ export class Gelis extends RouteBuilder<""> {
       },
 
       installRouter(router: GelisInternalRouter): void {
-        state.router = router;
+        state.router = resolveRuntimeRouter(router);
       },
 
       installPrebuiltRuntime(
@@ -535,7 +570,7 @@ export class Gelis extends RouteBuilder<""> {
 
         applyRouteSpecializersToRoutes(state, routes);
 
-        state.router = router;
+        state.router = resolveRuntimeRouter(router);
 
         state.routes = routes;
 
@@ -670,20 +705,12 @@ export class Gelis extends RouteBuilder<""> {
     }
 
     const router = this.#state.router;
-    const matchRequestUrl = router.matchRequestUrl;
 
     let pathname: string | undefined;
-    let matched: RuntimeRouteMatch | undefined;
+    let matched = router.matchRequestUrl(method, request.url);
 
-    if (matchRequestUrl === undefined) {
-      pathname = pathnameFromRequestUrl(request.url);
-      matched = router.match(method, pathname);
-    } else {
-      matched = matchRequestUrl.call(router, method, request.url);
-
-      if (matched === undefined) {
-        matched = matchRequestUrl.call(router, ALL_ROUTE_METHOD, request.url);
-      }
+    if (matched === undefined) {
+      matched = router.matchRequestUrl(ALL_ROUTE_METHOD, request.url);
     }
 
     if (matched === undefined) {
