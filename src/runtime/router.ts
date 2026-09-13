@@ -74,6 +74,15 @@ const EMPTY_PARAMS = Object.freeze({}) as Record<string, string>;
 export class Router {
   #methods = new Map<string, MethodRoutes>();
 
+  constructor(requestUrlFastPathEnabled = true) {
+    if (!requestUrlFastPathEnabled) {
+      Object.defineProperty(this, "matchRequestUrl", {
+        configurable: true,
+        value: undefined,
+      });
+    }
+  }
+
   static fromMethods(methods: Map<string, MethodRoutes>): Router {
     const router = new Router();
 
@@ -86,6 +95,10 @@ export class Router {
     const table = this.getOrCreateMethod(route.method);
 
     registerRouteIntoTable(table, route);
+
+    if (routePathHasParams(route.path)) {
+      this.enableRequestUrlFastPath();
+    }
   }
 
   /*
@@ -107,6 +120,7 @@ export class Router {
     const nextMethods = new Map(this.#methods);
 
     const writableMethods = new Map<string, MethodRoutes>();
+    let enableRequestUrlFastPath = false;
 
     for (const route of routes) {
       let table = writableMethods.get(route.method);
@@ -125,6 +139,10 @@ export class Router {
       }
 
       registerRouteIntoTable(table, route);
+
+      if (!enableRequestUrlFastPath && routePathHasParams(route.path)) {
+        enableRequestUrlFastPath = true;
+      }
     }
 
     /*
@@ -132,6 +150,10 @@ export class Router {
      * before this point.
      */
     this.#methods = nextMethods;
+
+    if (enableRequestUrlFastPath) {
+      this.enableRequestUrlFastPath();
+    }
   }
 
   match(method: string, pathname: string): RuntimeRouteMatch | undefined {
@@ -280,19 +302,6 @@ export class Router {
      */
     const fastMapKind = table.fastMapKind;
 
-    if (fastMapKind === FAST_MAP_STATIC_ONLY) {
-      const staticRoute = table.staticRoutes.get(pathnameFromRequestUrl(url));
-
-      if (staticRoute) {
-        return {
-          route: staticRoute,
-          params: EMPTY_PARAMS,
-        };
-      }
-
-      return undefined;
-    }
-
     if (fastMapKind === undefined && table.usesDynamicTrie) {
       return this.match(method, pathnameFromRequestUrl(url));
     }
@@ -345,6 +354,21 @@ export class Router {
      * - legacy/prebuilt tables: conservatively retain exact static lookup.
      */
     if (fastMapKind !== FAST_MAP_TRAILING_ONLY) {
+      if (fastMapKind === FAST_MAP_STATIC_ONLY) {
+        const staticRoute = table.staticRoutes.get(
+          url.slice(pathStart, pathEnd),
+        );
+
+        if (staticRoute) {
+          return {
+            route: staticRoute,
+            params: EMPTY_PARAMS,
+          };
+        }
+
+        return undefined;
+      }
+
       if (fastMapKind === FAST_MAP_MIXED) {
         const staticPathLengthMax = table.staticPathLengthMax!;
 
@@ -473,6 +497,12 @@ export class Router {
     return methods;
   }
 
+  private enableRequestUrlFastPath(): void {
+    if (Object.prototype.hasOwnProperty.call(this, "matchRequestUrl")) {
+      Reflect.deleteProperty(this, "matchRequestUrl");
+    }
+  }
+
   private getOrCreateMethod(method: string): MethodRoutes {
     const existing = this.#methods.get(method);
 
@@ -486,6 +516,18 @@ export class Router {
 
     return created;
   }
+}
+
+function routePathHasParams(path: string): boolean {
+  const segments = splitPath(path);
+
+  for (const segment of segments) {
+    if (segment.startsWith(":")) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 function methodTableMatchesPath(
