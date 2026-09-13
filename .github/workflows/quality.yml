@@ -31,3 +31,17 @@ jobs:
 
       - name: Run quality gates
         run: bun run check
+
+      - name: Setup Bun 1.4.2 for CP4-AE probe
+        if: github.ref == 'refs/heads/work/competitive-cp4ae-kind-only-production-acceptance'
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+
+      - name: Fetch CP4-AE production ancestry
+        if: github.ref == 'refs/heads/work/competitive-cp4ae-kind-only-production-acceptance'
+        run: git fetch --no-tags --unshallow origin
+
+      - name: Run CP4-AE correctness probe only
+        if: github.ref == 'refs/heads/work/competitive-cp4ae-kind-only-production-acceptance'
+        run: bun bench/runtime/cp4ae-kind-only-production-acceptance.mts --probe-only
