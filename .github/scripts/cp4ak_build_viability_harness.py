@@ -12,6 +12,16 @@ source = subprocess.run(
     capture_output=True,
     text=True,
 ).stdout
+worker = subprocess.run(
+    [
+        "git",
+        "show",
+        "8cac0e4b9cfde14629d677a311f5e2035697bc96:bench/runtime/cp4ae-kind-only-production-acceptance-worker.mts",
+    ],
+    check=True,
+    capture_output=True,
+    text=True,
+).stdout
 
 text = source
 strict = [
@@ -69,5 +79,9 @@ if 'mixed-same-length-dynamic-raw' not in text:
 
 (repo / "bench/runtime/cp4ak-static-leading-mask-viability.mts").write_text(
     text,
+    encoding="utf-8",
+)
+(repo / "bench/runtime/cp4ak-static-leading-mask-viability-worker.mts").write_text(
+    worker,
     encoding="utf-8",
 )
