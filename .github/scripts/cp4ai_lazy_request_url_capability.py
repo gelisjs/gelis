@@ -3,6 +3,19 @@ from pathlib import Path
 path = Path("src/runtime/router.ts")
 text = path.read_text(encoding="utf-8")
 
+old_import = '''import { pathnameFromRequestUrl } from "./url";
+
+import type { RuntimeRouteRecord } from "./types";
+'''
+new_import = '''import { ALL_ROUTE_METHOD } from "../http-method";
+import { pathnameFromRequestUrl } from "./url";
+
+import type { RuntimeRouteRecord } from "./types";
+'''
+if text.count(old_import) != 1:
+    raise SystemExit(f"expected one router import anchor, found {text.count(old_import)}")
+text = text.replace(old_import, new_import, 1)
+
 old_class = '''export class Router {
   #methods = new Map<string, MethodRoutes>();
 
@@ -23,9 +36,13 @@ old_class = '''export class Router {
 new_class = '''export class Router {
   #methods = new Map<string, MethodRoutes>();
 
-  declare matchRequestUrl:
-    | ((method: string, url: string) => RuntimeRouteMatch | undefined)
-    | undefined;
+  constructor() {
+    Object.defineProperty(this, "matchRequestUrl", {
+      configurable: true,
+      writable: true,
+      value: undefined,
+    });
+  }
 
   static fromMethods(methods: Map<string, MethodRoutes>): Router {
     const router = new Router();
@@ -42,7 +59,10 @@ new_class = '''export class Router {
   register(route: RuntimeRouteRecord): void {
     const table = this.getOrCreateMethod(route.method);
 
-    if (registerRouteIntoTable(table, route)) {
+    if (
+      registerRouteIntoTable(table, route) ||
+      route.method === ALL_ROUTE_METHOD
+    ) {
       this.#activateRequestUrlMatching();
     }
   }
@@ -60,7 +80,7 @@ old_batch = '''    const nextMethods = new Map(this.#methods);
 new_batch = '''    const nextMethods = new Map(this.#methods);
 
     const writableMethods = new Map<string, MethodRoutes>();
-    let registeredDynamicRoute = false;
+    let needsRequestUrlMatching = false;
 
     for (const route of routes) {
 '''
@@ -78,8 +98,10 @@ old_batch_register = '''      registerRouteIntoTable(table, route);
     this.#methods = nextMethods;
   }
 '''
-new_batch_register = '''      registeredDynamicRoute =
-        registerRouteIntoTable(table, route) || registeredDynamicRoute;
+new_batch_register = '''      needsRequestUrlMatching =
+        registerRouteIntoTable(table, route) ||
+        route.method === ALL_ROUTE_METHOD ||
+        needsRequestUrlMatching;
     }
 
     /*
@@ -88,7 +110,7 @@ new_batch_register = '''      registeredDynamicRoute =
      */
     this.#methods = nextMethods;
 
-    if (registeredDynamicRoute) {
+    if (needsRequestUrlMatching) {
       this.#activateRequestUrlMatching();
     }
   }
@@ -102,12 +124,19 @@ text = text.replace(old_batch_register, new_batch_register, 1)
 old_method = '''  matchRequestUrl(method: string, url: string): RuntimeRouteMatch | undefined {
 '''
 new_method = '''  #activateRequestUrlMatching(): void {
-    if (this.matchRequestUrl === undefined) {
-      this.matchRequestUrl = this.#matchRequestUrl;
+    const capability = this as unknown as {
+      matchRequestUrl?: Router["matchRequestUrl"];
+    };
+
+    if (
+      Object.prototype.hasOwnProperty.call(this, "matchRequestUrl") &&
+      capability.matchRequestUrl === undefined
+    ) {
+      delete capability.matchRequestUrl;
     }
   }
 
-  #matchRequestUrl(method: string, url: string): RuntimeRouteMatch | undefined {
+  matchRequestUrl(method: string, url: string): RuntimeRouteMatch | undefined {
 '''
 if text.count(old_method) != 1:
     raise SystemExit(f"expected one matchRequestUrl method, found {text.count(old_method)}")
@@ -118,8 +147,11 @@ anchor = '''function createMethodRoutes(): MethodRoutes {
 helpers = '''function methodsNeedRequestUrlMatching(
   methods: Map<string, MethodRoutes>,
 ): boolean {
-  for (const table of methods.values()) {
-    if (methodTableNeedsRequestUrlMatching(table)) {
+  for (const [method, table] of methods) {
+    if (
+      method === ALL_ROUTE_METHOD ||
+      methodTableNeedsRequestUrlMatching(table)
+    ) {
       return true;
     }
   }
