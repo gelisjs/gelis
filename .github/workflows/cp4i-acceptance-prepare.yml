@@ -1,0 +1,37 @@
+name: CP4-I Acceptance Prepare
+
+on:
+  push:
+    branches:
+      - work/competitive-cp4i-mixed-upper-bound
+    paths:
+      - .cp4i-acceptance-trigger
+
+permissions:
+  contents: write
+
+jobs:
+  prepare:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: work/competitive-cp4i-mixed-upper-bound
+          fetch-depth: 0
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+      - run: bun install --frozen-lockfile
+      - name: Generate CP4-I viability artifacts
+        run: python .github/scripts/cp4i_acceptance_prepare.py
+      - name: Format frozen artifacts
+        run: bunx prettier --write bench/runtime/cp4i-mixed-upper-bound-acceptance.mts bench/runtime/cp4i-mixed-upper-bound-worker.mts docs/benchmarks/competitive-cp4i-mixed-upper-bound-freeze.md
+      - name: Full quality
+        run: bun run check
+      - name: Commit frozen viability artifacts
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add bench/runtime/cp4i-mixed-upper-bound-acceptance.mts bench/runtime/cp4i-mixed-upper-bound-worker.mts docs/benchmarks/competitive-cp4i-mixed-upper-bound-freeze.md
+          git commit -m "bench(competitive): freeze CP4-I mixed upper-bound viability"
+          git push origin HEAD:work/competitive-cp4i-mixed-upper-bound
