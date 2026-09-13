@@ -1,0 +1,41 @@
+name: CP4-S Source Prepare
+
+on:
+  push:
+    branches:
+      - work/competitive-cp4s-all-url-fallback-specialization
+    paths:
+      - .cp4s-source-trigger
+
+permissions:
+  contents: write
+
+jobs:
+  prepare:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: work/competitive-cp4s-all-url-fallback-specialization
+          fetch-depth: 0
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+      - run: bun install --frozen-lockfile
+      - name: Restore exact CP4-Q request dispatch source
+        run: |
+          git show b268a99f58e6c055ed0255c30ea16783f85fb5f3:src/runtime/router.ts > src/runtime/router.ts
+          git show b268a99f58e6c055ed0255c30ea16783f85fb5f3:src/runtime/router-all.ts > src/runtime/router-all.ts
+      - name: Apply ALL URL fallback specialization
+        run: python .github/scripts/cp4s_all_url_fallback_specialization.py
+      - name: Format changed source and CP4-R evidence
+        run: bunx prettier --write src/runtime/router.ts src/runtime/router-all.ts docs/benchmarks/competitive-cp4r-local-authoritative.md
+      - name: Full quality
+        run: bun run check
+      - name: Commit source candidate
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/runtime/router.ts src/runtime/router-all.ts docs/benchmarks/competitive-cp4r-local-authoritative.md
+          git commit -m "perf(runtime): specialize ALL request URL fallback"
+          git push origin HEAD:work/competitive-cp4s-all-url-fallback-specialization
