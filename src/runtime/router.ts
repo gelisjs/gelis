@@ -273,10 +273,14 @@ export class Router {
     }
 
     /*
-     * Generic trie matching already requires a materialized pathname.
-     * Avoid paying the full-URL offset parser before falling back to it.
+     * Runtime-created fast-map tables carry a registration-time kind.
+     * Treat that kind as the primary capability discriminator so fast-map
+     * requests do not pay a separate usesDynamicTrie property read/branch.
+     * Legacy/prebuilt tables without a kind retain the conservative check.
      */
-    if (table.usesDynamicTrie) {
+    const fastMapKind = table.fastMapKind;
+
+    if (fastMapKind === undefined && table.usesDynamicTrie) {
       return this.match(method, pathnameFromRequestUrl(url));
     }
 
@@ -327,8 +331,6 @@ export class Router {
      * - mixed static + trailing: use the frozen min/max length range;
      * - legacy/prebuilt tables: conservatively retain exact static lookup.
      */
-    const fastMapKind = table.fastMapKind;
-
     if (fastMapKind !== FAST_MAP_TRAILING_ONLY) {
       if (fastMapKind === FAST_MAP_STATIC_ONLY) {
         const staticRoute = table.staticRoutes.get(
@@ -382,7 +384,7 @@ export class Router {
     const trailingParamFingerprints = table.trailingParamFingerprints;
     const trailingParamRoutes = table.trailingParamRoutes;
 
-    if (!table.usesDynamicTrie) {
+    if (fastMapKind !== undefined || !table.usesDynamicTrie) {
       if (
         pathEnd - pathStart > 1 &&
         (trailingParamFingerprints !== undefined ||
@@ -826,6 +828,7 @@ function registerRouteIntoTable(
   if (!table.usesDynamicTrie) {
     migrateTrailingRoutesToTrie(table);
 
+    delete table.fastMapKind;
     table.usesDynamicTrie = true;
   }
 
