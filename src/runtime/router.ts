@@ -1,3 +1,4 @@
+import { ALL_ROUTE_METHOD } from "../http-method";
 import { pathnameFromRequestUrl } from "./url";
 
 import type { RuntimeRouteRecord } from "./types";
@@ -74,10 +75,22 @@ const EMPTY_PARAMS = Object.freeze({}) as Record<string, string>;
 export class Router {
   #methods = new Map<string, MethodRoutes>();
 
+  constructor() {
+    Object.defineProperty(this, "matchRequestUrl", {
+      configurable: true,
+      writable: true,
+      value: undefined,
+    });
+  }
+
   static fromMethods(methods: Map<string, MethodRoutes>): Router {
     const router = new Router();
 
     router.#methods = methods;
+
+    if (methodsNeedRequestUrlMatching(methods)) {
+      router.#activateRequestUrlMatching();
+    }
 
     return router;
   }
@@ -85,7 +98,12 @@ export class Router {
   register(route: RuntimeRouteRecord): void {
     const table = this.getOrCreateMethod(route.method);
 
-    registerRouteIntoTable(table, route);
+    if (
+      registerRouteIntoTable(table, route) ||
+      route.method === ALL_ROUTE_METHOD
+    ) {
+      this.#activateRequestUrlMatching();
+    }
   }
 
   /*
@@ -107,6 +125,7 @@ export class Router {
     const nextMethods = new Map(this.#methods);
 
     const writableMethods = new Map<string, MethodRoutes>();
+    let needsRequestUrlMatching = false;
 
     for (const route of routes) {
       let table = writableMethods.get(route.method);
@@ -124,7 +143,10 @@ export class Router {
         nextMethods.set(route.method, table);
       }
 
-      registerRouteIntoTable(table, route);
+      needsRequestUrlMatching =
+        registerRouteIntoTable(table, route) ||
+        route.method === ALL_ROUTE_METHOD ||
+        needsRequestUrlMatching;
     }
 
     /*
@@ -132,6 +154,10 @@ export class Router {
      * before this point.
      */
     this.#methods = nextMethods;
+
+    if (needsRequestUrlMatching) {
+      this.#activateRequestUrlMatching();
+    }
   }
 
   match(method: string, pathname: string): RuntimeRouteMatch | undefined {
@@ -263,6 +289,19 @@ export class Router {
 
       params,
     };
+  }
+
+  #activateRequestUrlMatching(): void {
+    const capability = this as unknown as {
+      matchRequestUrl?: Router["matchRequestUrl"];
+    };
+
+    if (
+      Object.prototype.hasOwnProperty.call(this, "matchRequestUrl") &&
+      capability.matchRequestUrl === undefined
+    ) {
+      delete capability.matchRequestUrl;
+    }
   }
 
   matchRequestUrl(method: string, url: string): RuntimeRouteMatch | undefined {
@@ -599,6 +638,31 @@ function dynamicNodeMatchesPath(
   return false;
 }
 
+function methodsNeedRequestUrlMatching(
+  methods: Map<string, MethodRoutes>,
+): boolean {
+  for (const [method, table] of methods) {
+    if (
+      method === ALL_ROUTE_METHOD ||
+      methodTableNeedsRequestUrlMatching(table)
+    ) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+function methodTableNeedsRequestUrlMatching(table: MethodRoutes): boolean {
+  return (
+    table.usesDynamicTrie ||
+    (table.trailingParamFingerprints !== undefined &&
+      table.trailingParamFingerprints.size !== 0) ||
+    (table.trailingParamRoutes !== undefined &&
+      table.trailingParamRoutes.size !== 0)
+  );
+}
+
 function createMethodRoutes(): MethodRoutes {
   return {
     staticRoutes: new Map(),
@@ -686,7 +750,7 @@ function registerRouteIntoTable(
   table: MethodRoutes,
 
   route: RuntimeRouteRecord,
-): void {
+): boolean {
   const segments = splitPath(route.path);
 
   const paramNames: string[] = [];
@@ -727,7 +791,7 @@ function registerRouteIntoTable(
       table.staticPathLengthMax = pathLength;
     }
 
-    return;
+    return false;
   }
 
   const finalSegment = segments[segments.length - 1];
@@ -759,7 +823,7 @@ function registerRouteIntoTable(
           throw duplicateRoute(route);
         }
 
-        return;
+        return true;
       }
 
       const trailingParamRoutes = table.trailingParamRoutes;
@@ -771,14 +835,14 @@ function registerRouteIntoTable(
 
         trailingParamRoutes.set(prefix, trailingRoute);
 
-        return;
+        return true;
       }
 
       if (!registerTrailingFingerprint(table, prefix, trailingRoute)) {
         throw duplicateRoute(route);
       }
 
-      return;
+      return true;
     }
   }
 
@@ -794,6 +858,8 @@ function registerRouteIntoTable(
 
     route,
   );
+
+  return true;
 }
 
 function migrateTrailingRoutesToTrie(table: MethodRoutes): void {
