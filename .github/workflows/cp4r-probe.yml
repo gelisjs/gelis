@@ -1,0 +1,26 @@
+name: CP4-R Correctness Probe
+
+on:
+  push:
+    branches:
+      - work/competitive-cp4r-upper-bound-sentinel-dispatch
+    paths:
+      - .cp4r-probe-trigger
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: work/competitive-cp4r-upper-bound-sentinel-dispatch
+          fetch-depth: 0
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+      - run: bun install --frozen-lockfile
+      - name: CP4-R correctness probe only
+        run: bun bench/runtime/cp4r-upper-bound-sentinel-dispatch-acceptance.mts --probe-only
