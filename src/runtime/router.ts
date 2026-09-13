@@ -325,23 +325,22 @@ export class Router {
      * CP4-E ordering for the exact-static lane. This isolates request-dispatch
      * control flow from the already-frozen registration metadata shape.
      */
-    if (table.staticRoutes.size !== 0) {
-      const staticPathLengthMax = table.staticPathLengthMax;
+    const staticPathLengthMax = table.staticPathLengthMax;
 
-      if (
-        staticPathLengthMax === undefined ||
-        pathEnd - pathStart <= staticPathLengthMax
-      ) {
-        pathname = url.slice(pathStart, pathEnd);
+    if (
+      staticPathLengthMax === undefined
+        ? table.staticRoutes.size !== 0
+        : pathEnd - pathStart <= staticPathLengthMax
+    ) {
+      pathname = url.slice(pathStart, pathEnd);
 
-        const staticRoute = table.staticRoutes.get(pathname);
+      const staticRoute = table.staticRoutes.get(pathname);
 
-        if (staticRoute) {
-          return {
-            route: staticRoute,
-            params: EMPTY_PARAMS,
-          };
-        }
+      if (staticRoute) {
+        return {
+          route: staticRoute,
+          params: EMPTY_PARAMS,
+        };
       }
     }
 
