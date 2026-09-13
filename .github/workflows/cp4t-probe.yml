@@ -1,0 +1,26 @@
+name: CP4-T Correctness Probe
+
+on:
+  push:
+    branches:
+      - work/competitive-cp4t-all-table-miss-fallback
+    paths:
+      - .cp4t-probe-trigger
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: work/competitive-cp4t-all-table-miss-fallback
+          fetch-depth: 0
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+      - run: bun install --frozen-lockfile
+      - name: CP4-T correctness probe only
+        run: bun bench/runtime/cp4t-all-table-miss-fallback-acceptance.mts --probe-only
