@@ -1,0 +1,39 @@
+name: CP4-N Format
+
+on:
+  push:
+    branches:
+      - work/competitive-cp4n-mixed-static-sublineage
+    paths:
+      - .cp4n-format-trigger
+
+permissions:
+  contents: write
+
+jobs:
+  format:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: work/competitive-cp4n-mixed-static-sublineage
+          fetch-depth: 0
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+      - run: bun install --frozen-lockfile
+      - name: Format CP4-N artifacts and CP4-M evidence
+        run: bunx prettier --write bench/runtime/cp4n-mixed-static-sublineage.mts docs/benchmarks/competitive-cp4n-mixed-static-sublineage-freeze.md docs/benchmarks/competitive-cp4m-local-authoritative.md
+      - name: Full quality
+        run: bun run check
+      - name: Commit formatting
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add bench/runtime/cp4n-mixed-static-sublineage.mts docs/benchmarks/competitive-cp4n-mixed-static-sublineage-freeze.md docs/benchmarks/competitive-cp4m-local-authoritative.md
+          if git diff --cached --quiet; then
+            echo "No formatting changes"
+          else
+            git commit -m "bench(competitive): format CP4-N attribution artifacts"
+            git push origin HEAD:work/competitive-cp4n-mixed-static-sublineage
+          fi
