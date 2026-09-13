@@ -348,14 +348,9 @@ export class Router {
       }
 
       if (fastMapKind === FAST_MAP_MIXED) {
-        const pathLength = pathEnd - pathStart;
-        const staticPathLengthMin = table.staticPathLengthMin!;
         const staticPathLengthMax = table.staticPathLengthMax!;
 
-        if (
-          pathLength >= staticPathLengthMin &&
-          pathLength <= staticPathLengthMax
-        ) {
+        if (pathEnd - pathStart <= staticPathLengthMax) {
           pathname = url.slice(pathStart, pathEnd);
 
           const staticRoute = table.staticRoutes.get(pathname);
