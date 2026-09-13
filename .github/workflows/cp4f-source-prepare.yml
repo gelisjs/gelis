@@ -1,0 +1,44 @@
+name: CP4-F Source Prepare
+
+on:
+  push:
+    branches:
+      - work/competitive-cp4f-method-table-kind
+    paths:
+      - .cp4f-source-trigger
+
+permissions:
+  contents: write
+
+jobs:
+  prepare:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: work/competitive-cp4f-method-table-kind
+          fetch-depth: 0
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+
+      - run: bun install --frozen-lockfile
+
+      - name: Apply CP4-F source transform
+        run: python .github/scripts/cp4f_method_table_kind.py
+
+      - name: Format changed files
+        run: bunx prettier --write src/runtime/router.ts docs/benchmarks/competitive-cp4e-local-authoritative.md
+
+      - name: Full quality
+        run: bun run check
+
+      - name: Commit frozen source candidate
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/runtime/router.ts docs/benchmarks/competitive-cp4e-local-authoritative.md
+          git diff --cached --quiet && exit 0
+          git commit -m "perf(router): specialize fast-map method-table kind"
+          git push origin HEAD:work/competitive-cp4f-method-table-kind
