@@ -39,20 +39,13 @@ interface TrailingFingerprintCollisionEntry {
 type TrailingFingerprintEntry =
   TrailingFingerprintUniqueEntry | TrailingFingerprintCollisionEntry;
 
-type FastMapKind = 0 | 1 | 2;
-
-const FAST_MAP_STATIC_ONLY: FastMapKind = 0;
-const FAST_MAP_TRAILING_ONLY: FastMapKind = 1;
-const FAST_MAP_MIXED: FastMapKind = 2;
+const FAST_MAP_TRAILING_ONLY = -1;
+const FAST_MAP_EMPTY = 0;
 
 export interface MethodRoutes {
   readonly staticRoutes: Map<string, RuntimeRouteRecord>;
 
-  fastMapKind?: FastMapKind;
-
-  staticPathLengthMin?: number;
-
-  staticPathLengthMax?: number;
+  fastMapState?: number;
 
   trailingParamRoutes: Map<string, TrailingParamRoute> | undefined;
 
@@ -278,9 +271,9 @@ export class Router {
      * requests do not pay a separate usesDynamicTrie property read/branch.
      * Legacy/prebuilt tables without a kind retain the conservative check.
      */
-    const fastMapKind = table.fastMapKind;
+    const fastMapState = table.fastMapState;
 
-    if (fastMapKind === undefined && table.usesDynamicTrie) {
+    if (fastMapState === undefined && table.usesDynamicTrie) {
       return this.match(method, pathnameFromRequestUrl(url));
     }
 
@@ -331,8 +324,8 @@ export class Router {
      * - mixed static + trailing: use the frozen min/max length range;
      * - legacy/prebuilt tables: conservatively retain exact static lookup.
      */
-    if (fastMapKind !== FAST_MAP_TRAILING_ONLY) {
-      if (fastMapKind === FAST_MAP_STATIC_ONLY) {
+    if (fastMapState !== FAST_MAP_TRAILING_ONLY) {
+      if (fastMapState !== undefined && fastMapState > FAST_MAP_EMPTY) {
         const staticRoute = table.staticRoutes.get(
           url.slice(pathStart, pathEnd),
         );
@@ -347,10 +340,8 @@ export class Router {
         return undefined;
       }
 
-      if (fastMapKind === FAST_MAP_MIXED) {
-        const staticPathLengthMax = table.staticPathLengthMax!;
-
-        if (pathEnd - pathStart <= staticPathLengthMax) {
+      if (fastMapState !== undefined && fastMapState < FAST_MAP_TRAILING_ONLY) {
+        if (pathEnd - pathStart <= -fastMapState - 1) {
           pathname = url.slice(pathStart, pathEnd);
 
           const staticRoute = table.staticRoutes.get(pathname);
@@ -379,7 +370,7 @@ export class Router {
     const trailingParamFingerprints = table.trailingParamFingerprints;
     const trailingParamRoutes = table.trailingParamRoutes;
 
-    if (fastMapKind !== undefined || !table.usesDynamicTrie) {
+    if (fastMapState !== undefined || !table.usesDynamicTrie) {
       if (
         pathEnd - pathStart > 1 &&
         (trailingParamFingerprints !== undefined ||
@@ -641,11 +632,7 @@ function createMethodRoutes(): MethodRoutes {
   return {
     staticRoutes: new Map(),
 
-    fastMapKind: FAST_MAP_STATIC_ONLY,
-
-    staticPathLengthMin: Number.POSITIVE_INFINITY,
-
-    staticPathLengthMax: Number.NEGATIVE_INFINITY,
+    fastMapState: FAST_MAP_EMPTY,
 
     trailingParamRoutes: undefined,
 
@@ -659,17 +646,9 @@ function cloneMethodRoutes(table: MethodRoutes): MethodRoutes {
   return {
     staticRoutes: new Map(table.staticRoutes),
 
-    ...(table.fastMapKind === undefined
+    ...(table.fastMapState === undefined
       ? {}
-      : { fastMapKind: table.fastMapKind }),
-
-    ...(table.staticPathLengthMin === undefined
-      ? {}
-      : { staticPathLengthMin: table.staticPathLengthMin }),
-
-    ...(table.staticPathLengthMax === undefined
-      ? {}
-      : { staticPathLengthMax: table.staticPathLengthMax }),
+      : { fastMapState: table.fastMapState }),
 
     trailingParamRoutes:
       table.trailingParamRoutes === undefined
@@ -749,20 +728,24 @@ function registerRouteIntoTable(
 
     table.staticRoutes.set(route.path, route);
 
-    if (table.fastMapKind === FAST_MAP_TRAILING_ONLY) {
-      table.fastMapKind = FAST_MAP_MIXED;
-    }
-
     const pathLength = route.path.length;
-    const staticPathLengthMin = table.staticPathLengthMin;
-    const staticPathLengthMax = table.staticPathLengthMax;
+    const fastMapState = table.fastMapState;
 
-    if (staticPathLengthMin !== undefined && pathLength < staticPathLengthMin) {
-      table.staticPathLengthMin = pathLength;
-    }
+    if (fastMapState === FAST_MAP_TRAILING_ONLY) {
+      table.fastMapState = -(pathLength + 1);
+    } else if (fastMapState !== undefined) {
+      if (
+        fastMapState === FAST_MAP_EMPTY ||
+        (fastMapState > FAST_MAP_EMPTY && pathLength > fastMapState)
+      ) {
+        table.fastMapState = pathLength;
+      } else if (fastMapState < FAST_MAP_TRAILING_ONLY) {
+        const staticPathLengthMax = -fastMapState - 1;
 
-    if (staticPathLengthMax !== undefined && pathLength > staticPathLengthMax) {
-      table.staticPathLengthMax = pathLength;
+        if (pathLength > staticPathLengthMax) {
+          table.fastMapState = -(pathLength + 1);
+        }
+      }
     }
 
     return;
@@ -776,9 +759,12 @@ function registerRouteIntoTable(
       : undefined;
 
   if (trailingParamName !== undefined && !table.usesDynamicTrie) {
-    if (table.fastMapKind === FAST_MAP_STATIC_ONLY) {
-      table.fastMapKind =
-        table.staticRoutes.size === 0 ? FAST_MAP_TRAILING_ONLY : FAST_MAP_MIXED;
+    const fastMapState = table.fastMapState;
+
+    if (fastMapState === FAST_MAP_EMPTY) {
+      table.fastMapState = FAST_MAP_TRAILING_ONLY;
+    } else if (fastMapState !== undefined && fastMapState > FAST_MAP_EMPTY) {
+      table.fastMapState = -(fastMapState + 1);
     }
 
     const slash = route.path.lastIndexOf("/");
@@ -823,7 +809,7 @@ function registerRouteIntoTable(
   if (!table.usesDynamicTrie) {
     migrateTrailingRoutesToTrie(table);
 
-    delete table.fastMapKind;
+    delete table.fastMapState;
     table.usesDynamicTrie = true;
   }
 
