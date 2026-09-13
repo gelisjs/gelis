@@ -1,0 +1,23 @@
+name: CP4-I Correctness Probe
+
+on:
+  push:
+    branches:
+      - work/competitive-cp4i-mixed-upper-bound
+    paths:
+      - .cp4i-probe-trigger
+
+jobs:
+  probe:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: work/competitive-cp4i-mixed-upper-bound
+          fetch-depth: 0
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+      - run: bun install --frozen-lockfile
+      - name: CP4-I correctness probe only
+        run: bun bench/runtime/cp4i-mixed-upper-bound-acceptance.mts --probe-only
