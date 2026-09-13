@@ -26,7 +26,7 @@ worker = subprocess.run(
 ).stdout
 
 text = source_harness
-replacements = [
+strict_replacements = [
     (
         'const CP4Z_SOURCE = "1b4057ad9d12bc28d2ab2ca7917924368fe99444";',
         'const CONTROL_SOURCE = "a7751059eef1d3074e6e0a1c2d227b49889affe4";',
@@ -52,35 +52,33 @@ replacements = [
     ('cp4zMedian', 'controlMedian'),
     ('const cp4z =', 'const control ='),
     ('candidate / cp4z', 'candidate / control'),
-    ('candidate / CP4-Z', 'candidate / CP4-AI control'),
-    ('Candidate / Z', 'Candidate / AI control'),
-    ('candidate / Z', 'candidate / AI control'),
-    ('CP4-Z source:', 'CP4-AI source:'),
-    ('Z→candidate + 3 candidate→Z', 'control→candidate + 3 candidate→control'),
-    ('Z/candidate KIND-primary viability', 'AI-control/candidate lazy + KIND-primary viability'),
-    ('KIND-primary Z viability', 'lazy + KIND-primary composition viability'),
-    ('KIND-PRIMARY Z VIABILITY', 'LAZY-KIND COMPOSITION VIABILITY'),
-    ('LOCAL KIND-PRIMARY Z VIABILITY RUN', 'LOCAL LAZY-KIND COMPOSITION VIABILITY RUN'),
-    ('CP4-AH', 'CP4-AJ'),
 ]
 
-for old, new in replacements:
+for old, new in strict_replacements:
     if old not in text:
         raise SystemExit(f"missing replacement token: {old}")
     text = text.replace(old, new)
 
-text = text.replace(
-    '["static-only-raw", 0.995],',
-    '["static-only-raw", 1.02],',
-)
-text = text.replace(
-    '["mixed-static-raw", 1.01],',
-    '["mixed-static-raw", 0.975],',
-)
+text = text.replace("CP4-AH", "CP4-AJ")
+text = text.replace("CP4-Z", "CP4-AI")
+text = text.replace("Z/candidate KIND-primary viability", "AI-control/candidate lazy + KIND-primary viability")
+text = text.replace("Z→candidate + 3 candidate→Z", "control→candidate + 3 candidate→control")
+text = text.replace("candidate / Z", "candidate / AI control")
+text = text.replace("KIND-primary Z viability", "lazy + KIND-primary composition viability")
+text = text.replace("KIND-PRIMARY Z VIABILITY", "LAZY-KIND COMPOSITION VIABILITY")
+text = text.replace("LOCAL KIND-PRIMARY Z VIABILITY RUN", "LOCAL LAZY-KIND COMPOSITION VIABILITY RUN")
+
+if '["static-only-raw", 0.995],' not in text:
+    raise SystemExit("missing static-only gate")
+if '["mixed-static-raw", 1.01],' not in text:
+    raise SystemExit("missing mixed-static gate")
+text = text.replace('["static-only-raw", 0.995],', '["static-only-raw", 1.02],')
+text = text.replace('["mixed-static-raw", 1.01],', '["mixed-static-raw", 0.975],')
 
 if 'const control = getSummary(summaries, spec.cell, "control").median;' not in text:
     raise SystemExit("control summary replacement failed")
-text = text.replace('candidate / control).toFixed(4)', 'candidate / control).toFixed(4)')
+if 'candidate / control' not in text:
+    raise SystemExit("control ratio replacement failed")
 
 harness_path = repo / "bench/runtime/cp4aj-lazy-kind-primary-viability.mts"
 worker_path = repo / "bench/runtime/cp4aj-lazy-kind-primary-viability-worker.mts"
