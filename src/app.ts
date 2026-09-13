@@ -234,6 +234,12 @@ export interface GelisInternalRouter {
     pathname: string,
   ): RuntimeRouteMatch | undefined;
 
+  matchRequestUrl?(
+    method: string,
+
+    url: string,
+  ): RuntimeRouteMatch | undefined;
+
   matchingMethods(pathname: string): string[];
 }
 
@@ -663,12 +669,27 @@ export class Gelis extends RouteBuilder<""> {
       }
     }
 
-    const pathname = pathnameFromRequestUrl(request.url);
+    const router = this.#state.router;
+    const matchRequestUrl = router.matchRequestUrl;
 
-    let matched = this.#state.router.match(method, pathname);
+    let pathname: string | undefined;
+    let matched: RuntimeRouteMatch | undefined;
+
+    if (matchRequestUrl === undefined) {
+      pathname = pathnameFromRequestUrl(request.url);
+      matched = router.match(method, pathname);
+    } else {
+      matched = matchRequestUrl.call(router, method, request.url);
+
+      if (matched === undefined) {
+        matched = matchRequestUrl.call(router, ALL_ROUTE_METHOD, request.url);
+      }
+    }
 
     if (matched === undefined) {
-      const fallback = resolveMethodMiss(this.#state.router, method, pathname);
+      pathname ??= pathnameFromRequestUrl(request.url);
+
+      const fallback = resolveMethodMiss(router, method, pathname);
 
       if (fallback instanceof Response) {
         return fallback;
