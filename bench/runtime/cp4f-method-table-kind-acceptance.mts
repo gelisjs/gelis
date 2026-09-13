@@ -432,7 +432,7 @@ function cleanupWorktree(): void {
     cleanupError === undefined
   ) {
     cleanupError = new Error(
-      "CP4-E production worktree remained after cleanup",
+      "CP4-F production worktree remained after cleanup",
     );
   }
 
