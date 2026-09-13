@@ -294,7 +294,16 @@ function preflight(): void {
 
   const sourceDiff = spawnSync(
     "git",
-    ["-C", REPOSITORY_ROOT, "diff", "--quiet", CP4Z_SOURCE, "HEAD", "--", "src"],
+    [
+      "-C",
+      REPOSITORY_ROOT,
+      "diff",
+      "--quiet",
+      CP4Z_SOURCE,
+      "HEAD",
+      "--",
+      "src",
+    ],
     { encoding: "utf8" },
   );
   if (sourceDiff.status !== 0) {

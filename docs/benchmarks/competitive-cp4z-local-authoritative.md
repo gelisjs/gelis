@@ -21,21 +21,21 @@ This is the first valid completed local timed CP4-Z run and is authoritative as-
 
 ## Frozen production gates
 
-| gate | ratio | limit | result |
-| --- | ---: | ---: | --- |
-| static-only raw | 1.0251x | <= 1.0200x | FAIL |
-| mixed static raw | 1.0142x | <= 1.0200x | PASS |
-| mixed dynamic raw guard | 0.8960x | <= 1.0200x | PASS |
-| mixed dynamic JSON guard | 0.9264x | <= 1.0200x | PASS |
-| mixed dynamic geomean | 0.9111x | <= 0.9800x | PASS |
-| mixed same-length dynamic raw | 1.0168x | <= 1.0200x | PASS |
-| pure trailing dynamic raw | 0.8911x | <= 0.9400x | PASS |
-| pure trailing dynamic JSON | 0.9312x | <= 0.9500x | PASS |
-| generic dynamic raw | 1.0030x | <= 1.0300x | PASS |
-| forced collision raw | 0.9290x | <= 1.1500x | PASS |
-| ALL dynamic raw | 0.9243x | <= 1.0500x | PASS |
-| static registration | 1.0564x | <= 1.0500x | FAIL |
-| static retained heap | 0.9984x | <= 1.0500x | PASS |
+| gate                          |   ratio |      limit | result |
+| ----------------------------- | ------: | ---------: | ------ |
+| static-only raw               | 1.0251x | <= 1.0200x | FAIL   |
+| mixed static raw              | 1.0142x | <= 1.0200x | PASS   |
+| mixed dynamic raw guard       | 0.8960x | <= 1.0200x | PASS   |
+| mixed dynamic JSON guard      | 0.9264x | <= 1.0200x | PASS   |
+| mixed dynamic geomean         | 0.9111x | <= 0.9800x | PASS   |
+| mixed same-length dynamic raw | 1.0168x | <= 1.0200x | PASS   |
+| pure trailing dynamic raw     | 0.8911x | <= 0.9400x | PASS   |
+| pure trailing dynamic JSON    | 0.9312x | <= 0.9500x | PASS   |
+| generic dynamic raw           | 1.0030x | <= 1.0300x | PASS   |
+| forced collision raw          | 0.9290x | <= 1.1500x | PASS   |
+| ALL dynamic raw               | 0.9243x | <= 1.0500x | PASS   |
+| static registration           | 1.0564x | <= 1.0500x | FAIL   |
+| static retained heap          | 0.9984x | <= 1.0500x | PASS   |
 
 Acceptance marker:
 
