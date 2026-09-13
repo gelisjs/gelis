@@ -272,9 +272,6 @@ export class Router {
       return this.match(method, pathnameFromRequestUrl(url));
     }
 
-    const trailingParamFingerprints = table.trailingParamFingerprints;
-    const trailingParamRoutes = table.trailingParamRoutes;
-
     let authorityStart: number;
 
     if (
@@ -316,28 +313,6 @@ export class Router {
     let pathname: string | undefined;
 
     /*
-     * A pure-static method table does not need the dynamic discriminator at
-     * all. Preserve the direct CP4-B static lookup path.
-     */
-    if (
-      trailingParamFingerprints === undefined &&
-      trailingParamRoutes === undefined
-    ) {
-      pathname = url.slice(pathStart, pathEnd);
-
-      const staticRoute = table.staticRoutes.get(pathname);
-
-      if (staticRoute) {
-        return {
-          route: staticRoute,
-          params: EMPTY_PARAMS,
-        };
-      }
-
-      return undefined;
-    }
-
-    /*
      * Exact static precedence can be skipped only when the request pathname
      * length lies outside the complete runtime-created static length range.
      * Legacy/prebuilt tables without this metadata conservatively perform the
@@ -364,6 +339,9 @@ export class Router {
         }
       }
     }
+
+    const trailingParamFingerprints = table.trailingParamFingerprints;
+    const trailingParamRoutes = table.trailingParamRoutes;
 
     if (!table.usesDynamicTrie) {
       if (
