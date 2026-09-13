@@ -39,18 +39,8 @@ interface TrailingFingerprintCollisionEntry {
 type TrailingFingerprintEntry =
   TrailingFingerprintUniqueEntry | TrailingFingerprintCollisionEntry;
 
-type FastMapKind = 0 | 1 | 2;
-
-const FAST_MAP_STATIC_ONLY: FastMapKind = 0;
-const FAST_MAP_TRAILING_ONLY: FastMapKind = 1;
-const FAST_MAP_MIXED: FastMapKind = 2;
-
 export interface MethodRoutes {
   readonly staticRoutes: Map<string, RuntimeRouteRecord>;
-
-  fastMapKind?: FastMapKind;
-
-  staticPathLengthMin?: number;
 
   staticPathLengthMax?: number;
 
@@ -603,10 +593,6 @@ function createMethodRoutes(): MethodRoutes {
   return {
     staticRoutes: new Map(),
 
-    fastMapKind: FAST_MAP_STATIC_ONLY,
-
-    staticPathLengthMin: Number.POSITIVE_INFINITY,
-
     staticPathLengthMax: Number.NEGATIVE_INFINITY,
 
     trailingParamRoutes: undefined,
@@ -620,14 +606,6 @@ function createMethodRoutes(): MethodRoutes {
 function cloneMethodRoutes(table: MethodRoutes): MethodRoutes {
   return {
     staticRoutes: new Map(table.staticRoutes),
-
-    ...(table.fastMapKind === undefined
-      ? {}
-      : { fastMapKind: table.fastMapKind }),
-
-    ...(table.staticPathLengthMin === undefined
-      ? {}
-      : { staticPathLengthMin: table.staticPathLengthMin }),
 
     ...(table.staticPathLengthMax === undefined
       ? {}
@@ -711,17 +689,8 @@ function registerRouteIntoTable(
 
     table.staticRoutes.set(route.path, route);
 
-    if (table.fastMapKind === FAST_MAP_TRAILING_ONLY) {
-      table.fastMapKind = FAST_MAP_MIXED;
-    }
-
     const pathLength = route.path.length;
-    const staticPathLengthMin = table.staticPathLengthMin;
     const staticPathLengthMax = table.staticPathLengthMax;
-
-    if (staticPathLengthMin !== undefined && pathLength < staticPathLengthMin) {
-      table.staticPathLengthMin = pathLength;
-    }
 
     if (staticPathLengthMax !== undefined && pathLength > staticPathLengthMax) {
       table.staticPathLengthMax = pathLength;
@@ -738,11 +707,6 @@ function registerRouteIntoTable(
       : undefined;
 
   if (trailingParamName !== undefined && !table.usesDynamicTrie) {
-    if (table.fastMapKind === FAST_MAP_STATIC_ONLY) {
-      table.fastMapKind =
-        table.staticRoutes.size === 0 ? FAST_MAP_TRAILING_ONLY : FAST_MAP_MIXED;
-    }
-
     const slash = route.path.lastIndexOf("/");
 
     if (slash >= 0) {
@@ -785,7 +749,6 @@ function registerRouteIntoTable(
   if (!table.usesDynamicTrie) {
     migrateTrailingRoutesToTrie(table);
 
-    delete table.fastMapKind;
     table.usesDynamicTrie = true;
   }
 
