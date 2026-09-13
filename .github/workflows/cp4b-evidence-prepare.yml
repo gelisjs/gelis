@@ -1,0 +1,35 @@
+name: CP4-B Evidence Prepare
+
+on:
+  push:
+    branches:
+      - work/competitive-cp4b-production-url-offset
+
+permissions:
+  contents: write
+
+jobs:
+  prepare:
+    if: github.event.head_commit.message == 'CP4B_EVIDENCE_TRIGGER'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: work/competitive-cp4b-production-url-offset
+          fetch-depth: 0
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+      - run: bun install --frozen-lockfile
+      - name: Format evidence
+        run: |
+          bunx prettier --write docs/benchmarks/competitive-cp4b-local-authoritative.md
+          if ! git diff --quiet; then
+            git config user.name github-actions[bot]
+            git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+            git add docs/benchmarks/competitive-cp4b-local-authoritative.md
+            git commit -m "chore(competitive): format CP4-B authoritative evidence"
+            git push origin HEAD:work/competitive-cp4b-production-url-offset
+          fi
+      - name: Full quality
+        run: bun run check
