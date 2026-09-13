@@ -26,7 +26,6 @@ jobs:
         run: |
           python3 - <<'PYTHON'
           from pathlib import Path
-
           workflow = Path('.github/workflows/cp4b-source-prepare.yml').read_text()
           marker = "          python3 - <<'PY'\n"
           start = workflow.index(marker) + len(marker)
@@ -34,28 +33,13 @@ jobs:
           lines = workflow[start:end].splitlines()
           script = "\n".join(line[10:] if line.startswith("          ") else line for line in lines)
           exec(compile(script, 'cp4b-source-prepare-embedded.py', 'exec'))
-
           app_path = Path('src/app.ts')
           app = app_path.read_text()
-          old = '''    } else {
-      matched = matchRequestUrl.call(router, method, request.url);
-    }
-
-    if (matched === undefined) {
-'''
-          new = '''    } else {
-      matched = matchRequestUrl.call(router, method, request.url);
-
-      if (matched === undefined) {
-        matched = matchRequestUrl.call(router, ALL_ROUTE_METHOD, request.url);
-      }
-    }
-
-    if (matched === undefined) {
-'''
-          if old not in app:
-              raise SystemExit('CP4-B ALL fallback app anchor missing')
-          app_path.write_text(app.replace(old, new, 1))
+          needle = "      matched = matchRequestUrl.call(router, method, request.url);\n"
+          insertion = needle + "\n      if (matched === undefined) {\n        matched = matchRequestUrl.call(router, ALL_ROUTE_METHOD, request.url);\n      }\n"
+          if app.count(needle) != 1:
+              raise SystemExit('CP4-B ALL fallback app anchor mismatch')
+          app_path.write_text(app.replace(needle, insertion, 1))
           PYTHON
       - name: Format candidate source and tests
         run: bunx prettier --write src/runtime/router.ts src/app.ts test/runtime/url-offset-routing.test.ts
