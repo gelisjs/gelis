@@ -306,14 +306,7 @@ function assertSingleRouterDelta(
   baseSource: string,
   source: string,
 ): void {
-  const changed = git([
-    "diff",
-    "--name-only",
-    baseSource,
-    source,
-    "--",
-    "src",
-  ]);
+  const changed = git(["diff", "--name-only", baseSource, source, "--", "src"]);
   if (changed !== "src/runtime/router.ts") {
     throw new Error(
       `${label} must differ from CP4-Z only at src/runtime/router.ts; got:\n${changed}`,
