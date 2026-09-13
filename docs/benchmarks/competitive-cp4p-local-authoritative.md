@@ -19,22 +19,20 @@ Do not rerun CP4-P merely because the result is unfavorable. The first valid com
 - Local correctness probe: `CP4-P CORRECTNESS PROBE: PASS (24/24)`
 - Completion marker: `CP4-P LOCAL MIXED-POSITIVE PACKED-STATE RUN: COMPLETE`
 
-## Authoritative ratios
+## Authoritative ratios and frozen gates
 
-| comparison | ratio | candidate delta | frozen limit | result |
-| --- | ---: | ---: | ---: | --- |
-| static-only raw | `0.9774x` | `-18.7 ns` | `<= 1.0200x` | PASS |
-| mixed static raw | `1.0013x` | `+1.1 ns` | `<= 0.9963x` | **FAIL** |
-| mixed dynamic raw | `1.0126x` | `+11.2 ns` | `<= 1.0200x` | PASS |
-| mixed dynamic JSON | `0.9773x` | `-15.7 ns` | `<= 1.0200x` | PASS |
-| mixed same-length dynamic raw | `1.0291x` | `+27.6 ns` | `<= 1.0200x` | **FAIL** |
-| pure trailing dynamic raw | `1.0058x` | `+5.1 ns` | `<= 1.0200x` | PASS |
-| pure trailing dynamic JSON | `0.9779x` | `-15.4 ns` | `<= 1.0200x` | PASS |
-| generic dynamic raw | `0.9747x` | `-30.8 ns` | `<= 1.0200x` | PASS |
-| forced collision raw | `0.9991x` | `-0.9 ns` | `<= 1.0200x` | PASS |
-| ALL dynamic raw | `0.9772x` | `-20.7 ns` | `<= 1.0200x` | PASS |
-| static registration | `0.9207x` | `-0.103 ms` | `<= 1.0500x` | PASS |
-| static retained heap | `1.0000x` | `-18 bytes` | `<= 1.0500x` | PASS |
+- static-only raw: `0.9774x`, delta `-18.7 ns`, limit `<= 1.0200x` — PASS
+- mixed static raw: `1.0013x`, delta `+1.1 ns`, limit `<= 0.9963x` — **FAIL**
+- mixed dynamic raw: `1.0126x`, delta `+11.2 ns`, limit `<= 1.0200x` — PASS
+- mixed dynamic JSON: `0.9773x`, delta `-15.7 ns`, limit `<= 1.0200x` — PASS
+- mixed same-length dynamic raw: `1.0291x`, delta `+27.6 ns`, limit `<= 1.0200x` — **FAIL**
+- pure trailing dynamic raw: `1.0058x`, delta `+5.1 ns`, limit `<= 1.0200x` — PASS
+- pure trailing dynamic JSON: `0.9779x`, delta `-15.4 ns`, limit `<= 1.0200x` — PASS
+- generic dynamic raw: `0.9747x`, delta `-30.8 ns`, limit `<= 1.0200x` — PASS
+- forced collision raw: `0.9991x`, delta `-0.9 ns`, limit `<= 1.0200x` — PASS
+- ALL dynamic raw: `0.9772x`, delta `-20.7 ns`, limit `<= 1.0200x` — PASS
+- static registration: `0.9207x`, delta `-0.103 ms`, limit `<= 1.0500x` — PASS
+- static retained heap: `1.0000x`, delta `-18 bytes`, limit `<= 1.0500x` — PASS
 
 Gate marker: `CP4-P MIXED-POSITIVE PACKED-STATE VIABILITY GATE: FAIL`
 
