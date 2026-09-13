@@ -29,5 +29,11 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
+      - name: Format CP4-AF diagnostic
+        run: |
+          bunx prettier bench/runtime/cp4af-production-z-kind-attribution.mts --write
+          git --no-pager diff -- bench/runtime/cp4af-production-z-kind-attribution.mts
+          exit 1
+
       - name: Run quality gates
         run: bun run check
