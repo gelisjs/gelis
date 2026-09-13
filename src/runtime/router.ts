@@ -450,6 +450,38 @@ export class Router {
     return matchGenericDynamicTable(table, pathname);
   }
 
+  matchRequestUrlWithAllFallback(
+    method: string,
+    url: string,
+  ): RuntimeRouteMatch | undefined {
+    /*
+     * app.all() activates the only caller of this method. When the ALL table
+     * is the router's sole method table, skip the guaranteed method miss and
+     * dispatch directly through the canonical request-URL matcher for `*`.
+     *
+     * If any concrete method table exists, preserve CP4-U semantics exactly:
+     * exact method first, then ALL fallback. Reading Map.size keeps the mode
+     * self-updating when routes are registered later without adding state or
+     * registration-time work to routers that never use app.all().
+     *
+     * Call through Router.prototype explicitly because app.all() shadows the
+     * instance matchRequestUrl property with its fallback wrapper.
+     */
+    const exactMatchRequestUrl = Router.prototype.matchRequestUrl;
+
+    if (this.#methods.size === 1) {
+      return exactMatchRequestUrl.call(this, ALL_ROUTE_METHOD, url);
+    }
+
+    const exact = exactMatchRequestUrl.call(this, method, url);
+
+    if (exact !== undefined || method === ALL_ROUTE_METHOD) {
+      return exact;
+    }
+
+    return exactMatchRequestUrl.call(this, ALL_ROUTE_METHOD, url);
+  }
+
   matchingMethods(pathname: string): string[] {
     const methods: string[] = [];
 

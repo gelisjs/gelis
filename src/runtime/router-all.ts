@@ -2,7 +2,8 @@ import { ALL_ROUTE_METHOD } from "../http-method";
 
 import { Router, type RuntimeRouteMatch } from "./router";
 
-const exactMatchRequestUrl = Router.prototype.matchRequestUrl;
+const exactMatchRequestUrlWithAllFallback =
+  Router.prototype.matchRequestUrlWithAllFallback;
 
 export function activateAllFallback(router: Router): void {
   if (!Object.prototype.hasOwnProperty.call(router, "match")) {
@@ -39,15 +40,8 @@ export function activateAllFallback(router: Router): void {
         method: string,
 
         url: string,
-      ): RuntimeRouteMatch | undefined => {
-        const exact = exactMatchRequestUrl.call(router, method, url);
-
-        if (exact !== undefined || method === ALL_ROUTE_METHOD) {
-          return exact;
-        }
-
-        return exactMatchRequestUrl.call(router, ALL_ROUTE_METHOD, url);
-      },
+      ): RuntimeRouteMatch | undefined =>
+        exactMatchRequestUrlWithAllFallback.call(router, method, url),
     });
   }
 }
