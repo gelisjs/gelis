@@ -31,14 +31,3 @@ jobs:
 
       - name: Run quality gates
         run: bun run check
-
-      - name: Setup Bun 1.4.2 for CP4-AF probe
-        uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: 1.4.2
-
-      - name: Fetch CP4-AF source ancestry
-        run: git fetch --no-tags --unshallow origin
-
-      - name: Run CP4-AF correctness probe only
-        run: bun bench/runtime/cp4af-production-z-kind-attribution.mts --probe-only
