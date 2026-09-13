@@ -22,14 +22,14 @@ jobs:
       - run: bun install --frozen-lockfile
       - name: Generate permanent CP4-Y artifacts
         run: python .github/scripts/cp4y_direct_production_revalidation.py
-      - name: Format permanent artifacts
-        run: bunx prettier --write bench/runtime/cp4y-direct-production-revalidation-acceptance.mts bench/runtime/cp4y-direct-production-revalidation-worker.mts docs/benchmarks/competitive-cp4y-direct-production-revalidation-freeze.md
+      - name: Format validation files
+        run: bunx prettier --write .github/workflows/cp4y-harness-freeze.yml docs/benchmarks/competitive-cp4x-local-authoritative.md bench/runtime/cp4y-direct-production-revalidation-acceptance.mts bench/runtime/cp4y-direct-production-revalidation-worker.mts docs/benchmarks/competitive-cp4y-direct-production-revalidation-freeze.md
       - name: Full quality
         run: bun run check
       - name: Commit frozen artifacts
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add bench/runtime/cp4y-direct-production-revalidation-acceptance.mts bench/runtime/cp4y-direct-production-revalidation-worker.mts docs/benchmarks/competitive-cp4y-direct-production-revalidation-freeze.md
+          git add .github/workflows/cp4y-harness-freeze.yml docs/benchmarks/competitive-cp4x-local-authoritative.md bench/runtime/cp4y-direct-production-revalidation-acceptance.mts bench/runtime/cp4y-direct-production-revalidation-worker.mts docs/benchmarks/competitive-cp4y-direct-production-revalidation-freeze.md
           git commit -m "bench(competitive): freeze CP4-Y direct production revalidation"
           git push origin HEAD:work/competitive-cp4y-direct-production-revalidation
