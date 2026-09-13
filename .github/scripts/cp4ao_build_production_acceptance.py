@@ -21,7 +21,7 @@ worker = subprocess.run(
 
 text = source
 
-replacements = [
+specific = [
     (
         'const CP4_Z_SOURCE = "1b4057ad9d12bc28d2ab2ca7917924368fe99444";',
         'const CP4_AK_SOURCE = "658c22c0d12322e278d996f47c4373831d61ba9b";',
@@ -36,24 +36,25 @@ replacements = [
     ),
     ('gelis-cp4ai-production-', 'gelis-cp4ao-production-'),
     ('gelis-cp4ai-cp4z-', 'gelis-cp4ao-cp4ak-'),
-    ('CP4_Z_WORKTREE', 'CP4_AK_WORKTREE'),
-    ('CP4_Z_SOURCE', 'CP4_AK_SOURCE'),
-    ('cp4zWorktreeCreated', 'cp4akWorktreeCreated'),
-    ('cp4z', 'cp4ak'),
-    ('CP4-Z', 'CP4-AK'),
-    ('Z / production', 'AK / production'),
-    ('candidate / Z', 'candidate / AK'),
-    ('CP4-AI', 'CP4-AO'),
     (
         'if (sourceNames !== "src/runtime/router.ts") {',
         'if (sourceNames !== "src/runtime/router-all.ts\\nsrc/runtime/router.ts") {',
     ),
 ]
-
-for old, new in replacements:
+for old, new in specific:
     if old not in text:
         raise SystemExit(f"missing replacement token: {old}")
     text = text.replace(old, new, 1)
+
+# Attribution identifiers occur throughout the harness and must move together.
+text = text.replace("CP4_Z_WORKTREE", "CP4_AK_WORKTREE")
+text = text.replace("CP4_Z_SOURCE", "CP4_AK_SOURCE")
+text = text.replace("cp4zWorktreeCreated", "cp4akWorktreeCreated")
+text = text.replace("cp4z", "cp4ak")
+text = text.replace("CP4-Z", "CP4-AK")
+text = text.replace("Z / production", "AK / production")
+text = text.replace("candidate / Z", "candidate / AK")
+text = text.replace("CP4-AI", "CP4-AO")
 
 text = text.replace(
     "Competitive Performance v0.1 — CP4-AO lazy request-URL capability direct production acceptance",
@@ -71,16 +72,13 @@ text = text.replace(
     "CP4-AO LOCAL LAZY-CAPABILITY PRODUCTION ACCEPTANCE RUN: COMPLETE",
     "CP4-AO LOCAL ALL-ONLY PRODUCTION ACCEPTANCE RUN: COMPLETE",
 )
-text = text.replace(
-    "Unexpected CP4-AK -> CP4-AO src/** delta:",
-    "Unexpected CP4-AK -> CP4-AO src/** delta:",
-)
 
 required = [
     'const PRODUCTION_SOURCE = "af4e5102046def1b163435333563b8d08f919bf5";',
     'const CP4_AK_SOURCE = "658c22c0d12322e278d996f47c4373831d61ba9b";',
     'const CANDIDATE_SOURCE = "8734bc5a88749f107efd5925f70e304370261d17";',
     'type Variant = "production" | "cp4ak" | "candidate";',
+    'const VARIANTS: readonly Variant[] = ["production", "cp4ak", "candidate"];',
     '{ label: "static-only raw", value: staticOnlyRatio, limit: 1.02 }',
     'label: "mixed dynamic geomean"',
     'limit: 0.98',
@@ -93,6 +91,10 @@ required = [
 for token in required:
     if token not in text:
         raise SystemExit(f"missing frozen token after transform: {token}")
+
+for forbidden in ["cp4z", "CP4_Z", "CP4-Z"]:
+    if forbidden in text:
+        raise SystemExit(f"stale attribution token after transform: {forbidden}")
 
 (repo / "bench/runtime/cp4ao-all-only-production-acceptance.mts").write_text(
     text,
