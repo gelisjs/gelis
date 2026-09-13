@@ -15,38 +15,38 @@
 
 ## Candidate / production ratios
 
-| comparison | ratio | candidate delta |
-| --- | ---: | ---: |
-| static-only raw | 1.0368x | +29.2 ns |
-| mixed static raw | 1.0222x | +17.4 ns |
-| mixed dynamic raw | 0.9346x | -61.9 ns |
-| mixed dynamic JSON | 0.9426x | -41.9 ns |
-| mixed same-length dynamic raw | 0.9798x | -19.5 ns |
-| pure trailing dynamic raw | 0.9250x | -70.9 ns |
-| pure trailing dynamic JSON | 0.9122x | -65.4 ns |
-| generic dynamic raw | 1.0246x | +28.2 ns |
-| forced collision raw | 0.9038x | -101.1 ns |
-| ALL dynamic raw | 0.9302x | -66.5 ns |
-| static registration | 1.0214x | +0.027 ms |
-| static retained heap delta | 0.9983x | -1071 bytes |
+| comparison                    |   ratio | candidate delta |
+| ----------------------------- | ------: | --------------: |
+| static-only raw               | 1.0368x |        +29.2 ns |
+| mixed static raw              | 1.0222x |        +17.4 ns |
+| mixed dynamic raw             | 0.9346x |        -61.9 ns |
+| mixed dynamic JSON            | 0.9426x |        -41.9 ns |
+| mixed same-length dynamic raw | 0.9798x |        -19.5 ns |
+| pure trailing dynamic raw     | 0.9250x |        -70.9 ns |
+| pure trailing dynamic JSON    | 0.9122x |        -65.4 ns |
+| generic dynamic raw           | 1.0246x |        +28.2 ns |
+| forced collision raw          | 0.9038x |       -101.1 ns |
+| ALL dynamic raw               | 0.9302x |        -66.5 ns |
+| static registration           | 1.0214x |       +0.027 ms |
+| static retained heap delta    | 0.9983x |     -1071 bytes |
 
 ## Frozen gate result
 
-| gate | candidate / production | limit | result |
-| --- | ---: | ---: | --- |
-| static-only raw | 1.0368x | `<= 1.0200x` | **FAIL** |
-| mixed static raw | 1.0222x | `<= 1.0200x` | **FAIL** |
-| mixed dynamic raw guard | 0.9346x | `<= 1.0200x` | PASS |
-| mixed dynamic JSON guard | 0.9426x | `<= 1.0200x` | PASS |
-| mixed dynamic geomean | 0.9386x | `<= 0.9800x` | PASS |
-| mixed same-length dynamic raw | 0.9798x | `<= 1.0200x` | PASS |
-| pure trailing dynamic raw | 0.9250x | `<= 0.9400x` | PASS |
-| pure trailing dynamic JSON | 0.9122x | `<= 0.9500x` | PASS |
-| generic dynamic raw | 1.0246x | `<= 1.0300x` | PASS |
-| forced collision raw | 0.9038x | `<= 1.1500x` | PASS |
-| ALL dynamic raw | 0.9302x | `<= 1.0500x` | PASS |
-| static registration | 1.0214x | `<= 1.0500x` | PASS |
-| static retained heap | 0.9983x | `<= 1.0500x` | PASS |
+| gate                          | candidate / production |        limit | result   |
+| ----------------------------- | ---------------------: | -----------: | -------- |
+| static-only raw               |                1.0368x | `<= 1.0200x` | **FAIL** |
+| mixed static raw              |                1.0222x | `<= 1.0200x` | **FAIL** |
+| mixed dynamic raw guard       |                0.9346x | `<= 1.0200x` | PASS     |
+| mixed dynamic JSON guard      |                0.9426x | `<= 1.0200x` | PASS     |
+| mixed dynamic geomean         |                0.9386x | `<= 0.9800x` | PASS     |
+| mixed same-length dynamic raw |                0.9798x | `<= 1.0200x` | PASS     |
+| pure trailing dynamic raw     |                0.9250x | `<= 0.9400x` | PASS     |
+| pure trailing dynamic JSON    |                0.9122x | `<= 0.9500x` | PASS     |
+| generic dynamic raw           |                1.0246x | `<= 1.0300x` | PASS     |
+| forced collision raw          |                0.9038x | `<= 1.1500x` | PASS     |
+| ALL dynamic raw               |                0.9302x | `<= 1.0500x` | PASS     |
+| static registration           |                1.0214x | `<= 1.0500x` | PASS     |
+| static retained heap          |                0.9983x | `<= 1.0500x` | PASS     |
 
 ## Interpretation
 
