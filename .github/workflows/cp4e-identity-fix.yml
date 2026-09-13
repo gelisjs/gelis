@@ -1,0 +1,63 @@
+name: CP4-E Identity Fix
+
+on:
+  push:
+    branches:
+      - work/competitive-cp4e-deferred-trailing-metadata
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    if: github.event.head_commit.message == 'CP4E_IDENTITY_FIX_TRIGGER'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: work/competitive-cp4e-deferred-trailing-metadata
+          fetch-depth: 0
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+      - run: bun install --frozen-lockfile
+      - name: Correct frozen CP4-E source identity
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          old = "f18e1131379f644ecdaf11132dceb2a8965fa430"
+          new = "f18e43623eeafe6356248b174b3ae2112bcc8e82"
+          paths = [
+              Path("bench/runtime/cp4e-deferred-trailing-metadata-acceptance.mts"),
+              Path("docs/benchmarks/competitive-cp4e-deferred-trailing-metadata-freeze.md"),
+          ]
+
+          total = 0
+          for path in paths:
+              text = path.read_text()
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f"expected exactly one stale CP4-E SHA in {path}, got {count}")
+              path.write_text(text.replace(old, new))
+              total += count
+
+          if total != 2:
+              raise SystemExit(f"expected two total replacements, got {total}")
+          PY
+      - name: Format corrected artifacts
+        run: >-
+          bunx prettier --write
+          bench/runtime/cp4e-deferred-trailing-metadata-acceptance.mts
+          docs/benchmarks/competitive-cp4e-deferred-trailing-metadata-freeze.md
+      - name: Full quality
+        run: bun run check
+      - name: Commit identity correction
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add \
+            bench/runtime/cp4e-deferred-trailing-metadata-acceptance.mts \
+            docs/benchmarks/competitive-cp4e-deferred-trailing-metadata-freeze.md
+          git commit -m "bench(competitive): correct CP4-E frozen source identity"
+          git push origin HEAD:work/competitive-cp4e-deferred-trailing-metadata
