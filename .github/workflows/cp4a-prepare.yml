@@ -1,0 +1,44 @@
+name: CP4-A Prepare
+
+on:
+  push:
+    branches:
+      - work/competitive-cp4a-full-url-offset-viability
+
+permissions:
+  contents: write
+
+jobs:
+  prepare:
+    if: github.event.head_commit.message == 'CP4A_PREPARE'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: work/competitive-cp4a-full-url-offset-viability
+          fetch-depth: 0
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+      - run: bun install --frozen-lockfile
+      - name: Format CP4-A files
+        run: |
+          bunx prettier --write \
+            bench/runtime/cp4a-full-url-offset-worker.mts \
+            bench/runtime/cp4a-full-url-offset-acceptance.mts \
+            docs/benchmarks/competitive-cp4a-full-url-offset-viability-freeze.md
+          if ! git diff --quiet; then
+            git config user.name github-actions[bot]
+            git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+            git add bench/runtime/cp4a-full-url-offset-worker.mts \
+              bench/runtime/cp4a-full-url-offset-acceptance.mts \
+              docs/benchmarks/competitive-cp4a-full-url-offset-viability-freeze.md
+            git commit -m "chore(competitive): format CP4-A harness"
+            git push origin HEAD:work/competitive-cp4a-full-url-offset-viability
+          fi
+      - name: Full quality
+        run: bun run check
+      - name: CP4-A correctness probe
+        run: bun bench/runtime/cp4a-full-url-offset-acceptance.mts --probe-only
+      - name: Verify source guard
+        run: git diff --quiet af4e5102046def1b163435333563b8d08f919bf5 HEAD -- src
