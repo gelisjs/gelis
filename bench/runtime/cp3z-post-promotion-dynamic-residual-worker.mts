@@ -21,10 +21,7 @@ const DYNAMIC_URL = `http://gelis.test${DYNAMIC_PATH}`;
 const DYNAMIC_REQUEST = new Request(DYNAMIC_URL);
 
 type PayloadKind =
-  | "string-stable"
-  | "string-param"
-  | "json-stable"
-  | "json-param";
+  "string-stable" | "string-param" | "json-stable" | "json-param";
 
 type Cell =
   | "pathname-request-dynamic"

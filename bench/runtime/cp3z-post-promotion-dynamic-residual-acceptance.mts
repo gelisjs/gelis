@@ -82,7 +82,9 @@ if (probeOnly) {
   }
 
   console.log();
-  console.log(`CP3-Z CORRECTNESS PROBE: PASS (${CELLS.length}/${CELLS.length})`);
+  console.log(
+    `CP3-Z CORRECTNESS PROBE: PASS (${CELLS.length}/${CELLS.length})`,
+  );
   process.exit(0);
 }
 
@@ -104,30 +106,112 @@ console.log();
 console.log("Derived diagnostics — non-additive, engineering direction only");
 console.log("| diagnostic | value |");
 console.log("| --- | ---: |");
-printRatio("router request-derived / literal", "router-request-dynamic", "router-literal-dynamic");
-printDelta("router request-derived - literal", "router-request-dynamic", "router-literal-dynamic");
-printDelta("router request-derived - pathname only", "router-request-dynamic", "pathname-request-dynamic");
-printDelta("handler stable string - request router", "handler-string-stable", "router-request-dynamic");
-printDelta("handler param string - stable string", "handler-string-param", "handler-string-stable");
-printDelta("handler stable JSON - request router", "handler-json-stable", "router-request-dynamic");
-printDelta("handler param JSON - stable JSON", "handler-json-param", "handler-json-stable");
-printDelta("normalize stable string", "pipeline-string-stable", "handler-string-stable");
-printDelta("normalize param string", "pipeline-string-param", "handler-string-param");
-printDelta("normalize stable JSON", "pipeline-json-stable", "handler-json-stable");
+printRatio(
+  "router request-derived / literal",
+  "router-request-dynamic",
+  "router-literal-dynamic",
+);
+printDelta(
+  "router request-derived - literal",
+  "router-request-dynamic",
+  "router-literal-dynamic",
+);
+printDelta(
+  "router request-derived - pathname only",
+  "router-request-dynamic",
+  "pathname-request-dynamic",
+);
+printDelta(
+  "handler stable string - request router",
+  "handler-string-stable",
+  "router-request-dynamic",
+);
+printDelta(
+  "handler param string - stable string",
+  "handler-string-param",
+  "handler-string-stable",
+);
+printDelta(
+  "handler stable JSON - request router",
+  "handler-json-stable",
+  "router-request-dynamic",
+);
+printDelta(
+  "handler param JSON - stable JSON",
+  "handler-json-param",
+  "handler-json-stable",
+);
+printDelta(
+  "normalize stable string",
+  "pipeline-string-stable",
+  "handler-string-stable",
+);
+printDelta(
+  "normalize param string",
+  "pipeline-string-param",
+  "handler-string-param",
+);
+printDelta(
+  "normalize stable JSON",
+  "pipeline-json-stable",
+  "handler-json-stable",
+);
 printDelta("normalize param JSON", "pipeline-json-param", "handler-json-param");
-printDelta("app.fetch stable string - pipeline", "app-string-stable", "pipeline-string-stable");
-printDelta("app.fetch param string - pipeline", "app-string-param", "pipeline-string-param");
-printDelta("app.fetch stable JSON - pipeline", "app-json-stable", "pipeline-json-stable");
-printDelta("app.fetch param JSON - pipeline", "app-json-param", "pipeline-json-param");
-printDelta("param penalty at string handler", "handler-string-param", "handler-string-stable");
-printDelta("param penalty at string pipeline", "pipeline-string-param", "pipeline-string-stable");
-printDelta("param penalty at string app.fetch", "app-string-param", "app-string-stable");
-printDelta("param penalty at JSON handler", "handler-json-param", "handler-json-stable");
-printDelta("param penalty at JSON pipeline", "pipeline-json-param", "pipeline-json-stable");
-printDelta("param penalty at JSON app.fetch", "app-json-param", "app-json-stable");
+printDelta(
+  "app.fetch stable string - pipeline",
+  "app-string-stable",
+  "pipeline-string-stable",
+);
+printDelta(
+  "app.fetch param string - pipeline",
+  "app-string-param",
+  "pipeline-string-param",
+);
+printDelta(
+  "app.fetch stable JSON - pipeline",
+  "app-json-stable",
+  "pipeline-json-stable",
+);
+printDelta(
+  "app.fetch param JSON - pipeline",
+  "app-json-param",
+  "pipeline-json-param",
+);
+printDelta(
+  "param penalty at string handler",
+  "handler-string-param",
+  "handler-string-stable",
+);
+printDelta(
+  "param penalty at string pipeline",
+  "pipeline-string-param",
+  "pipeline-string-stable",
+);
+printDelta(
+  "param penalty at string app.fetch",
+  "app-string-param",
+  "app-string-stable",
+);
+printDelta(
+  "param penalty at JSON handler",
+  "handler-json-param",
+  "handler-json-stable",
+);
+printDelta(
+  "param penalty at JSON pipeline",
+  "pipeline-json-param",
+  "pipeline-json-stable",
+);
+printDelta(
+  "param penalty at JSON app.fetch",
+  "app-json-param",
+  "app-json-stable",
+);
 
 console.log();
-console.log("CP3-Z is decomposition-only: no performance acceptance threshold is applied.");
+console.log(
+  "CP3-Z is decomposition-only: no performance acceptance threshold is applied.",
+);
 console.log();
 console.log("CP3-Z LOCAL DYNAMIC RESIDUAL DECOMPOSITION RUN: COMPLETE");
 
@@ -201,7 +285,9 @@ function runWorker(cell: Cell, workerProbeOnly: boolean): WorkerResult {
 
   const parsed = JSON.parse(line) as WorkerResult;
   if (parsed.cell !== cell) {
-    throw new Error(`Worker cell mismatch: expected ${cell}, got ${parsed.cell}`);
+    throw new Error(
+      `Worker cell mismatch: expected ${cell}, got ${parsed.cell}`,
+    );
   }
   return parsed;
 }
@@ -236,7 +322,9 @@ function preflight(): void {
     { encoding: "utf8" },
   );
   if (sourceDiff.status !== 0) {
-    throw new Error(`src/** differs from frozen production ${PRODUCTION_SOURCE}`);
+    throw new Error(
+      `src/** differs from frozen production ${PRODUCTION_SOURCE}`,
+    );
   }
 
   const ancestor = spawnSync(
@@ -252,7 +340,9 @@ function preflight(): void {
     { encoding: "utf8" },
   );
   if (ancestor.status !== 0) {
-    throw new Error(`Frozen production ${PRODUCTION_SOURCE} is not an ancestor of HEAD`);
+    throw new Error(
+      `Frozen production ${PRODUCTION_SOURCE} is not an ancestor of HEAD`,
+    );
   }
 }
 
