@@ -68,20 +68,36 @@ const CELLS: readonly CellSpec[] = [
   { cell: "static-only-raw", label: "static-only guard", limit: 1.02 },
   { cell: "mixed-static-raw", label: "mixed-static recovery", limit: 0.9963 },
   { cell: "mixed-dynamic-raw", label: "mixed dynamic raw guard", limit: 1.02 },
-  { cell: "mixed-dynamic-json", label: "mixed dynamic JSON guard", limit: 1.02 },
+  {
+    cell: "mixed-dynamic-json",
+    label: "mixed dynamic JSON guard",
+    limit: 1.02,
+  },
   {
     cell: "mixed-same-length-dynamic-raw",
     label: "mixed same-length dynamic raw guard",
     limit: 1.02,
   },
-  { cell: "trailing-dynamic-raw", label: "pure trailing dynamic raw guard", limit: 1.02 },
+  {
+    cell: "trailing-dynamic-raw",
+    label: "pure trailing dynamic raw guard",
+    limit: 1.02,
+  },
   {
     cell: "trailing-dynamic-json",
     label: "pure trailing dynamic JSON guard",
     limit: 1.02,
   },
-  { cell: "generic-dynamic-raw", label: "generic dynamic raw guard", limit: 1.02 },
-  { cell: "collision-dynamic-raw", label: "forced collision raw guard", limit: 1.02 },
+  {
+    cell: "generic-dynamic-raw",
+    label: "generic dynamic raw guard",
+    limit: 1.02,
+  },
+  {
+    cell: "collision-dynamic-raw",
+    label: "forced collision raw guard",
+    limit: 1.02,
+  },
   { cell: "all-dynamic-raw", label: "ALL dynamic raw guard", limit: 1.02 },
 ];
 
@@ -164,7 +180,9 @@ function runProbe(): void {
     for (const source of SOURCES) {
       const result = runWorker(spec.cell, source.label, true);
       if (!result.probeOnly || result.cell !== spec.cell) {
-        throw new Error(`Invalid probe result for ${source.label} ${spec.cell}`);
+        throw new Error(
+          `Invalid probe result for ${source.label} ${spec.cell}`,
+        );
       }
       console.log(`PASS ${source.label}-${spec.cell}`);
     }
@@ -206,7 +224,9 @@ function runTiming(): void {
     for (const source of SOURCES) {
       const input = values.get(key(spec.cell, source.label));
       if (input === undefined || input.length !== SAMPLES) {
-        throw new Error(`Incomplete timing set for ${source.label} ${spec.cell}`);
+        throw new Error(
+          `Incomplete timing set for ${source.label} ${spec.cell}`,
+        );
       }
       summaries.set(
         key(spec.cell, source.label),
@@ -332,7 +352,9 @@ function preflight(): void {
     { encoding: "utf8" },
   );
   if (sourceDiff.status !== 0) {
-    throw new Error(`src/** differs from frozen CP4-W source ${SOURCES[2]!.sha}`);
+    throw new Error(
+      `src/** differs from frozen CP4-W source ${SOURCES[2]!.sha}`,
+    );
   }
 }
 
