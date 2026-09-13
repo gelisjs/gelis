@@ -280,6 +280,19 @@ export class Router {
      */
     const fastMapKind = table.fastMapKind;
 
+    if (fastMapKind === FAST_MAP_STATIC_ONLY) {
+      const staticRoute = table.staticRoutes.get(pathnameFromRequestUrl(url));
+
+      if (staticRoute) {
+        return {
+          route: staticRoute,
+          params: EMPTY_PARAMS,
+        };
+      }
+
+      return undefined;
+    }
+
     if (fastMapKind === undefined && table.usesDynamicTrie) {
       return this.match(method, pathnameFromRequestUrl(url));
     }
@@ -332,21 +345,6 @@ export class Router {
      * - legacy/prebuilt tables: conservatively retain exact static lookup.
      */
     if (fastMapKind !== FAST_MAP_TRAILING_ONLY) {
-      if (fastMapKind === FAST_MAP_STATIC_ONLY) {
-        const staticRoute = table.staticRoutes.get(
-          url.slice(pathStart, pathEnd),
-        );
-
-        if (staticRoute) {
-          return {
-            route: staticRoute,
-            params: EMPTY_PARAMS,
-          };
-        }
-
-        return undefined;
-      }
-
       if (fastMapKind === FAST_MAP_MIXED) {
         const staticPathLengthMax = table.staticPathLengthMax!;
 

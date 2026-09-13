@@ -20,40 +20,40 @@ The first valid local authoritative run completed on the frozen machine and harn
 
 ## Authoritative medians
 
-| cell | production | candidate | ratio | result |
-| --- | ---: | ---: | ---: | --- |
-| static-only raw | 785.1 ns/op | 843.8 ns/op | `1.0747x` | FAIL |
-| mixed static raw | 790.0 ns/op | 808.5 ns/op | `1.0234x` | FAIL |
-| mixed dynamic raw | 964.1 ns/op | 875.4 ns/op | `0.9080x` | PASS |
-| mixed dynamic JSON | 727.5 ns/op | 681.5 ns/op | `0.9369x` | PASS |
-| mixed same-length dynamic raw | 951.2 ns/op | 950.6 ns/op | `0.9994x` | PASS |
-| pure trailing dynamic raw | 983.3 ns/op | 885.6 ns/op | `0.9006x` | PASS |
-| pure trailing dynamic JSON | 752.5 ns/op | 682.3 ns/op | `0.9067x` | PASS |
-| generic dynamic raw | 1171.0 ns/op | 1203.6 ns/op | `1.0278x` | PASS |
-| forced collision raw | 1021.4 ns/op | 987.8 ns/op | `0.9671x` | PASS |
-| ALL dynamic raw | 966.0 ns/op | 891.9 ns/op | `0.9232x` | PASS |
-| static registration | 1.242 ms | 1.245 ms | `1.0030x` | PASS |
-| static retained heap delta | 619117 bytes | 617921 bytes | `0.9981x` | PASS |
+| cell                          |   production |    candidate |     ratio | result |
+| ----------------------------- | -----------: | -----------: | --------: | ------ |
+| static-only raw               |  785.1 ns/op |  843.8 ns/op | `1.0747x` | FAIL   |
+| mixed static raw              |  790.0 ns/op |  808.5 ns/op | `1.0234x` | FAIL   |
+| mixed dynamic raw             |  964.1 ns/op |  875.4 ns/op | `0.9080x` | PASS   |
+| mixed dynamic JSON            |  727.5 ns/op |  681.5 ns/op | `0.9369x` | PASS   |
+| mixed same-length dynamic raw |  951.2 ns/op |  950.6 ns/op | `0.9994x` | PASS   |
+| pure trailing dynamic raw     |  983.3 ns/op |  885.6 ns/op | `0.9006x` | PASS   |
+| pure trailing dynamic JSON    |  752.5 ns/op |  682.3 ns/op | `0.9067x` | PASS   |
+| generic dynamic raw           | 1171.0 ns/op | 1203.6 ns/op | `1.0278x` | PASS   |
+| forced collision raw          | 1021.4 ns/op |  987.8 ns/op | `0.9671x` | PASS   |
+| ALL dynamic raw               |  966.0 ns/op |  891.9 ns/op | `0.9232x` | PASS   |
+| static registration           |     1.242 ms |     1.245 ms | `1.0030x` | PASS   |
+| static retained heap delta    | 619117 bytes | 617921 bytes | `0.9981x` | PASS   |
 
 Mixed dynamic geomean: `0.9223x` — PASS against the frozen `<= 0.9800x` gate.
 
 ## Frozen production gates
 
-| gate | candidate / production | limit | result |
-| --- | ---: | ---: | --- |
-| static-only raw | `1.0747x` | `<= 1.0200x` | FAIL |
-| mixed static raw | `1.0234x` | `<= 1.0200x` | FAIL |
-| mixed dynamic raw guard | `0.9080x` | `<= 1.0200x` | PASS |
-| mixed dynamic JSON guard | `0.9369x` | `<= 1.0200x` | PASS |
-| mixed dynamic geomean | `0.9223x` | `<= 0.9800x` | PASS |
-| mixed same-length dynamic raw | `0.9994x` | `<= 1.0200x` | PASS |
-| pure trailing dynamic raw | `0.9006x` | `<= 0.9400x` | PASS |
-| pure trailing dynamic JSON | `0.9067x` | `<= 0.9500x` | PASS |
-| generic dynamic raw | `1.0278x` | `<= 1.0300x` | PASS |
-| forced collision raw | `0.9671x` | `<= 1.1500x` | PASS |
-| ALL dynamic raw | `0.9232x` | `<= 1.0500x` | PASS |
-| static registration | `1.0030x` | `<= 1.0500x` | PASS |
-| static retained heap | `0.9981x` | `<= 1.0500x` | PASS |
+| gate                          | candidate / production |        limit | result |
+| ----------------------------- | ---------------------: | -----------: | ------ |
+| static-only raw               |              `1.0747x` | `<= 1.0200x` | FAIL   |
+| mixed static raw              |              `1.0234x` | `<= 1.0200x` | FAIL   |
+| mixed dynamic raw guard       |              `0.9080x` | `<= 1.0200x` | PASS   |
+| mixed dynamic JSON guard      |              `0.9369x` | `<= 1.0200x` | PASS   |
+| mixed dynamic geomean         |              `0.9223x` | `<= 0.9800x` | PASS   |
+| mixed same-length dynamic raw |              `0.9994x` | `<= 1.0200x` | PASS   |
+| pure trailing dynamic raw     |              `0.9006x` | `<= 0.9400x` | PASS   |
+| pure trailing dynamic JSON    |              `0.9067x` | `<= 0.9500x` | PASS   |
+| generic dynamic raw           |              `1.0278x` | `<= 1.0300x` | PASS   |
+| forced collision raw          |              `0.9671x` | `<= 1.1500x` | PASS   |
+| ALL dynamic raw               |              `0.9232x` | `<= 1.0500x` | PASS   |
+| static registration           |              `1.0030x` | `<= 1.0500x` | PASS   |
+| static retained heap          |              `0.9981x` | `<= 1.0500x` | PASS   |
 
 ## Interpretation
 
