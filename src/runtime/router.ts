@@ -39,13 +39,20 @@ interface TrailingFingerprintCollisionEntry {
 type TrailingFingerprintEntry =
   TrailingFingerprintUniqueEntry | TrailingFingerprintCollisionEntry;
 
-const FAST_MAP_TRAILING_ONLY = -1;
-const FAST_MAP_EMPTY = 0;
+type FastMapKind = 0 | 1 | 2;
+
+const FAST_MAP_STATIC_ONLY: FastMapKind = 0;
+const FAST_MAP_TRAILING_ONLY: FastMapKind = 1;
+const FAST_MAP_MIXED: FastMapKind = 2;
 
 export interface MethodRoutes {
   readonly staticRoutes: Map<string, RuntimeRouteRecord>;
 
-  fastMapState?: number;
+  fastMapKind?: FastMapKind;
+
+  staticPathLengthMin?: number;
+
+  staticPathLengthMax?: number;
 
   trailingParamRoutes: Map<string, TrailingParamRoute> | undefined;
 
@@ -266,14 +273,12 @@ export class Router {
     }
 
     /*
-     * Runtime-created fast-map tables carry a registration-time kind.
-     * Treat that kind as the primary capability discriminator so fast-map
-     * requests do not pay a separate usesDynamicTrie property read/branch.
-     * Legacy/prebuilt tables without a kind retain the conservative check.
+     * Generic trie matching already requires a materialized pathname.
+     * Defer fast-map lane discrimination until after URL offsets are known so
+     * mixed static hits do not pay the FastMapKind branch chain introduced in
+     * CP4-F. Registration metadata remains unchanged for attribution purity.
      */
-    const fastMapState = table.fastMapState;
-
-    if (fastMapState === undefined && table.usesDynamicTrie) {
+    if (table.usesDynamicTrie) {
       return this.match(method, pathnameFromRequestUrl(url));
     }
 
@@ -316,16 +321,17 @@ export class Router {
     let pathname: string | undefined;
 
     /*
-     * Runtime-created fast-map tables carry a registration-time kind so
-     * capabilities that are not installed do not tax the hot path.
-     *
-     * - pure static: use the CP4-B-shaped exact lookup and return on miss;
-     * - pure trailing: skip static discrimination entirely;
-     * - mixed static + trailing: use the frozen min/max length range;
-     * - legacy/prebuilt tables: conservatively retain exact static lookup.
+     * Preserve CP4-I's upper-bound negative discrimination, but restore the
+     * CP4-E ordering for the exact-static lane. This isolates request-dispatch
+     * control flow from the already-frozen registration metadata shape.
      */
-    if (fastMapState !== undefined && fastMapState > FAST_MAP_EMPTY) {
-      if (pathEnd - pathStart <= fastMapState) {
+    if (table.staticRoutes.size !== 0) {
+      const staticPathLengthMax = table.staticPathLengthMax;
+
+      if (
+        staticPathLengthMax === undefined ||
+        pathEnd - pathStart <= staticPathLengthMax
+      ) {
         pathname = url.slice(pathStart, pathEnd);
 
         const staticRoute = table.staticRoutes.get(pathname);
@@ -337,37 +343,12 @@ export class Router {
           };
         }
       }
-    } else if (
-      fastMapState !== undefined &&
-      fastMapState < FAST_MAP_TRAILING_ONLY
-    ) {
-      const staticRoute = table.staticRoutes.get(url.slice(pathStart, pathEnd));
-
-      if (staticRoute) {
-        return {
-          route: staticRoute,
-          params: EMPTY_PARAMS,
-        };
-      }
-
-      return undefined;
-    } else if (fastMapState === undefined && table.staticRoutes.size !== 0) {
-      pathname = url.slice(pathStart, pathEnd);
-
-      const staticRoute = table.staticRoutes.get(pathname);
-
-      if (staticRoute) {
-        return {
-          route: staticRoute,
-          params: EMPTY_PARAMS,
-        };
-      }
     }
 
     const trailingParamFingerprints = table.trailingParamFingerprints;
     const trailingParamRoutes = table.trailingParamRoutes;
 
-    if (fastMapState !== undefined || !table.usesDynamicTrie) {
+    if (!table.usesDynamicTrie) {
       if (
         pathEnd - pathStart > 1 &&
         (trailingParamFingerprints !== undefined ||
@@ -629,7 +610,11 @@ function createMethodRoutes(): MethodRoutes {
   return {
     staticRoutes: new Map(),
 
-    fastMapState: FAST_MAP_EMPTY,
+    fastMapKind: FAST_MAP_STATIC_ONLY,
+
+    staticPathLengthMin: Number.POSITIVE_INFINITY,
+
+    staticPathLengthMax: Number.NEGATIVE_INFINITY,
 
     trailingParamRoutes: undefined,
 
@@ -643,9 +628,17 @@ function cloneMethodRoutes(table: MethodRoutes): MethodRoutes {
   return {
     staticRoutes: new Map(table.staticRoutes),
 
-    ...(table.fastMapState === undefined
+    ...(table.fastMapKind === undefined
       ? {}
-      : { fastMapState: table.fastMapState }),
+      : { fastMapKind: table.fastMapKind }),
+
+    ...(table.staticPathLengthMin === undefined
+      ? {}
+      : { staticPathLengthMin: table.staticPathLengthMin }),
+
+    ...(table.staticPathLengthMax === undefined
+      ? {}
+      : { staticPathLengthMax: table.staticPathLengthMax }),
 
     trailingParamRoutes:
       table.trailingParamRoutes === undefined
@@ -725,23 +718,20 @@ function registerRouteIntoTable(
 
     table.staticRoutes.set(route.path, route);
 
+    if (table.fastMapKind === FAST_MAP_TRAILING_ONLY) {
+      table.fastMapKind = FAST_MAP_MIXED;
+    }
+
     const pathLength = route.path.length;
-    const fastMapState = table.fastMapState;
+    const staticPathLengthMin = table.staticPathLengthMin;
+    const staticPathLengthMax = table.staticPathLengthMax;
 
-    if (fastMapState === FAST_MAP_TRAILING_ONLY) {
-      table.fastMapState = pathLength;
-    } else if (fastMapState !== undefined) {
-      if (fastMapState === FAST_MAP_EMPTY) {
-        table.fastMapState = -(pathLength + 1);
-      } else if (fastMapState < FAST_MAP_TRAILING_ONLY) {
-        const staticPathLengthMax = -fastMapState - 1;
+    if (staticPathLengthMin !== undefined && pathLength < staticPathLengthMin) {
+      table.staticPathLengthMin = pathLength;
+    }
 
-        if (pathLength > staticPathLengthMax) {
-          table.fastMapState = -(pathLength + 1);
-        }
-      } else if (pathLength > fastMapState) {
-        table.fastMapState = pathLength;
-      }
+    if (staticPathLengthMax !== undefined && pathLength > staticPathLengthMax) {
+      table.staticPathLengthMax = pathLength;
     }
 
     return;
@@ -755,15 +745,9 @@ function registerRouteIntoTable(
       : undefined;
 
   if (trailingParamName !== undefined && !table.usesDynamicTrie) {
-    const fastMapState = table.fastMapState;
-
-    if (fastMapState === FAST_MAP_EMPTY) {
-      table.fastMapState = FAST_MAP_TRAILING_ONLY;
-    } else if (
-      fastMapState !== undefined &&
-      fastMapState < FAST_MAP_TRAILING_ONLY
-    ) {
-      table.fastMapState = -fastMapState - 1;
+    if (table.fastMapKind === FAST_MAP_STATIC_ONLY) {
+      table.fastMapKind =
+        table.staticRoutes.size === 0 ? FAST_MAP_TRAILING_ONLY : FAST_MAP_MIXED;
     }
 
     const slash = route.path.lastIndexOf("/");
@@ -808,7 +792,7 @@ function registerRouteIntoTable(
   if (!table.usesDynamicTrie) {
     migrateTrailingRoutesToTrie(table);
 
-    delete table.fastMapState;
+    delete table.fastMapKind;
     table.usesDynamicTrie = true;
   }
 
