@@ -14,33 +14,33 @@
 
 ## Candidate / control ratios
 
-| comparison | ratio | candidate delta |
-| --- | ---: | ---: |
-| static-only raw | 0.9926x | -6.1 ns |
-| mixed static raw | 0.9801x | -16.3 ns |
-| mixed dynamic raw | 1.0170x | +14.7 ns |
-| mixed dynamic JSON | 0.9839x | -11.1 ns |
-| mixed same-length dynamic raw | 0.9835x | -16.0 ns |
-| pure trailing dynamic raw | 1.0140x | +12.3 ns |
-| pure trailing dynamic JSON | 0.9986x | -1.0 ns |
-| generic dynamic raw | 0.9816x | -21.9 ns |
-| forced collision raw | 0.9856x | -14.1 ns |
-| ALL dynamic raw | 1.0183x | +16.2 ns |
+| comparison                    |   ratio | candidate delta |
+| ----------------------------- | ------: | --------------: |
+| static-only raw               | 0.9926x |         -6.1 ns |
+| mixed static raw              | 0.9801x |        -16.3 ns |
+| mixed dynamic raw             | 1.0170x |        +14.7 ns |
+| mixed dynamic JSON            | 0.9839x |        -11.1 ns |
+| mixed same-length dynamic raw | 0.9835x |        -16.0 ns |
+| pure trailing dynamic raw     | 1.0140x |        +12.3 ns |
+| pure trailing dynamic JSON    | 0.9986x |         -1.0 ns |
+| generic dynamic raw           | 0.9816x |        -21.9 ns |
+| forced collision raw          | 0.9856x |        -14.1 ns |
+| ALL dynamic raw               | 1.0183x |        +16.2 ns |
 
 ## Frozen gate result
 
-| gate | candidate / CP4-H control | limit | result |
-| --- | ---: | ---: | --- |
-| static-only guard | 0.9926x | `<= 1.0200x` | PASS |
-| mixed-static recovery | 0.9801x | `<= 0.9948x` | PASS |
-| mixed dynamic raw guard | 1.0170x | `<= 1.0200x` | PASS |
-| mixed dynamic JSON guard | 0.9839x | `<= 1.0200x` | PASS |
-| mixed same-length dynamic raw guard | 0.9835x | `<= 1.0200x` | PASS |
-| pure trailing dynamic raw guard | 1.0140x | `<= 1.0200x` | PASS |
-| pure trailing dynamic JSON guard | 0.9986x | `<= 1.0200x` | PASS |
-| generic dynamic raw guard | 0.9816x | `<= 1.0200x` | PASS |
-| forced collision raw guard | 0.9856x | `<= 1.0200x` | PASS |
-| ALL dynamic raw guard | 1.0183x | `<= 1.0200x` | PASS |
+| gate                                | candidate / CP4-H control |        limit | result |
+| ----------------------------------- | ------------------------: | -----------: | ------ |
+| static-only guard                   |                   0.9926x | `<= 1.0200x` | PASS   |
+| mixed-static recovery               |                   0.9801x | `<= 0.9948x` | PASS   |
+| mixed dynamic raw guard             |                   1.0170x | `<= 1.0200x` | PASS   |
+| mixed dynamic JSON guard            |                   0.9839x | `<= 1.0200x` | PASS   |
+| mixed same-length dynamic raw guard |                   0.9835x | `<= 1.0200x` | PASS   |
+| pure trailing dynamic raw guard     |                   1.0140x | `<= 1.0200x` | PASS   |
+| pure trailing dynamic JSON guard    |                   0.9986x | `<= 1.0200x` | PASS   |
+| generic dynamic raw guard           |                   0.9816x | `<= 1.0200x` | PASS   |
+| forced collision raw guard          |                   0.9856x | `<= 1.0200x` | PASS   |
+| ALL dynamic raw guard               |                   1.0183x | `<= 1.0200x` | PASS   |
 
 ## Interpretation
 
