@@ -31,3 +31,14 @@ jobs:
 
       - name: Run quality gates
         run: bun run check
+
+      - name: Setup Bun 1.4.2 for CP4-AH probe
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+
+      - name: Fetch CP4-AH source ancestry
+        run: git fetch --no-tags --unshallow origin
+
+      - name: Run CP4-AH correctness probe only
+        run: bun bench/runtime/cp4ah-kind-primary-z-viability.mts --probe-only
