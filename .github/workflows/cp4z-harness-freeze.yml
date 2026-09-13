@@ -1,0 +1,70 @@
+name: CP4-Z Harness Freeze
+
+on:
+  push:
+    branches:
+      - work/competitive-cp4z-mixed-static-first-generic-table
+    paths:
+      - .cp4z-harness-trigger
+
+permissions:
+  contents: write
+
+jobs:
+  freeze:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: work/competitive-cp4z-mixed-static-first-generic-table
+          fetch-depth: 0
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+      - run: bun install --frozen-lockfile
+      - name: Build CP4-Z artifacts from frozen CP4-Y production harness
+        shell: bash
+        run: |
+          cp bench/runtime/cp4y-direct-production-revalidation-acceptance.mts bench/runtime/cp4z-mixed-static-first-production-acceptance.mts
+          cp bench/runtime/cp4y-direct-production-revalidation-worker.mts bench/runtime/cp4z-mixed-static-first-production-acceptance-worker.mts
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('bench/runtime/cp4z-mixed-static-first-production-acceptance.mts')
+          text = path.read_text()
+          text = text.replace('cp4y-direct-production-revalidation-worker.mts', 'cp4z-mixed-static-first-production-acceptance-worker.mts')
+          text = text.replace('CP4-Y direct production revalidation', 'CP4-Z mixed-static-first direct production acceptance')
+          text = text.replace('CP4-Y', 'CP4-Z').replace('cp4y', 'cp4z')
+          text = text.replace('efaa228231c920fee78053edeb5c8c094f324aca', '1b4057ad9d12bc28d2ab2ca7917924368fe99444')
+          text = text.replace('DIRECT PRODUCTION REVALIDATION GATE', 'MIXED-STATIC-FIRST DIRECT PRODUCTION ACCEPTANCE GATE')
+          text = text.replace('LOCAL DIRECT PRODUCTION REVALIDATION RUN', 'LOCAL MIXED-STATIC-FIRST PRODUCTION ACCEPTANCE RUN')
+          path.write_text(text)
+          worker = Path('bench/runtime/cp4z-mixed-static-first-production-acceptance-worker.mts')
+          w = worker.read_text().replace('cp4y-app', 'cp4z-app').replace('cp4y-router', 'cp4z-router')
+          worker.write_text(w)
+          PY
+          cat > docs/benchmarks/competitive-cp4z-mixed-static-first-production-acceptance-freeze.md <<'EOF'
+          # Competitive Performance v0.1 — CP4-Z Mixed-Static-First Direct Production Acceptance Freeze
+
+          Date: 2026-09-13
+
+          Production source: `af4e5102046def1b163435333563b8d08f919bf5`.
+
+          CP4-Z candidate source: `1b4057ad9d12bc28d2ab2ca7917924368fe99444`.
+
+          Runtime is Bun `1.4.2`, revision `744846f844374847c902b5e7fd59b4342a51ef99`, with `5,000` routes and `12` mirrored fresh-worker pairs per cell pair. Pair order is balanced 6/6.
+
+          Production thresholds are unchanged from CP4-Y / CP4-J: static-only `<=1.0200x`; mixed static `<=1.0200x`; mixed dynamic raw `<=1.0200x`; mixed dynamic JSON `<=1.0200x`; mixed dynamic geomean `<=0.9800x`; mixed same-length `<=1.0200x`; trailing raw `<=0.9400x`; trailing JSON `<=0.9500x`; generic raw `<=1.0300x`; collision `<=1.1500x`; ALL `<=1.0500x`; registration `<=1.0500x`; retained heap `<=1.0500x`.
+
+          PASS requires every gate to pass in the first valid completed local timed run. CI timing is non-authoritative.
+          EOF
+      - name: Format artifacts
+        run: bunx prettier --write bench/runtime/cp4z-mixed-static-first-production-acceptance.mts bench/runtime/cp4z-mixed-static-first-production-acceptance-worker.mts docs/benchmarks/competitive-cp4z-mixed-static-first-production-acceptance-freeze.md
+      - name: Full quality
+        run: bun run check
+      - name: Commit frozen artifacts
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add bench/runtime/cp4z-mixed-static-first-production-acceptance.mts bench/runtime/cp4z-mixed-static-first-production-acceptance-worker.mts docs/benchmarks/competitive-cp4z-mixed-static-first-production-acceptance-freeze.md
+          git commit -m "bench(competitive): freeze CP4-Z production acceptance"
+          git push origin HEAD:work/competitive-cp4z-mixed-static-first-generic-table
