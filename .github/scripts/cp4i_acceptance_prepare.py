@@ -28,6 +28,10 @@ accept = accept.replace(
     "CP4-H FAST-MAP PRIMARY DISCRIMINATOR DECOMPOSITION GATE",
     "CP4-I MIXED UPPER-BOUND VIABILITY GATE",
 )
+accept = accept.replace(
+    "CP4-F control worktree remained after cleanup",
+    "CP4-I control worktree remained after cleanup",
+)
 
 old_gates = re.compile(r"  const gates = \[.*?  \] as const;", re.S)
 new_gates = '''  const gates = [
