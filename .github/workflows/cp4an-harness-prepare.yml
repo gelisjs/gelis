@@ -1,0 +1,38 @@
+name: CP4-AN Harness Prepare
+
+on:
+  push:
+    branches:
+      - work/competitive-cp4an-all-only-method-miss-elision-viability
+    paths:
+      - .cp4an-harness-trigger
+
+permissions:
+  contents: write
+
+jobs:
+  prepare:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: work/competitive-cp4an-all-only-method-miss-elision-viability
+          fetch-depth: 0
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+      - run: bun install --frozen-lockfile
+      - name: Build frozen CP4-AN viability harness
+        run: python .github/scripts/cp4an_build_viability_harness.py
+      - name: Format frozen artifacts
+        run: bunx prettier --write bench/runtime/cp4an-all-only-method-miss-elision-viability.mts bench/runtime/cp4an-all-only-method-miss-elision-viability-worker.mts docs/benchmarks/competitive-cp4an-all-only-method-miss-elision-viability-freeze.md
+      - name: Full quality
+        run: bun run check
+      - name: Commit frozen harness
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add bench/runtime/cp4an-all-only-method-miss-elision-viability.mts bench/runtime/cp4an-all-only-method-miss-elision-viability-worker.mts docs/benchmarks/competitive-cp4an-all-only-method-miss-elision-viability-freeze.md
+          git commit -m "bench(cp4an): freeze ALL-only method-miss elision viability"
+          git push origin HEAD:work/competitive-cp4an-all-only-method-miss-elision-viability
