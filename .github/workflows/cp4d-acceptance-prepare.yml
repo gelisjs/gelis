@@ -1,0 +1,51 @@
+name: CP4-D Acceptance Prepare
+
+on:
+  push:
+    branches:
+      - work/competitive-cp4d-static-length-range
+
+permissions:
+  contents: write
+
+jobs:
+  prepare:
+    if: github.event.head_commit.message == 'CP4D_ACCEPTANCE_PREPARE_TRIGGER'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: work/competitive-cp4d-static-length-range
+          fetch-depth: 0
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+      - run: bun install --frozen-lockfile
+      - name: Format CP4-D acceptance files
+        run: |
+          bunx prettier --write \
+            bench/runtime/cp4d-static-length-range-worker.mts \
+            bench/runtime/cp4d-static-length-range-acceptance.mts \
+            docs/benchmarks/competitive-cp4d-static-length-range-freeze.md
+          if ! git diff --quiet; then
+            git config user.name github-actions[bot]
+            git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+            git add \
+              bench/runtime/cp4d-static-length-range-worker.mts \
+              bench/runtime/cp4d-static-length-range-acceptance.mts \
+              docs/benchmarks/competitive-cp4d-static-length-range-freeze.md
+            git commit -m "chore(competitive): format CP4-D acceptance harness"
+            git push origin HEAD:work/competitive-cp4d-static-length-range
+          fi
+      - name: Full quality
+        run: bun run check
+      - name: CP4-D correctness probe
+        run: bun bench/runtime/cp4d-static-length-range-acceptance.mts --probe-only
+      - name: Verify frozen source guard
+        run: git diff --quiet 5d9e5672031ff0ec468052f1d82c55e10b5387d7 HEAD -- src
+      - name: Verify no CP4-D production worktree remains
+        run: |
+          if git worktree list --porcelain | grep -q 'gelis-cp4d-production'; then
+            echo 'CP4-D production worktree remained after probe'
+            exit 1
+          fi
