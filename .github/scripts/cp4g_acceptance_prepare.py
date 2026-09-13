@@ -10,8 +10,18 @@ accept = accept.replace("cp4f-method-table-kind-worker.mts", "cp4g-request-url-d
 accept = accept.replace("PRODUCTION_SOURCE", "CONTROL_SOURCE")
 accept = accept.replace("PRODUCTION_WORKTREE", "CONTROL_WORKTREE")
 accept = accept.replace("productionWorktreeCreated", "controlWorktreeCreated")
-accept = accept.replace('"af4e5102046def1b163435333563b8d08f919bf5"', f'"{control}"', 1)
-accept = accept.replace('"1e19a185eafbe271125eb73fc9f389413345ea8b"', f'"{candidate}"', 1)
+accept = re.sub(
+    r'const CONTROL_SOURCE = ".*?";',
+    f'const CONTROL_SOURCE = "{control}";',
+    accept,
+    count=1,
+)
+accept = re.sub(
+    r'const CANDIDATE_SOURCE = ".*?";',
+    f'const CANDIDATE_SOURCE = "{candidate}";',
+    accept,
+    count=1,
+)
 accept = accept.replace('"production"', '"control"')
 accept = accept.replace("production", "control")
 accept = accept.replace("Production", "Control")
@@ -26,6 +36,11 @@ accept = accept.replace('  { cell: "static-registration", label: "static registr
 accept = accept.replace('  { cell: "static-memory", label: "static retained heap delta" },\n', "")
 accept = accept.replace('  const registrationRatio = ratio(summaries, "static-registration");\n', "")
 accept = accept.replace('  const memoryRatio = ratio(summaries, "static-memory");\n', "")
+accept = accept.replace("  const mixedGeomean = Math.sqrt(mixedRawRatio * mixedJsonRatio);\n", "")
+accept = accept.replace(
+    '  console.log(`Control src: ${CONTROL_SOURCE}`);',
+    '  console.log(`Control src:      ${CONTROL_SOURCE}`);',
+)
 
 old_gates = re.compile(r"  const gates = \[.*?  \] as const;", re.S)
 new_gates = '''  const gates = [
