@@ -194,7 +194,9 @@ function runTiming(): void {
     for (const source of SOURCES) {
       const input = values.get(key(spec.cell, source.label));
       if (input === undefined || input.length !== SAMPLES) {
-        throw new Error(`Incomplete timing set for ${source.label} ${spec.cell}`);
+        throw new Error(
+          `Incomplete timing set for ${source.label} ${spec.cell}`,
+        );
       }
       summaries.set(
         key(spec.cell, source.label),
@@ -248,7 +250,8 @@ function runTiming(): void {
         passing++;
       }
     }
-    const result = passing === CELLS.length ? "PROJECTED ALL PASS" : "PROJECTED FAIL";
+    const result =
+      passing === CELLS.length ? "PROJECTED ALL PASS" : "PROJECTED FAIL";
     console.log(`| ${variant} | ${passing}/${CELLS.length} | ${result} |`);
   }
 }
@@ -259,7 +262,8 @@ function runWorker(
   workerProbeOnly: boolean,
 ): WorkerResult {
   const sourceRoot = worktrees.get(variant);
-  if (sourceRoot === undefined) throw new Error(`Missing worktree for ${variant}`);
+  if (sourceRoot === undefined)
+    throw new Error(`Missing worktree for ${variant}`);
 
   const result = spawnSync(
     process.execPath,
