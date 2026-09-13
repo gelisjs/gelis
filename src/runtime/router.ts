@@ -42,6 +42,8 @@ type TrailingFingerprintEntry =
 export interface MethodRoutes {
   readonly staticRoutes: Map<string, RuntimeRouteRecord>;
 
+  staticPathLengths?: Set<number>;
+
   trailingParamRoutes: Map<string, TrailingParamRoute> | undefined;
 
   trailingParamFingerprints?: Map<number, TrailingFingerprintEntry>;
@@ -260,6 +262,14 @@ export class Router {
       return undefined;
     }
 
+    /*
+     * Generic trie matching already requires a materialized pathname.
+     * Avoid paying the full-URL offset parser before falling back to it.
+     */
+    if (table.usesDynamicTrie) {
+      return this.match(method, pathnameFromRequestUrl(url));
+    }
+
     let authorityStart: number;
 
     if (
@@ -296,23 +306,33 @@ export class Router {
 
     const queryStart = url.indexOf("?", pathStart + 1);
     const pathEnd = queryStart === -1 ? url.length : queryStart;
+    const pathLength = pathEnd - pathStart;
 
     let pathname: string | undefined;
 
     /*
-     * Preserve exact static precedence before every dynamic path.
-     * Pure-dynamic method tables skip pathname slicing entirely.
+     * Exact static precedence is only possible when at least one installed
+     * static route has the same pathname length. Legacy/prebuilt tables that
+     * do not carry the optional discriminator conservatively take the old
+     * exact-static slice path.
      */
     if (table.staticRoutes.size !== 0) {
-      pathname = url.slice(pathStart, pathEnd);
+      const staticPathLengths = table.staticPathLengths;
 
-      const staticRoute = table.staticRoutes.get(pathname);
+      if (
+        staticPathLengths === undefined ||
+        staticPathLengths.has(pathLength)
+      ) {
+        pathname = url.slice(pathStart, pathEnd);
 
-      if (staticRoute) {
-        return {
-          route: staticRoute,
-          params: EMPTY_PARAMS,
-        };
+        const staticRoute = table.staticRoutes.get(pathname);
+
+        if (staticRoute) {
+          return {
+            route: staticRoute,
+            params: EMPTY_PARAMS,
+          };
+        }
       }
     }
 
@@ -581,6 +601,8 @@ function createMethodRoutes(): MethodRoutes {
   return {
     staticRoutes: new Map(),
 
+    staticPathLengths: new Set(),
+
     trailingParamRoutes: undefined,
 
     dynamicRoot: createDynamicNode(),
@@ -592,6 +614,10 @@ function createMethodRoutes(): MethodRoutes {
 function cloneMethodRoutes(table: MethodRoutes): MethodRoutes {
   return {
     staticRoutes: new Map(table.staticRoutes),
+
+    ...(table.staticPathLengths === undefined
+      ? {}
+      : { staticPathLengths: new Set(table.staticPathLengths) }),
 
     trailingParamRoutes:
       table.trailingParamRoutes === undefined
@@ -670,6 +696,7 @@ function registerRouteIntoTable(
     }
 
     table.staticRoutes.set(route.path, route);
+    table.staticPathLengths?.add(route.path.length);
 
     return;
   }
