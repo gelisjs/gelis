@@ -1,0 +1,37 @@
+name: CP4-O Source Prepare
+
+on:
+  push:
+    branches:
+      - work/competitive-cp4o-packed-fast-map-state
+    paths:
+      - .cp4o-source-trigger
+
+permissions:
+  contents: write
+
+jobs:
+  prepare:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: work/competitive-cp4o-packed-fast-map-state
+          fetch-depth: 0
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+      - run: bun install --frozen-lockfile
+      - name: Apply packed fast-map state transform
+        run: python .github/scripts/cp4o_packed_fast_map_state.py
+      - name: Format source
+        run: bunx prettier --write src/runtime/router.ts
+      - name: Full quality
+        run: bun run check
+      - name: Commit source candidate
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/runtime/router.ts
+          git commit -m "perf(runtime): pack fast-map state and static upper bound"
+          git push origin HEAD:work/competitive-cp4o-packed-fast-map-state
