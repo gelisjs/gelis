@@ -1,0 +1,32 @@
+name: CP4-AQ0 evidence format
+
+on:
+  push:
+    branches:
+      - work/competitive-cp4aq0-benchmark-stability-calibration-evidence
+
+permissions:
+  contents: write
+
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: work/competitive-cp4aq0-benchmark-stability-calibration-evidence
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.0
+      - run: bun install --frozen-lockfile
+      - name: Format evidence
+        run: bunx prettier docs/benchmarks/competitive-cp4aq0-local-authoritative.md --write
+      - name: Commit formatting
+        shell: bash
+        run: |
+          if git diff --quiet; then exit 0; fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/benchmarks/competitive-cp4aq0-local-authoritative.md
+          git commit -m "style(competitive): format CP4-AQ0 evidence"
+          git push
