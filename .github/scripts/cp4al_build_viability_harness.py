@@ -45,7 +45,9 @@ strict = [
     ),
     ('CP4-AI source:', 'CP4-AK source:'),
     ('Overall candidate / AI control ratios', 'Overall candidate / AK control ratios'),
+    ('Blockwise candidate / AI control ratios', 'Blockwise candidate / AK control ratios'),
     ('candidate / AI control', 'candidate / AK control'),
+    ('| gate | candidate / AI control | limit | result |', '| gate | candidate / AK control | limit | result |'),
     (
         'Frozen CP4-AK static-leading mask viability gates',
         'Frozen CP4-AL ALL dynamic specialization viability gates',
@@ -107,6 +109,10 @@ if 'const CANDIDATE_SOURCE = "2a01866678b296a9618e17c245a897752f4d640a";' not in
     raise SystemExit("candidate source replacement failed")
 if 'CP4-AK source:' not in text:
     raise SystemExit("control label replacement failed")
+if 'Blockwise candidate / AK control ratios' not in text:
+    raise SystemExit("blockwise control label replacement failed")
+if '| gate | candidate / AK control | limit | result |' not in text:
+    raise SystemExit("gate control label replacement failed")
 if '["mixed-static-raw", 1.01]' not in text:
     raise SystemExit("mixed-static guard replacement failed")
 if '["all-dynamic-raw", 0.985]' not in text:
