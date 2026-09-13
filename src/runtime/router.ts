@@ -50,8 +50,6 @@ export interface MethodRoutes {
 
   fastMapKind?: FastMapKind;
 
-  staticPathLengthMin?: number;
-
   staticPathLengthMax?: number;
 
   trailingParamRoutes: Map<string, TrailingParamRoute> | undefined;
@@ -605,8 +603,6 @@ function createMethodRoutes(): MethodRoutes {
 
     fastMapKind: FAST_MAP_STATIC_ONLY,
 
-    staticPathLengthMin: Number.POSITIVE_INFINITY,
-
     staticPathLengthMax: Number.NEGATIVE_INFINITY,
 
     trailingParamRoutes: undefined,
@@ -624,10 +620,6 @@ function cloneMethodRoutes(table: MethodRoutes): MethodRoutes {
     ...(table.fastMapKind === undefined
       ? {}
       : { fastMapKind: table.fastMapKind }),
-
-    ...(table.staticPathLengthMin === undefined
-      ? {}
-      : { staticPathLengthMin: table.staticPathLengthMin }),
 
     ...(table.staticPathLengthMax === undefined
       ? {}
@@ -716,12 +708,7 @@ function registerRouteIntoTable(
     }
 
     const pathLength = route.path.length;
-    const staticPathLengthMin = table.staticPathLengthMin;
     const staticPathLengthMax = table.staticPathLengthMax;
-
-    if (staticPathLengthMin !== undefined && pathLength < staticPathLengthMin) {
-      table.staticPathLengthMin = pathLength;
-    }
 
     if (staticPathLengthMax !== undefined && pathLength > staticPathLengthMax) {
       table.staticPathLengthMax = pathLength;
