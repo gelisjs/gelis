@@ -5,8 +5,8 @@ import { fileURLToPath } from "node:url";
 
 const EXPECTED_BUN = "1.4.2";
 const EXPECTED_BUN_REVISION = "744846f844374847c902b5e7fd59b4342a51ef99";
-const CONTROL_SOURCE = "b3ae6337b561d2683376a0f459a3bbf2d50d0867";
-const CANDIDATE_SOURCE = "1e19a185eafbe271125eb73fc9f389413345ea8b";
+const CONTROL_SOURCE = "1e19a185eafbe271125eb73fc9f389413345ea8b";
+const CANDIDATE_SOURCE = "b3ae6337b561d2683376a0f459a3bbf2d50d0867";
 const ROUTES = 5_000;
 const SAMPLES = 11;
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -127,7 +127,7 @@ function printHeader(): void {
   console.log(`Revision:       ${Bun.revision}`);
   console.log(`CPU:            ${cpu}`);
   console.log(`Harness SHA:    ${harnessSha}`);
-  console.log(`Control src: ${CONTROL_SOURCE}`);
+  console.log(`Control src:      ${CONTROL_SOURCE}`);
   console.log(`Candidate src:  ${CANDIDATE_SOURCE}`);
   console.log(`Routes:         ${ROUTES.toLocaleString("en-US")}`);
   console.log(
@@ -226,7 +226,6 @@ function runTiming(): void {
   const mixedStaticRatio = ratio(summaries, "mixed-static-raw");
   const mixedRawRatio = ratio(summaries, "mixed-dynamic-raw");
   const mixedJsonRatio = ratio(summaries, "mixed-dynamic-json");
-  const mixedGeomean = Math.sqrt(mixedRawRatio * mixedJsonRatio);
   const sameLengthRatio = ratio(summaries, "mixed-same-length-dynamic-raw");
   const trailingRawRatio = ratio(summaries, "trailing-dynamic-raw");
   const trailingJsonRatio = ratio(summaries, "trailing-dynamic-json");
