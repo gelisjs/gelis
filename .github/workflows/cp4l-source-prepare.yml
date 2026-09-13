@@ -1,0 +1,39 @@
+name: CP4-L Source Prepare
+
+on:
+  push:
+    branches:
+      - work/competitive-cp4l-static-capability-elision
+    paths:
+      - .cp4l-source-trigger
+
+permissions:
+  contents: write
+
+jobs:
+  prepare:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: work/competitive-cp4l-static-capability-elision
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+      - run: bun install --frozen-lockfile
+      - name: Apply CP4-L source transform
+        run: python .github/scripts/cp4l_static_capability_elision.py
+      - name: Format source and evidence
+        run: bunx prettier --write src/runtime/router.ts src/app.ts docs/benchmarks/competitive-cp4k-local-authoritative.md
+      - name: Full quality
+        run: bun run check
+      - name: Commit CP4-L source candidate
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/runtime/router.ts src/app.ts docs/benchmarks/competitive-cp4k-local-authoritative.md
+          git diff --cached --quiet && exit 0
+          git commit -m "perf(router): elide static-only request-url capability"
+          git push origin HEAD:work/competitive-cp4l-static-capability-elision
