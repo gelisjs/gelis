@@ -13,6 +13,7 @@ accept = accept.replace("CP4-E DEFERRED TRAILING-METADATA GATE", "CP4-F METHOD-T
 accept = accept.replace("CP4-E LOCAL DEFERRED TRAILING-METADATA RUN: COMPLETE", "CP4-F LOCAL METHOD-TABLE KIND RUN: COMPLETE")
 accept = accept.replace("CP4-E requires", "CP4-F requires")
 accept = accept.replace("CP4-E source", "CP4-F source")
+accept = accept.replace("CP4-E production worktree", "CP4-F production worktree")
 accept = accept.replace("gelis-cp4e-production-", "gelis-cp4f-production-")
 Path("bench/runtime/cp4f-method-table-kind-acceptance.mts").write_text(accept)
 
