@@ -249,9 +249,7 @@ function runTiming(): void {
     "cp4c",
     "cp4b",
   );
-  const mixedRecoveryGeomean = Math.sqrt(
-    mixedRawRecovery * mixedJsonRecovery,
-  );
+  const mixedRecoveryGeomean = Math.sqrt(mixedRawRecovery * mixedJsonRecovery);
 
   console.log();
   console.log("CP4-C mechanism diagnostics (decomposition only; no gate)");
@@ -384,14 +382,7 @@ function preflight(): void {
 
   const sourceAncestor = spawnSync(
     "git",
-    [
-      "-C",
-      REPOSITORY_ROOT,
-      "merge-base",
-      "--is-ancestor",
-      CP4C_SOURCE,
-      "HEAD",
-    ],
+    ["-C", REPOSITORY_ROOT, "merge-base", "--is-ancestor", CP4C_SOURCE, "HEAD"],
     { encoding: "utf8" },
   );
   if (sourceAncestor.status !== 0) {
@@ -544,7 +535,9 @@ function git(args: readonly string[]): string {
 function gitAt(path: string, args: readonly string[]): string {
   const result = spawnSync("git", ["-C", path, ...args], { encoding: "utf8" });
   if (result.status !== 0) {
-    throw new Error(`git ${args.join(" ")} failed in ${path}:\n${result.stderr}`);
+    throw new Error(
+      `git ${args.join(" ")} failed in ${path}:\n${result.stderr}`,
+    );
   }
   return result.stdout.trim();
 }
