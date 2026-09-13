@@ -1,3 +1,5 @@
+import { pathnameFromRequestUrl } from "./url";
+
 import type { RuntimeRouteRecord } from "./types";
 
 export interface DynamicRoute {
@@ -247,6 +249,156 @@ export class Router {
     return {
       route: dynamicRoute.route,
 
+      params,
+    };
+  }
+
+  matchRequestUrl(method: string, url: string): RuntimeRouteMatch | undefined {
+    const table = this.#methods.get(method);
+
+    if (!table) {
+      return undefined;
+    }
+
+    let authorityStart: number;
+
+    if (
+      url.charCodeAt(0) !== 104 ||
+      url.charCodeAt(1) !== 116 ||
+      url.charCodeAt(2) !== 116 ||
+      url.charCodeAt(3) !== 112
+    ) {
+      return this.match(method, pathnameFromRequestUrl(url));
+    }
+
+    if (
+      url.charCodeAt(4) === 58 &&
+      url.charCodeAt(5) === 47 &&
+      url.charCodeAt(6) === 47
+    ) {
+      authorityStart = 7;
+    } else if (
+      url.charCodeAt(4) === 115 &&
+      url.charCodeAt(5) === 58 &&
+      url.charCodeAt(6) === 47 &&
+      url.charCodeAt(7) === 47
+    ) {
+      authorityStart = 8;
+    } else {
+      return this.match(method, pathnameFromRequestUrl(url));
+    }
+
+    const pathStart = url.indexOf("/", authorityStart);
+
+    if (pathStart === -1) {
+      return this.match(method, "/");
+    }
+
+    const queryStart = url.indexOf("?", pathStart + 1);
+    const pathEnd = queryStart === -1 ? url.length : queryStart;
+
+    let pathname: string | undefined;
+
+    /*
+     * Preserve exact static precedence before every dynamic path.
+     * Pure-dynamic method tables skip pathname slicing entirely.
+     */
+    if (table.staticRoutes.size !== 0) {
+      pathname = url.slice(pathStart, pathEnd);
+
+      const staticRoute = table.staticRoutes.get(pathname);
+
+      if (staticRoute) {
+        return {
+          route: staticRoute,
+          params: EMPTY_PARAMS,
+        };
+      }
+    }
+
+    if (!table.usesDynamicTrie) {
+      const trailingParamFingerprints = table.trailingParamFingerprints;
+      const trailingParamRoutes = table.trailingParamRoutes;
+
+      if (
+        pathEnd - pathStart > 1 &&
+        (trailingParamFingerprints !== undefined ||
+          trailingParamRoutes !== undefined)
+      ) {
+        const slash = url.lastIndexOf("/", pathEnd - 1);
+
+        if (slash >= pathStart) {
+          const prefixEnd = slash + 1;
+          const prefixLength = prefixEnd - pathStart;
+
+          let trailingRoute: TrailingParamRoute | undefined;
+
+          if (trailingParamFingerprints !== undefined) {
+            const entry = trailingParamFingerprints.get(
+              prefixFingerprintRange(url, prefixEnd, prefixLength),
+            );
+
+            if (entry?.kind === "unique") {
+              if (
+                entry.prefix.length === prefixLength &&
+                url.startsWith(entry.prefix, pathStart)
+              ) {
+                trailingRoute = entry.trailingRoute;
+              }
+            } else if (entry !== undefined) {
+              trailingRoute = entry.routes.get(url.slice(pathStart, prefixEnd));
+            }
+          } else if (trailingParamRoutes !== undefined) {
+            trailingRoute = trailingParamRoutes.get(
+              url.slice(pathStart, prefixEnd),
+            );
+          }
+
+          if (trailingRoute) {
+            const value = url.slice(prefixEnd, pathEnd);
+
+            return {
+              route: trailingRoute.route,
+              params: {
+                [trailingRoute.paramName]: decodeParam(value),
+              },
+            };
+          }
+        }
+      }
+
+      return undefined;
+    }
+
+    pathname ??= url.slice(pathStart, pathEnd);
+
+    const captures: number[] = [];
+    const dynamicRoute = matchDynamicPath(
+      table.dynamicRoot,
+      pathname,
+      captures,
+    );
+
+    if (!dynamicRoute) {
+      return undefined;
+    }
+
+    const params: Record<string, string> = {};
+
+    for (let index = 0; index < dynamicRoute.paramNames.length; index++) {
+      const name = dynamicRoute.paramNames[index];
+      const start = captures[index * 2];
+      const end = captures[index * 2 + 1];
+
+      if (name === undefined || start === undefined || end === undefined) {
+        continue;
+      }
+
+      params[name] = decodeParam(pathname.slice(start, end));
+    }
+
+    return {
+      route: dynamicRoute.route,
       params,
     };
   }
@@ -715,6 +867,21 @@ function prefixFingerprint(value: string, end: number): number {
   hash = Math.imul(hash ^ codeBefore(value, end, 4), 668265263);
 
   hash = Math.imul(hash ^ codeBefore(value, end, 5), 374761393);
+
+  return hash | 0;
+}
+
+function prefixFingerprintRange(
+  value: string,
+  absoluteEnd: number,
+  prefixLength: number,
+): number {
+  let hash = Math.imul(prefixLength, -1640531527);
+
+  hash = Math.imul(hash ^ codeBefore(value, absoluteEnd, 2), -2048144789);
+  hash = Math.imul(hash ^ codeBefore(value, absoluteEnd, 3), -1028477387);
+  hash = Math.imul(hash ^ codeBefore(value, absoluteEnd, 4), 668265263);
+  hash = Math.imul(hash ^ codeBefore(value, absoluteEnd, 5), 374761393);
 
   return hash | 0;
 }
