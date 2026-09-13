@@ -20,20 +20,20 @@ CP4-O tested whether packing fast-map lane state and the static upper bound into
 
 ## Authoritative ratios
 
-| comparison | candidate / control | frozen limit | result |
-| --- | ---: | ---: | --- |
-| static-only raw | `1.0074x` | `<= 1.0200x` | PASS |
-| mixed static raw | `1.0008x` | `<= 0.9963x` | **FAIL** |
-| mixed dynamic raw | `0.9851x` | `<= 1.0200x` | PASS |
-| mixed dynamic JSON | `0.9976x` | `<= 1.0200x` | PASS |
-| mixed same-length dynamic raw | `1.0168x` | `<= 1.0200x` | PASS |
-| pure trailing dynamic raw | `0.9647x` | `<= 1.0200x` | PASS |
-| pure trailing dynamic JSON | `1.0148x` | `<= 1.0200x` | PASS |
-| generic dynamic raw | `0.9781x` | `<= 1.0200x` | PASS |
-| forced collision raw | `0.9998x` | `<= 1.0200x` | PASS |
-| ALL dynamic raw | `0.9972x` | `<= 1.0200x` | PASS |
-| static registration | `0.9372x` | `<= 1.0500x` | PASS |
-| static retained heap | `1.0000x` | `<= 1.0500x` | PASS |
+| comparison                    | candidate / control | frozen limit | result   |
+| ----------------------------- | ------------------: | -----------: | -------- |
+| static-only raw               |           `1.0074x` | `<= 1.0200x` | PASS     |
+| mixed static raw              |           `1.0008x` | `<= 0.9963x` | **FAIL** |
+| mixed dynamic raw             |           `0.9851x` | `<= 1.0200x` | PASS     |
+| mixed dynamic JSON            |           `0.9976x` | `<= 1.0200x` | PASS     |
+| mixed same-length dynamic raw |           `1.0168x` | `<= 1.0200x` | PASS     |
+| pure trailing dynamic raw     |           `0.9647x` | `<= 1.0200x` | PASS     |
+| pure trailing dynamic JSON    |           `1.0148x` | `<= 1.0200x` | PASS     |
+| generic dynamic raw           |           `0.9781x` | `<= 1.0200x` | PASS     |
+| forced collision raw          |           `0.9998x` | `<= 1.0200x` | PASS     |
+| ALL dynamic raw               |           `0.9972x` | `<= 1.0200x` | PASS     |
+| static registration           |           `0.9372x` | `<= 1.0500x` | PASS     |
+| static retained heap          |           `1.0000x` | `<= 1.0500x` | PASS     |
 
 ## Interpretation
 

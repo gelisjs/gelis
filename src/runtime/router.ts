@@ -324,36 +324,8 @@ export class Router {
      * - mixed static + trailing: use the frozen min/max length range;
      * - legacy/prebuilt tables: conservatively retain exact static lookup.
      */
-    if (fastMapState !== FAST_MAP_TRAILING_ONLY) {
-      if (fastMapState !== undefined && fastMapState > FAST_MAP_EMPTY) {
-        const staticRoute = table.staticRoutes.get(
-          url.slice(pathStart, pathEnd),
-        );
-
-        if (staticRoute) {
-          return {
-            route: staticRoute,
-            params: EMPTY_PARAMS,
-          };
-        }
-
-        return undefined;
-      }
-
-      if (fastMapState !== undefined && fastMapState < FAST_MAP_TRAILING_ONLY) {
-        if (pathEnd - pathStart <= -fastMapState - 1) {
-          pathname = url.slice(pathStart, pathEnd);
-
-          const staticRoute = table.staticRoutes.get(pathname);
-
-          if (staticRoute) {
-            return {
-              route: staticRoute,
-              params: EMPTY_PARAMS,
-            };
-          }
-        }
-      } else if (table.staticRoutes.size !== 0) {
+    if (fastMapState !== undefined && fastMapState > FAST_MAP_EMPTY) {
+      if (pathEnd - pathStart <= fastMapState) {
         pathname = url.slice(pathStart, pathEnd);
 
         const staticRoute = table.staticRoutes.get(pathname);
@@ -364,6 +336,31 @@ export class Router {
             params: EMPTY_PARAMS,
           };
         }
+      }
+    } else if (
+      fastMapState !== undefined &&
+      fastMapState < FAST_MAP_TRAILING_ONLY
+    ) {
+      const staticRoute = table.staticRoutes.get(url.slice(pathStart, pathEnd));
+
+      if (staticRoute) {
+        return {
+          route: staticRoute,
+          params: EMPTY_PARAMS,
+        };
+      }
+
+      return undefined;
+    } else if (fastMapState === undefined && table.staticRoutes.size !== 0) {
+      pathname = url.slice(pathStart, pathEnd);
+
+      const staticRoute = table.staticRoutes.get(pathname);
+
+      if (staticRoute) {
+        return {
+          route: staticRoute,
+          params: EMPTY_PARAMS,
+        };
       }
     }
 
@@ -732,19 +729,18 @@ function registerRouteIntoTable(
     const fastMapState = table.fastMapState;
 
     if (fastMapState === FAST_MAP_TRAILING_ONLY) {
-      table.fastMapState = -(pathLength + 1);
+      table.fastMapState = pathLength;
     } else if (fastMapState !== undefined) {
-      if (
-        fastMapState === FAST_MAP_EMPTY ||
-        (fastMapState > FAST_MAP_EMPTY && pathLength > fastMapState)
-      ) {
-        table.fastMapState = pathLength;
+      if (fastMapState === FAST_MAP_EMPTY) {
+        table.fastMapState = -(pathLength + 1);
       } else if (fastMapState < FAST_MAP_TRAILING_ONLY) {
         const staticPathLengthMax = -fastMapState - 1;
 
         if (pathLength > staticPathLengthMax) {
           table.fastMapState = -(pathLength + 1);
         }
+      } else if (pathLength > fastMapState) {
+        table.fastMapState = pathLength;
       }
     }
 
@@ -763,8 +759,11 @@ function registerRouteIntoTable(
 
     if (fastMapState === FAST_MAP_EMPTY) {
       table.fastMapState = FAST_MAP_TRAILING_ONLY;
-    } else if (fastMapState !== undefined && fastMapState > FAST_MAP_EMPTY) {
-      table.fastMapState = -(fastMapState + 1);
+    } else if (
+      fastMapState !== undefined &&
+      fastMapState < FAST_MAP_TRAILING_ONLY
+    ) {
+      table.fastMapState = -fastMapState - 1;
     }
 
     const slash = route.path.lastIndexOf("/");
