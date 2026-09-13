@@ -26,58 +26,62 @@ Local correctness probe before timing: `PASS (14/14)`.
 
 ## Overall distributions
 
-| Cell | Source | Median | p25 | p75 | Min | Max | Unit |
-| --- | --- | ---: | ---: | ---: | ---: | ---: | --- |
-| static-only-raw | cp4z | 816.1 | 799.2 | 829.9 | 784.5 | 862.6 | ns/op |
-| static-only-raw | candidate | 818.5 | 802.6 | 827.1 | 786.8 | 951.0 | ns/op |
-| mixed-static-raw | cp4z | 829.1 | 810.3 | 890.2 | 793.1 | 962.4 | ns/op |
-| mixed-static-raw | candidate | 813.5 | 802.5 | 874.0 | 786.1 | 938.5 | ns/op |
-| mixed-dynamic-raw | cp4z | 889.4 | 868.0 | 910.1 | 848.8 | 949.1 | ns/op |
-| mixed-dynamic-raw | candidate | 887.1 | 868.4 | 912.5 | 849.3 | 989.0 | ns/op |
-| trailing-dynamic-raw | cp4z | 885.3 | 872.8 | 907.9 | 854.3 | 961.3 | ns/op |
-| trailing-dynamic-raw | candidate | 878.5 | 870.8 | 909.6 | 851.3 | 965.7 | ns/op |
-| generic-dynamic-raw | cp4z | 1212.5 | 1161.6 | 1246.7 | 1130.5 | 1340.8 | ns/op |
-| generic-dynamic-raw | candidate | 1193.3 | 1159.7 | 1221.3 | 1122.8 | 1242.7 | ns/op |
-| all-dynamic-raw | cp4z | 881.4 | 871.4 | 890.5 | 861.5 | 954.8 | ns/op |
-| all-dynamic-raw | candidate | 881.7 | 870.0 | 900.1 | 859.2 | 917.5 | ns/op |
-| static-registration | cp4z | 1.274 | 1.237 | 1.324 | 1.215 | 1.744 | ms |
-| static-registration | candidate | 1.237 | 1.230 | 1.266 | 1.216 | 1.323 | ms |
+```text
+cell                    source       median   p25      p75      min      max      unit
+static-only-raw         cp4z          816.1   799.2    829.9    784.5    862.6   ns/op
+static-only-raw         candidate     818.5   802.6    827.1    786.8    951.0   ns/op
+mixed-static-raw        cp4z          829.1   810.3    890.2    793.1    962.4   ns/op
+mixed-static-raw        candidate     813.5   802.5    874.0    786.1    938.5   ns/op
+mixed-dynamic-raw       cp4z          889.4   868.0    910.1    848.8    949.1   ns/op
+mixed-dynamic-raw       candidate     887.1   868.4    912.5    849.3    989.0   ns/op
+trailing-dynamic-raw    cp4z          885.3   872.8    907.9    854.3    961.3   ns/op
+trailing-dynamic-raw    candidate     878.5   870.8    909.6    851.3    965.7   ns/op
+generic-dynamic-raw     cp4z         1212.5  1161.6   1246.7   1130.5   1340.8   ns/op
+generic-dynamic-raw     candidate    1193.3  1159.7   1221.3   1122.8   1242.7   ns/op
+all-dynamic-raw         cp4z          881.4   871.4    890.5    861.5    954.8   ns/op
+all-dynamic-raw         candidate     881.7   870.0    900.1    859.2    917.5   ns/op
+static-registration     cp4z            1.274   1.237    1.324    1.215    1.744  ms
+static-registration     candidate       1.237   1.230    1.266    1.216    1.323  ms
+```
 
 ## Overall candidate / Z ratios
 
-| Comparison | Candidate / Z |
-| --- | ---: |
-| static-only raw | `1.0029x` |
-| mixed static raw | `0.9812x` |
-| mixed dynamic raw | `0.9974x` |
-| pure trailing dynamic raw | `0.9923x` |
-| generic dynamic raw | `0.9841x` |
-| ALL dynamic raw | `1.0004x` |
-| static registration | `0.9712x` |
+```text
+comparison                  candidate / Z
+static-only raw             1.0029x
+mixed static raw            0.9812x
+mixed dynamic raw           0.9974x
+pure trailing dynamic raw   0.9923x
+generic dynamic raw         0.9841x
+ALL dynamic raw             1.0004x
+static registration         0.9712x
+```
 
 ## Blockwise candidate / Z ratios
 
-| Comparison | Block 1 | Block 2 | Block 3 | Block 4 | Candidate-faster blocks |
-| --- | ---: | ---: | ---: | ---: | ---: |
-| static-only raw | 1.0082x | 0.9929x | 0.9928x | 1.0200x | 2/4 |
-| mixed static raw | 0.9886x | 0.9716x | 1.0132x | 1.0021x | 2/4 |
-| mixed dynamic raw | 0.9882x | 1.0310x | 0.9904x | 0.9902x | 3/4 |
-| pure trailing dynamic raw | 0.9635x | 1.0266x | 1.0069x | 0.9970x | 2/4 |
-| generic dynamic raw | 0.9785x | 0.9796x | 0.9859x | 0.9983x | 4/4 |
-| ALL dynamic raw | 1.0015x | 1.0260x | 0.9784x | 0.9932x | 2/4 |
-| static registration | 0.9573x | 0.9897x | 0.9829x | 0.9369x | 4/4 |
+```text
+comparison                  block 1   block 2   block 3   block 4   candidate-faster blocks
+static-only raw             1.0082x   0.9929x   0.9928x   1.0200x   2/4
+mixed static raw            0.9886x   0.9716x   1.0132x   1.0021x   2/4
+mixed dynamic raw           0.9882x   1.0310x   0.9904x   0.9902x   3/4
+pure trailing dynamic raw   0.9635x   1.0266x   1.0069x   0.9970x   2/4
+generic dynamic raw         0.9785x   0.9796x   0.9859x   0.9983x   4/4
+ALL dynamic raw             1.0015x   1.0260x   0.9784x   0.9932x   2/4
+static registration         0.9573x   0.9897x   0.9829x   0.9369x   4/4
+```
 
 ## Frozen viability gates
 
-| Gate | Candidate / Z | Limit | Result |
-| --- | ---: | ---: | --- |
-| static-only raw | `1.0029x` | `<= 0.9950x` | **FAIL** |
-| mixed static raw | `0.9812x` | `<= 1.0100x` | PASS |
-| mixed dynamic raw | `0.9974x` | `<= 1.0200x` | PASS |
-| pure trailing dynamic raw | `0.9923x` | `<= 1.0200x` | PASS |
-| generic dynamic raw | `0.9841x` | `<= 1.0200x` | PASS |
-| ALL dynamic raw | `1.0004x` | `<= 1.0200x` | PASS |
-| static registration | `0.9712x` | `<= 1.0200x` | PASS |
+```text
+gate                        candidate / Z   limit       result
+static-only raw             1.0029x         <=0.9950x   FAIL
+mixed static raw            0.9812x         <=1.0100x   PASS
+mixed dynamic raw           0.9974x         <=1.0200x   PASS
+pure trailing dynamic raw   0.9923x         <=1.0200x   PASS
+generic dynamic raw         0.9841x         <=1.0200x   PASS
+ALL dynamic raw             1.0004x         <=1.0200x   PASS
+static registration         0.9712x         <=1.0200x   PASS
+```
 
 Final harness result:
 
