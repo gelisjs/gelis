@@ -22,8 +22,16 @@ const WORKER = resolve(
 );
 const REPOSITORY_ROOT = resolve(HERE, "../..");
 const RUN_TOKEN = `${process.pid}-${Date.now()}`;
-const WORKTREE_A = resolve(REPOSITORY_ROOT, "..", `gelis-cp4aq2-a-${RUN_TOKEN}`);
-const WORKTREE_B = resolve(REPOSITORY_ROOT, "..", `gelis-cp4aq2-b-${RUN_TOKEN}`);
+const WORKTREE_A = resolve(
+  REPOSITORY_ROOT,
+  "..",
+  `gelis-cp4aq2-a-${RUN_TOKEN}`,
+);
+const WORKTREE_B = resolve(
+  REPOSITORY_ROOT,
+  "..",
+  `gelis-cp4aq2-b-${RUN_TOKEN}`,
+);
 
 type Cell =
   | "static-only-raw"
@@ -32,10 +40,7 @@ type Cell =
   | "collision-dynamic-raw"
   | "all-dynamic-raw";
 
-type Classification =
-  | "CLEAR IMPROVEMENT"
-  | "INCONCLUSIVE"
-  | "CLEAR REGRESSION";
+type Classification = "CLEAR IMPROVEMENT" | "INCONCLUSIVE" | "CLEAR REGRESSION";
 
 type EffectKey = "minus10" | "minus5" | "control" | "plus5" | "plus10";
 
@@ -184,7 +189,9 @@ function printHeader(): void {
   if (probeOnly) {
     console.log("Mode:            correctness probe only");
   } else {
-    console.log(`Paired workers:  ${PAIRED_WORKERS_PER_CELL} fresh workers/cell`);
+    console.log(
+      `Paired workers:  ${PAIRED_WORKERS_PER_CELL} fresh workers/cell`,
+    );
     console.log(`Cycles/worker:   ${CYCLES_PER_WORKER}`);
     console.log("Cycle order:     balanced ABBA / BAAB within each process");
     console.log("Timed legs:      32 per worker (4 legs × 8 cycles)");
@@ -193,7 +200,9 @@ function printHeader(): void {
     console.log(
       `Neutral zone:    ${NEUTRAL_LOW.toFixed(2)}x–${NEUTRAL_HIGH.toFixed(2)}x`,
     );
-    console.log("Injection:       post-timing multiplicative shift of B/A ratios");
+    console.log(
+      "Injection:       post-timing multiplicative shift of B/A ratios",
+    );
     console.log(
       `Windows affinity: logical CPU ${affinityLogicalCpu} (0x${affinityMaskHex})`,
     );
@@ -274,12 +283,16 @@ function validateTimedResult(
 }
 
 function printRawDiagnostics(all: ReadonlyMap<Cell, WorkerResult[]>): void {
-  console.log("Raw same-source paired-worker diagnostics before synthetic shifting");
+  console.log(
+    "Raw same-source paired-worker diagnostics before synthetic shifting",
+  );
   console.log("| comparison | median B/A | bootstrap 95% CI | min | max |");
   console.log("| --- | ---: | ---: | ---: | ---: |");
 
   for (const spec of CELLS) {
-    const values = getResults(all, spec.cell).map((result) => result.workerRatio!);
+    const values = getResults(all, spec.cell).map(
+      (result) => result.workerRatio!,
+    );
     const diagnostic = rawDiagnostics(values, spec.cell);
     console.log(
       `| ${spec.label} | ${diagnostic.median.toFixed(4)}x | ${diagnostic.bootstrapLow.toFixed(4)}x–${diagnostic.bootstrapHigh.toFixed(4)}x | ${diagnostic.min.toFixed(4)}x | ${diagnostic.max.toFixed(4)}x |`,
@@ -356,7 +369,9 @@ function printFrontierRows(rows: readonly FrontierRow[]): void {
 }
 
 function printBandSummary(rows: readonly FrontierRow[]): void {
-  const controlPass = CELLS.every((spec) => getRow(rows, spec.cell, "control").pass);
+  const controlPass = CELLS.every(
+    (spec) => getRow(rows, spec.cell, "control").pass,
+  );
   const fivePass = CELLS.every(
     (spec) =>
       getRow(rows, spec.cell, "minus5").pass &&
@@ -539,7 +554,9 @@ function preflight(): void {
 
   if (!probeOnly) {
     if (process.platform !== "win32") {
-      throw new Error("CP4-AQ2 timed calibration is authoritative only on Windows");
+      throw new Error(
+        "CP4-AQ2 timed calibration is authoritative only on Windows",
+      );
     }
     if (logicalCpuCount !== EXPECTED_LOCAL_LOGICAL_CPUS) {
       throw new Error(
