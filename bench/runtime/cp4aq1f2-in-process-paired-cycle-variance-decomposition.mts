@@ -291,9 +291,7 @@ function buildDiagnostics(
   return output;
 }
 
-function printDiagnostics(
-  diagnostics: ReadonlyMap<Cell, Diagnostics>,
-): void {
+function printDiagnostics(diagnostics: ReadonlyMap<Cell, Diagnostics>): void {
   console.log();
   console.log("AQ1F2 in-process paired-cycle diagnostics");
   console.log(
@@ -344,8 +342,7 @@ function printViability(diagnostics: ReadonlyMap<Cell, Diagnostics>): void {
   for (const spec of CELLS) {
     const value = getDiagnostics(diagnostics, spec.cell);
     const bias = Math.abs(value.workerMedianRatio - 1);
-    const ciPass =
-      value.bootstrapLow >= 0.985 && value.bootstrapHigh <= 1.015;
+    const ciPass = value.bootstrapLow >= 0.985 && value.bootstrapHigh <= 1.015;
     const pass =
       bias <= 0.01 &&
       ciPass &&
@@ -488,7 +485,9 @@ function quotePowerShell(value: string): string {
 
 function preflight(): void {
   if (Bun.version !== EXPECTED_BUN) {
-    throw new Error(`CP4-AQ1F2 requires Bun ${EXPECTED_BUN}, got ${Bun.version}`);
+    throw new Error(
+      `CP4-AQ1F2 requires Bun ${EXPECTED_BUN}, got ${Bun.version}`,
+    );
   }
   if (Bun.revision !== EXPECTED_BUN_REVISION) {
     throw new Error(
@@ -503,7 +502,9 @@ function preflight(): void {
 
   if (!probeOnly) {
     if (process.platform !== "win32") {
-      throw new Error("CP4-AQ1F2 timed calibration is authoritative only on Windows");
+      throw new Error(
+        "CP4-AQ1F2 timed calibration is authoritative only on Windows",
+      );
     }
     if (logicalCpuCount !== EXPECTED_LOCAL_LOGICAL_CPUS) {
       throw new Error(
@@ -575,7 +576,10 @@ function summarize(values: readonly number[]): Summary {
 }
 
 function median(values: readonly number[]): number {
-  return percentileSorted([...values].sort((a, b) => a - b), 0.5);
+  return percentileSorted(
+    [...values].sort((a, b) => a - b),
+    0.5,
+  );
 }
 
 function percentileSorted(values: readonly number[], quantile: number): number {

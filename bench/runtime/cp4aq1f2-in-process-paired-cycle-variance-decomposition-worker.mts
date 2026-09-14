@@ -269,12 +269,7 @@ function trailingJsonCell(Gelis: GelisConstructor): PreparedCell {
   const request = new Request(
     `http://gelis.test/r/${LAST}/${PARAM_VALUE}?source=cp4f2`,
   );
-  return responseCell(
-    app,
-    request,
-    JSON.stringify({ id: PARAM_VALUE }),
-    true,
-  );
+  return responseCell(app, request, JSON.stringify({ id: PARAM_VALUE }), true);
 }
 
 function collisionCell(Gelis: GelisConstructor): PreparedCell {
@@ -371,7 +366,8 @@ function measure(operation: () => void, iterations: number): number {
 }
 
 function median(values: readonly number[]): number {
-  if (values.length === 0) throw new Error("Cannot take median of empty values");
+  if (values.length === 0)
+    throw new Error("Cannot take median of empty values");
   const sorted = [...values].sort((a, b) => a - b);
   const middle = Math.floor(sorted.length / 2);
   if (sorted.length % 2 === 1) return sorted[middle]!;
