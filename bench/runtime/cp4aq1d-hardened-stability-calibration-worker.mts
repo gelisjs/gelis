@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 
@@ -109,6 +109,7 @@ const variant = requiredVariant(args.variant);
 const sourceRoot = required(args.sourceRoot, "--source-root");
 const probeOnly = args.probeOnly === "true";
 const launchGate = args.launchGate;
+const resultFile = args.resultFile;
 if (launchGate !== undefined) {
   await waitForLaunchGate(launchGate);
 }
@@ -146,7 +147,7 @@ if (probeOnly) {
     warmups: 0,
     sink: 0,
   };
-  console.log(JSON.stringify(result));
+  emitResult(result, resultFile);
 } else if (prepared.singleMeasure !== undefined) {
   const measured = prepared.singleMeasure();
   const result: WorkerResult = {
@@ -159,7 +160,7 @@ if (probeOnly) {
     warmups: 1,
     sink: measured.sink,
   };
-  console.log(JSON.stringify(result));
+  emitResult(result, resultFile);
 } else {
   const cellOperation = prepared.operation;
   if (cellOperation === undefined) {
@@ -186,7 +187,7 @@ if (probeOnly) {
     warmups: WARMUP,
     sink,
   };
-  console.log(JSON.stringify(result));
+  emitResult(result, resultFile);
 }
 
 function prepareCell(
@@ -522,6 +523,16 @@ interface ParsedArgs {
   readonly sourceRoot: string | undefined;
   readonly probeOnly: string | undefined;
   readonly launchGate: string | undefined;
+  readonly resultFile: string | undefined;
+}
+
+function emitResult(result: WorkerResult, path: string | undefined): void {
+  const json = JSON.stringify(result);
+  if (path === undefined) {
+    console.log(json);
+    return;
+  }
+  writeFileSync(path, json, "utf8");
 }
 
 async function waitForLaunchGate(path: string): Promise<void> {
@@ -552,6 +563,7 @@ function readArgs(values: readonly string[]): ParsedArgs {
     sourceRoot: entries.get("source-root"),
     probeOnly: entries.get("probe-only"),
     launchGate: entries.get("launch-gate"),
+    resultFile: entries.get("result-file"),
   };
 }
 

@@ -1,8 +1,8 @@
-# CP4-AQ1C hardened benchmark stability calibration freeze
+# CP4-AQ1D hardened benchmark stability calibration freeze
 
 ## Purpose
 
-CP4-AQ1C calibrates a hardened local benchmark runner before any further Gelis performance acceptance work. It compares byte-identical production source against itself and therefore measures environment/estimator stability only.
+CP4-AQ1D calibrates a hardened local benchmark runner before any further Gelis performance acceptance work. It compares byte-identical production source against itself and therefore measures environment/estimator stability only.
 
 This phase cannot reclassify CP4-AO, CP4-AP, or any Gelis source performance result.
 
@@ -97,17 +97,17 @@ Every hotpath cell must satisfy all of:
 
 All 12 cells must pass for:
 
-`CP4-AQ1C HARDENED BENCHMARK 2%-GATE READINESS: PASS`
+`CP4-AQ1D HARDENED BENCHMARK 2%-GATE READINESS: PASS`
 
 Any failure means this exact hardened runner is not yet accepted for future 2% performance gates. There is no rerun of an unchanged failed calibration to search for a passing result; a new calibration requires a changed mechanism and a new frozen phase.
 
 ## Interpretation contract
 
-- CP4-AQ1C is calibration-only.
+- CP4-AQ1D is calibration-only.
 - No historical performance ratio is recomputed or chained from this result.
 - CP4-AO remains classified by its first valid frozen run under its own protocol.
 - CP4-AQ remains paused until a hardened benchmark protocol is accepted.
-- The first valid completed local timed CP4-AQ1C run is authoritative for this calibration phase.
+- The first valid completed local timed CP4-AQ1D run is authoritative for this calibration phase.
 
 ## AQ1B launcher-only delta
 
@@ -126,3 +126,19 @@ AQ1C preserves AQ1B's frozen workloads, block structure, sample counts, estimato
 - temporary stdout, stderr, and gate files are removed after every worker.
 
 Before the first full timed AQ1C run, `--launcher-probe` may be run once on the authoritative local host. It executes one `static-only-raw` worker and one `static-memory` worker through the exact final gated launcher. Their metrics are discarded and are infrastructure-only; they are not Gelis performance evidence. A failed launcher probe is not a timed calibration run.
+
+## AQ1D result-file IPC correction
+
+AQ1C did not complete: after its correctness probe and 2/2 launcher probe both passed, the full run again reached `static-memory` and then observed a successful child process with no parseable stdout result before the final dataset/completion marker. AQ1C therefore created no authoritative timed calibration result.
+
+AQ1D preserves AQ1C's workloads, 8x8 mirrored block structure, 64 samples/source/cell, fixed CPU affinity, HIGH priority, launch gate, estimator, bootstrap procedure, and readiness criteria. It changes only post-measurement worker-result transport:
+
+- timed workers receive a unique `--result-file` path;
+- after correctness and measurement are complete, the worker serializes its `WorkerResult` with synchronous `writeFileSync`;
+- the parent reads that file synchronously only after the worker exits successfully;
+- redirected stdout is no longer the authoritative result channel;
+- stderr remains captured for diagnostics;
+- result files are deleted after each worker;
+- result-file writing occurs after the measured interval and is not part of the metric.
+
+Before the first full AQ1D timed run, `--launcher-probe` is an infrastructure-only 16-worker IPC stress probe: eight `static-only-raw` and eight `static-memory` workers, alternating A/B worktrees, all through the exact gated, pinned, HIGH-priority, result-file path. Probe metrics are discarded and cannot be used as Gelis performance evidence.
