@@ -1,12 +1,22 @@
-import { defineCapability, definePlugin } from "../plugin";
+import {
+  declareOfficialPluginRouteSpecializer,
+  defineCapability,
+  definePlugin,
+} from "../plugin";
 
 import type { Capability, Plugin } from "../plugin";
 
 import { createOfficialApplicationHttpMarker } from "../runtime/application-http";
 
-import { createApplicationTimeoutPolicy } from "./application";
+import {
+  createApplicationTimeoutPolicy,
+  runTimeoutBoundary,
+} from "./application";
 import { assertTimeoutDuration, GelisTimeoutError } from "./error";
-import { createTimeoutRoutePolicy } from "./route-policy";
+import {
+  createTimeoutRoutePolicy,
+  TIMEOUT_ROUTE_BOUNDARY_FAMILY,
+} from "./route-policy";
 
 import type { TimeoutHandler, TimeoutRequestStateStore } from "./application";
 import type { TimeoutRoutePolicy } from "./route-policy";
@@ -43,6 +53,26 @@ export function timeout(options?: TimeoutOptions): TimeoutCapability {
   const plugin = definePlugin("gelis/timeout", (context) => {
     timeoutApplicationCapability.provide(context, capability);
 
+    /*
+     * Route policies encode their owner directly, so route-only timeout
+     * usage does not depend on plugin installation order. When this
+     * capability is installed application-wide, every timed route in the
+     * application must resolve to this same owner.
+     */
+    declareOfficialPluginRouteSpecializer(context, (route) => {
+      const boundary = route.executionBoundary;
+
+      if (
+        boundary !== undefined &&
+        boundary.family === TIMEOUT_ROUTE_BOUNDARY_FAMILY &&
+        boundary.owner !== capability
+      ) {
+        throw new Error(
+          "Gelis application cannot mix distinct timeout capability owners",
+        );
+      }
+    });
+
     const duration = compiled.duration;
 
     if (duration === undefined) {
@@ -66,7 +96,20 @@ export function timeout(options?: TimeoutOptions): TimeoutCapability {
 
     route(duration) {
       assertTimeoutDuration(duration);
-      return createTimeoutRoutePolicy(capability, duration);
+
+      return createTimeoutRoutePolicy(
+        capability,
+        duration,
+        (request, execute) =>
+          runTimeoutBoundary(
+            request,
+            duration,
+            "route",
+            compiled.onTimeout,
+            states,
+            execute,
+          ),
+      );
     },
 
     signal(request) {
