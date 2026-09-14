@@ -52,6 +52,13 @@ interface TrailingFingerprintCollisionEntry {
   readonly routes?: Map<string, TrailingParamRoute>;
 
   readonly secondary?: Map<number, TrailingSecondaryFingerprintEntry>;
+
+  /*
+   * Runtime collision buckets retain one shared parameter name when every
+   * route in the bucket uses the same trailing parameter. Mixed-name buckets
+   * clear this value and fall back to route-local derivation on match.
+   */
+  paramName?: string;
 }
 
 type TrailingFingerprintEntry =
@@ -226,6 +233,7 @@ export class Router {
 
           let trailingRoute:
             TrailingParamRoute | TrailingCollisionRoute | undefined;
+          let collisionParamName: string | undefined;
 
           if (trailingParamFingerprints !== undefined) {
             const entry = trailingParamFingerprints.get(
@@ -245,6 +253,8 @@ export class Router {
               if (secondary === undefined) {
                 trailingRoute = entry.routes?.get(pathname.slice(0, prefixEnd));
               } else {
+                collisionParamName = entry.paramName;
+
                 const secondaryEntry = secondary.get(
                   secondaryPrefixFingerprint(pathname, prefixEnd),
                 );
@@ -270,7 +280,8 @@ export class Router {
 
           if (trailingRoute) {
             const value = pathname.slice(prefixEnd);
-            const paramName = trailingRouteParamName(trailingRoute);
+            const paramName =
+              collisionParamName ?? trailingRouteParamName(trailingRoute);
 
             return {
               route: trailingRoute.route,
@@ -447,6 +458,7 @@ export class Router {
 
           let trailingRoute:
             TrailingParamRoute | TrailingCollisionRoute | undefined;
+          let collisionParamName: string | undefined;
 
           if (trailingParamFingerprints !== undefined) {
             const entry = trailingParamFingerprints.get(
@@ -468,6 +480,8 @@ export class Router {
                   url.slice(pathStart, prefixEnd),
                 );
               } else {
+                collisionParamName = entry.paramName;
+
                 const secondaryEntry = secondary.get(
                   secondaryPrefixFingerprintRange(url, prefixEnd, prefixLength),
                 );
@@ -493,7 +507,8 @@ export class Router {
 
           if (trailingRoute) {
             const value = url.slice(prefixEnd, pathEnd);
-            const paramName = trailingRouteParamName(trailingRoute);
+            const paramName =
+              collisionParamName ?? trailingRouteParamName(trailingRoute);
 
             return {
               route: trailingRoute.route,
@@ -1115,6 +1130,10 @@ function registerTrailingFingerprint(
       kind: "collision",
 
       secondary,
+
+      ...(existing.trailingRoute.paramName === trailingRoute.paramName
+        ? { paramName: trailingRoute.paramName }
+        : {}),
     });
 
     return true;
@@ -1123,6 +1142,13 @@ function registerTrailingFingerprint(
   const secondary = existing.secondary;
 
   if (secondary !== undefined) {
+    if (
+      existing.paramName !== undefined &&
+      existing.paramName !== trailingRoute.paramName
+    ) {
+      delete existing.paramName;
+    }
+
     return registerTrailingSecondaryFingerprint(
       secondary,
       prefix,
@@ -1215,6 +1241,9 @@ function cloneTrailingParamFingerprints(
         ...(entry.routes === undefined
           ? {}
           : { routes: new Map(entry.routes) }),
+        ...(entry.paramName === undefined
+          ? {}
+          : { paramName: entry.paramName }),
       });
       continue;
     }
@@ -1236,6 +1265,7 @@ function cloneTrailingParamFingerprints(
     cloned.set(key, {
       kind: "collision",
       secondary: clonedSecondary,
+      ...(entry.paramName === undefined ? {} : { paramName: entry.paramName }),
     });
   }
 
