@@ -1,0 +1,24 @@
+name: CP4-AQ2 probe
+
+on:
+  push:
+    branches:
+      - work/competitive-cp4aq2-hotpath-detectability-frontier
+    paths:
+      - .github/workflows/cp4aq2-probe.yml
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+      - run: bun install --frozen-lockfile
+      - run: bun bench/runtime/cp4aq2-hotpath-detectability-frontier.mts --probe-only
