@@ -1206,19 +1206,11 @@ function trailingRoutePrefixMatches(
   start: number,
   prefixLength: number,
 ): boolean {
-  const routePath = route.route.path;
-
   if (trailingRoutePrefixLength(route) !== prefixLength) {
     return false;
   }
 
-  for (let index = 0; index < prefixLength; index++) {
-    if (routePath.charCodeAt(index) !== value.charCodeAt(start + index)) {
-      return false;
-    }
-  }
-
-  return true;
+  return route.route.path.startsWith(value.slice(start, start + prefixLength));
 }
 
 function cloneTrailingParamFingerprints(
