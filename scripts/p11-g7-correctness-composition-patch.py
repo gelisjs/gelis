@@ -1,0 +1,52 @@
+from pathlib import Path
+
+
+def replace_once(text: str, old: str, new: str, label: str) -> str:
+    if old not in text:
+        raise SystemExit(f"missing {label} anchor:\n{old}")
+    return text.replace(old, new, 1)
+
+
+path = Path("src/app.ts")
+text = path.read_text()
+
+text = replace_once(
+    text,
+    "  routeIdentityKeys: Set<string> | undefined;\n\n  localBeforeHooks:",
+    "  routeIdentityKeys: Set<string> | undefined;\n\n  /*\n   * Execution-boundary ownership is configuration metadata only.\n   * Allocate it lazily so applications without route boundaries retain\n   * their existing state shape and pay no per-request cost.\n   */\n  routeBoundaryOwners: Map<symbol, object> | undefined;\n\n  localBeforeHooks:",
+    "app state boundary owners",
+)
+
+text = replace_once(
+    text,
+    "      routeIdentityKeys: undefined,\n\n      localBeforeHooks:",
+    "      routeIdentityKeys: undefined,\n\n      routeBoundaryOwners: undefined,\n\n      localBeforeHooks:",
+    "constructor boundary owners",
+)
+
+old_validate_tail = '''    pending.add(key);\n  }\n}\n\nfunction commitModuleRuntimeRoutesAtomic(\n'''
+new_validate_tail = '''    pending.add(key);\n  }\n\n  validateRouteExecutionBoundaryOwners(state, routes);\n}\n\nfunction validateRouteExecutionBoundaryOwners(\n  state: AppRuntimeState,\n  routes: readonly RuntimeRouteRecord[],\n): void {\n  if (routes.length === 0) {\n    return;\n  }\n\n  const existing = state.routeBoundaryOwners;\n  let pending: Map<symbol, object> | undefined;\n\n  for (let index = 0; index < routes.length; index++) {\n    const boundary = routes[index]!.executionBoundary;\n\n    if (boundary === undefined) {\n      continue;\n    }\n\n    const existingOwner = existing?.get(boundary.family);\n\n    if (existingOwner !== undefined && existingOwner !== boundary.owner) {\n      throw new Error(\n        "Gelis application cannot mix distinct route execution boundary owners",\n      );\n    }\n\n    const pendingOwner = pending?.get(boundary.family);\n\n    if (pendingOwner !== undefined && pendingOwner !== boundary.owner) {\n      throw new Error(\n        "Gelis application cannot mix distinct route execution boundary owners",\n      );\n    }\n\n    if (existingOwner === undefined && pendingOwner === undefined) {\n      pending ??= new Map<symbol, object>();\n      pending.set(boundary.family, boundary.owner);\n    }\n  }\n}\n\nfunction commitRouteExecutionBoundaryOwners(\n  state: AppRuntimeState,\n  routes: readonly RuntimeRouteRecord[],\n): void {\n  let owners = state.routeBoundaryOwners;\n\n  for (let index = 0; index < routes.length; index++) {\n    const boundary = routes[index]!.executionBoundary;\n\n    if (boundary === undefined) {\n      continue;\n    }\n\n    if (owners === undefined) {\n      owners = new Map<symbol, object>();\n      state.routeBoundaryOwners = owners;\n    }\n\n    owners.set(boundary.family, boundary.owner);\n  }\n}\n\nfunction commitModuleRuntimeRoutesAtomic(\n'''
+text = replace_once(text, old_validate_tail, new_validate_tail, "boundary owner helpers")
+
+text = replace_once(
+    text,
+    '''  state.router.registerBatchAtomic(routes);\n\n  const routeIdentityKeys = state.routeIdentityKeys;\n''',
+    '''  state.router.registerBatchAtomic(routes);\n\n  commitRouteExecutionBoundaryOwners(state, routes);\n\n  const routeIdentityKeys = state.routeIdentityKeys;\n''',
+    "module boundary owner commit",
+)
+
+text = replace_once(
+    text,
+    '''  applyRouteSpecializers(state, route);\n\n  /*\n   * Router registration happens before mutating\n''',
+    '''  applyRouteSpecializers(state, route);\n  validateRouteExecutionBoundaryOwners(state, [route]);\n\n  /*\n   * Router registration happens before mutating\n''',
+    "single route boundary validation",
+)
+
+text = replace_once(
+    text,
+    '''  state.router.register(route);\n\n  if (route.method === ALL_ROUTE_METHOD && state.router instanceof Router) {\n''',
+    '''  state.router.register(route);\n  commitRouteExecutionBoundaryOwners(state, [route]);\n\n  if (route.method === ALL_ROUTE_METHOD && state.router instanceof Router) {\n''',
+    "single route boundary commit",
+)
+
+path.write_text(text)
