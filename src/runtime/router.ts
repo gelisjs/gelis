@@ -31,7 +31,9 @@ interface TrailingFingerprintUniqueEntry {
   readonly trailingRoute: TrailingParamRoute;
 }
 
-interface TrailingCollisionRoute extends TrailingParamRoute {
+interface TrailingCollisionRoute {
+  readonly route: RuntimeRouteRecord;
+
   readonly prefix: string;
 }
 
@@ -222,7 +224,8 @@ export class Router {
         if (slash >= 0) {
           const prefixEnd = slash + 1;
 
-          let trailingRoute: TrailingParamRoute | undefined;
+          let trailingRoute:
+            TrailingParamRoute | TrailingCollisionRoute | undefined;
 
           if (trailingParamFingerprints !== undefined) {
             const entry = trailingParamFingerprints.get(
@@ -267,12 +270,13 @@ export class Router {
 
           if (trailingRoute) {
             const value = pathname.slice(prefixEnd);
+            const paramName = trailingRouteParamName(trailingRoute);
 
             return {
               route: trailingRoute.route,
 
               params: {
-                [trailingRoute.paramName]: decodeParam(value),
+                [paramName]: decodeParam(value),
               },
             };
           }
@@ -441,7 +445,8 @@ export class Router {
           const prefixEnd = slash + 1;
           const prefixLength = prefixEnd - pathStart;
 
-          let trailingRoute: TrailingParamRoute | undefined;
+          let trailingRoute:
+            TrailingParamRoute | TrailingCollisionRoute | undefined;
 
           if (trailingParamFingerprints !== undefined) {
             const entry = trailingParamFingerprints.get(
@@ -488,11 +493,12 @@ export class Router {
 
           if (trailingRoute) {
             const value = url.slice(prefixEnd, pathEnd);
+            const paramName = trailingRouteParamName(trailingRoute);
 
             return {
               route: trailingRoute.route,
               params: {
-                [trailingRoute.paramName]: decodeParam(value),
+                [paramName]: decodeParam(value),
               },
             };
           }
@@ -1148,7 +1154,6 @@ function registerTrailingSecondaryFingerprint(
   const existing = secondary.get(key);
   const collisionRoute: TrailingCollisionRoute = {
     route: trailingRoute.route,
-    paramName: trailingRoute.paramName,
     prefix,
   };
 
@@ -1179,6 +1184,16 @@ function registerTrailingSecondaryFingerprint(
   );
 
   return true;
+}
+
+function trailingRouteParamName(
+  route: TrailingParamRoute | TrailingCollisionRoute,
+): string {
+  if ("paramName" in route) {
+    return route.paramName;
+  }
+
+  return route.route.path.slice(route.prefix.length + 1);
 }
 
 function cloneTrailingParamFingerprints(
