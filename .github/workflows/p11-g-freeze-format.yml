@@ -1,0 +1,45 @@
+name: P11-G Freeze Format
+
+on:
+  push:
+    branches:
+      - work/p11-g-request-id-timeout-freeze
+    paths:
+      - .github/workflows/p11-g-freeze-format.yml
+
+permissions:
+  contents: write
+
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.0
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Format freeze documents
+        run: |
+          bunx prettier --write docs/architecture/p11-g-request-id-timeout-capability-freeze.md docs/development/roadmap-current-status.md
+
+      - name: Commit formatted tree and remove temporary workflow
+        run: |
+          git rm .github/workflows/p11-g-freeze-format.yml
+          git add docs/architecture/p11-g-request-id-timeout-capability-freeze.md docs/development/roadmap-current-status.md
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "style: format P11-G freeze documentation"
+          git push origin HEAD:work/p11-g-request-id-timeout-freeze
