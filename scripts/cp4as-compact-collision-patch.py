@@ -1,0 +1,404 @@
+from pathlib import Path
+
+path = Path("src/runtime/router.ts")
+text = path.read_text()
+
+
+def replace_once(old: str, new: str, label: str) -> None:
+    global text
+    count = text.count(old)
+    if count != 1:
+        raise SystemExit(f"{label}: expected exactly one match, got {count}")
+    text = text.replace(old, new, 1)
+
+
+replace_once(
+    '''interface TrailingSecondaryFingerprintUniqueEntry {
+  readonly prefix: string;
+
+  readonly trailingRoute: TrailingParamRoute;
+}
+
+type TrailingSecondaryFingerprintEntry =
+  TrailingSecondaryFingerprintUniqueEntry | null;
+
+interface TrailingFingerprintCollisionEntry {
+  readonly kind: "collision";
+
+  readonly routes: Map<string, TrailingParamRoute>;
+
+  readonly secondary?: Map<number, TrailingSecondaryFingerprintEntry>;
+}
+''',
+    '''interface TrailingCollisionRoute extends TrailingParamRoute {
+  readonly prefix: string;
+}
+
+type TrailingSecondaryFingerprintEntry =
+  | TrailingCollisionRoute
+  | Map<string, TrailingCollisionRoute>;
+
+interface TrailingFingerprintCollisionEntry {
+  readonly kind: "collision";
+
+  /*
+   * Legacy/AOT/prebuilt collision buckets may still carry the exact prefix
+   * map. Runtime-created collision buckets use `secondary` instead, so the
+   * optimized representation does not retain two full indexes for the same
+   * routes.
+   */
+  readonly routes?: Map<string, TrailingParamRoute>;
+
+  readonly secondary?: Map<number, TrailingSecondaryFingerprintEntry>;
+}
+''',
+    "collision types",
+)
+
+replace_once(
+    '''              if (secondary === undefined) {
+                trailingRoute = entry.routes.get(pathname.slice(0, prefixEnd));
+              } else {
+                const secondaryEntry = secondary.get(
+                  secondaryPrefixFingerprint(pathname, prefixEnd),
+                );
+
+                if (secondaryEntry === null) {
+                  trailingRoute = entry.routes.get(
+                    pathname.slice(0, prefixEnd),
+                  );
+                } else if (
+                  secondaryEntry !== undefined &&
+                  secondaryEntry.prefix.length === prefixEnd &&
+                  pathname.startsWith(secondaryEntry.prefix)
+                ) {
+                  trailingRoute = secondaryEntry.trailingRoute;
+                }
+              }
+''',
+    '''              if (secondary === undefined) {
+                trailingRoute = entry.routes?.get(pathname.slice(0, prefixEnd));
+              } else {
+                const secondaryEntry = secondary.get(
+                  secondaryPrefixFingerprint(pathname, prefixEnd),
+                );
+
+                if (secondaryEntry instanceof Map) {
+                  trailingRoute = secondaryEntry.get(
+                    pathname.slice(0, prefixEnd),
+                  );
+                } else if (
+                  secondaryEntry !== undefined &&
+                  secondaryEntry.prefix.length === prefixEnd &&
+                  pathname.startsWith(secondaryEntry.prefix)
+                ) {
+                  trailingRoute = secondaryEntry;
+                }
+              }
+''',
+    "pathname collision lookup",
+)
+
+replace_once(
+    '''              if (secondary === undefined) {
+                trailingRoute = entry.routes.get(
+                  url.slice(pathStart, prefixEnd),
+                );
+              } else {
+                const secondaryEntry = secondary.get(
+                  secondaryPrefixFingerprintRange(url, prefixEnd, prefixLength),
+                );
+
+                if (secondaryEntry === null) {
+                  trailingRoute = entry.routes.get(
+                    url.slice(pathStart, prefixEnd),
+                  );
+                } else if (
+                  secondaryEntry !== undefined &&
+                  secondaryEntry.prefix.length === prefixLength &&
+                  url.startsWith(secondaryEntry.prefix, pathStart)
+                ) {
+                  trailingRoute = secondaryEntry.trailingRoute;
+                }
+              }
+''',
+    '''              if (secondary === undefined) {
+                trailingRoute = entry.routes?.get(
+                  url.slice(pathStart, prefixEnd),
+                );
+              } else {
+                const secondaryEntry = secondary.get(
+                  secondaryPrefixFingerprintRange(url, prefixEnd, prefixLength),
+                );
+
+                if (secondaryEntry instanceof Map) {
+                  trailingRoute = secondaryEntry.get(
+                    url.slice(pathStart, prefixEnd),
+                  );
+                } else if (
+                  secondaryEntry !== undefined &&
+                  secondaryEntry.prefix.length === prefixLength &&
+                  url.startsWith(secondaryEntry.prefix, pathStart)
+                ) {
+                  trailingRoute = secondaryEntry;
+                }
+              }
+''',
+    "request-url collision lookup",
+)
+
+replace_once(
+    '''            if (secondary === undefined) {
+              if (entry.routes.has(pathname.slice(0, prefixEnd))) {
+                return true;
+              }
+            } else {
+              const secondaryEntry = secondary.get(
+                secondaryPrefixFingerprint(pathname, prefixEnd),
+              );
+
+              if (secondaryEntry === null) {
+                if (entry.routes.has(pathname.slice(0, prefixEnd))) {
+                  return true;
+                }
+              } else if (
+                secondaryEntry !== undefined &&
+                secondaryEntry.prefix.length === prefixEnd &&
+                pathname.startsWith(secondaryEntry.prefix)
+              ) {
+                return true;
+              }
+            }
+''',
+    '''            if (secondary === undefined) {
+              if (entry.routes?.has(pathname.slice(0, prefixEnd))) {
+                return true;
+              }
+            } else {
+              const secondaryEntry = secondary.get(
+                secondaryPrefixFingerprint(pathname, prefixEnd),
+              );
+
+              if (secondaryEntry instanceof Map) {
+                if (secondaryEntry.has(pathname.slice(0, prefixEnd))) {
+                  return true;
+                }
+              } else if (
+                secondaryEntry !== undefined &&
+                secondaryEntry.prefix.length === prefixEnd &&
+                pathname.startsWith(secondaryEntry.prefix)
+              ) {
+                return true;
+              }
+            }
+''',
+    "matchingMethods collision lookup",
+)
+
+replace_once(
+    '''      for (const trailingRoute of entry.routes.values()) {
+        registerDynamicRoute(table.dynamicRoot, trailingRoute.route);
+      }
+''',
+    '''      const secondary = entry.secondary;
+
+      if (secondary === undefined) {
+        for (const trailingRoute of entry.routes?.values() ?? []) {
+          registerDynamicRoute(table.dynamicRoot, trailingRoute.route);
+        }
+
+        continue;
+      }
+
+      for (const secondaryEntry of secondary.values()) {
+        if (secondaryEntry instanceof Map) {
+          for (const trailingRoute of secondaryEntry.values()) {
+            registerDynamicRoute(table.dynamicRoot, trailingRoute.route);
+          }
+
+          continue;
+        }
+
+        registerDynamicRoute(table.dynamicRoot, secondaryEntry.route);
+      }
+''',
+    "collision migration",
+)
+
+start = text.index("function registerTrailingFingerprint(")
+end = text.index("function prefixFingerprint(", start)
+text = (
+    text[:start]
+    + '''function registerTrailingFingerprint(
+  table: MethodRoutes,
+
+  prefix: string,
+
+  trailingRoute: TrailingParamRoute,
+): boolean {
+  let fingerprints = table.trailingParamFingerprints;
+
+  if (fingerprints === undefined) {
+    fingerprints = new Map();
+
+    table.trailingParamFingerprints = fingerprints;
+  }
+
+  const key = prefixFingerprint(prefix, prefix.length);
+
+  const existing = fingerprints.get(key);
+
+  if (existing === undefined) {
+    fingerprints.set(key, {
+      kind: "unique",
+
+      prefix,
+
+      trailingRoute,
+    });
+
+    return true;
+  }
+
+  if (existing.kind === "unique") {
+    if (existing.prefix === prefix) {
+      return false;
+    }
+
+    const secondary = new Map<number, TrailingSecondaryFingerprintEntry>();
+
+    registerTrailingSecondaryFingerprint(
+      secondary,
+      existing.prefix,
+      existing.trailingRoute,
+    );
+
+    registerTrailingSecondaryFingerprint(secondary, prefix, trailingRoute);
+
+    fingerprints.set(key, {
+      kind: "collision",
+
+      secondary,
+    });
+
+    return true;
+  }
+
+  const secondary = existing.secondary;
+
+  if (secondary !== undefined) {
+    return registerTrailingSecondaryFingerprint(
+      secondary,
+      prefix,
+      trailingRoute,
+    );
+  }
+
+  const routes = existing.routes;
+
+  if (routes === undefined) {
+    throw new Error("Invalid trailing fingerprint collision index");
+  }
+
+  if (routes.has(prefix)) {
+    return false;
+  }
+
+  routes.set(prefix, trailingRoute);
+
+  return true;
+}
+
+function registerTrailingSecondaryFingerprint(
+  secondary: Map<number, TrailingSecondaryFingerprintEntry>,
+  prefix: string,
+  trailingRoute: TrailingParamRoute,
+): boolean {
+  const key = secondaryPrefixFingerprint(prefix, prefix.length);
+  const existing = secondary.get(key);
+  const collisionRoute: TrailingCollisionRoute = {
+    route: trailingRoute.route,
+    paramName: trailingRoute.paramName,
+    prefix,
+  };
+
+  if (existing === undefined) {
+    secondary.set(key, collisionRoute);
+    return true;
+  }
+
+  if (existing instanceof Map) {
+    if (existing.has(prefix)) {
+      return false;
+    }
+
+    existing.set(prefix, collisionRoute);
+    return true;
+  }
+
+  if (existing.prefix === prefix) {
+    return false;
+  }
+
+  secondary.set(
+    key,
+    new Map([
+      [existing.prefix, existing],
+      [prefix, collisionRoute],
+    ]),
+  );
+
+  return true;
+}
+
+function cloneTrailingParamFingerprints(
+  fingerprints: Map<number, TrailingFingerprintEntry>,
+): Map<number, TrailingFingerprintEntry> {
+  const cloned = new Map<number, TrailingFingerprintEntry>();
+
+  for (const [key, entry] of fingerprints) {
+    if (entry.kind === "unique") {
+      cloned.set(key, entry);
+      continue;
+    }
+
+    const secondary = entry.secondary;
+
+    if (secondary === undefined) {
+      cloned.set(key, {
+        kind: "collision",
+        ...(entry.routes === undefined
+          ? {}
+          : { routes: new Map(entry.routes) }),
+      });
+      continue;
+    }
+
+    const clonedSecondary = new Map<
+      number,
+      TrailingSecondaryFingerprintEntry
+    >();
+
+    for (const [secondaryKey, secondaryEntry] of secondary) {
+      clonedSecondary.set(
+        secondaryKey,
+        secondaryEntry instanceof Map
+          ? new Map(secondaryEntry)
+          : secondaryEntry,
+      );
+    }
+
+    cloned.set(key, {
+      kind: "collision",
+      secondary: clonedSecondary,
+    });
+  }
+
+  return cloned;
+}
+
+'''
+    + text[end:]
+)
+
+path.write_text(text)
