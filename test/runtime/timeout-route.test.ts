@@ -193,7 +193,7 @@ describe("P11-G6 route timeout boundary", () => {
     expect(handlerRan).toBe(false);
   });
 
-  test("covers beforeHandle and ignores lifecycle work that finishes after the route deadline", async () => {
+  test("covers a never-resolving beforeHandle without claiming forcible cancellation", async () => {
     const deadlines = timeout();
     const app = new Gelis();
     let handlerRan = false;
@@ -203,11 +203,12 @@ describe("P11-G6 route timeout boundary", () => {
       { timeout: deadlines.route(5) },
       () => {
         handlerRan = true;
-        return "late";
+        return "must not run";
       },
       {
-        async beforeHandle({ request }) {
-          await waitForAbort(deadlines.signal(request)!);
+        beforeHandle({ request }) {
+          expect(deadlines.signal(request)).toBeDefined();
+          return new Promise<never>(() => undefined);
         },
       },
     );
@@ -218,19 +219,20 @@ describe("P11-G6 route timeout boundary", () => {
     expect(handlerRan).toBe(false);
   });
 
-  test("covers afterHandle under the route deadline", async () => {
+  test("covers a never-resolving afterHandle under the route deadline", async () => {
     const deadlines = timeout();
     const app = new Gelis();
-    let afterFinished = false;
+    let afterStarted = false;
 
     app.get(
       "/after",
       { timeout: deadlines.route(5) },
       () => "handler completed",
       {
-        async afterHandle({ request }) {
-          await waitForAbort(deadlines.signal(request)!);
-          afterFinished = true;
+        afterHandle({ request }) {
+          expect(deadlines.signal(request)).toBeDefined();
+          afterStarted = true;
+          return new Promise<never>(() => undefined);
         },
       },
     );
@@ -238,18 +240,17 @@ describe("P11-G6 route timeout boundary", () => {
     const response = await app.fetch(new Request("https://api.example/after"));
 
     expect(response.status).toBe(503);
-    await Promise.resolve();
-    expect(afterFinished).toBe(true);
+    expect(afterStarted).toBe(true);
   });
 
-  test("covers asynchronous request-scope derivation", async () => {
+  test("covers never-resolving asynchronous request-scope derivation", async () => {
     const deadlines = timeout();
     const app = new Gelis();
     let handlerRan = false;
 
-    const scoped = app.requestScope(async ({ request }) => {
-      await waitForAbort(deadlines.signal(request)!);
-      return { ready: true };
+    const scoped = app.requestScope(({ request }) => {
+      expect(deadlines.signal(request)).toBeDefined();
+      return new Promise<{ ready: boolean }>(() => undefined);
     });
 
     scoped.get(
@@ -257,7 +258,7 @@ describe("P11-G6 route timeout boundary", () => {
       { timeout: deadlines.route(5) },
       () => {
         handlerRan = true;
-        return "late";
+        return "must not run";
       },
     );
 
