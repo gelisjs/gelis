@@ -6,32 +6,21 @@ import { fileURLToPath } from "node:url";
 
 const EXPECTED_BUN = "1.4.2";
 const EXPECTED_BUN_REVISION = "744846f844374847c902b5e7fd59b4342a51ef99";
-const SOURCE = "5d9698d6b8d368ddcff358fc2645435b93c0c062";
-const EXPECTED_WORKER_BLOB = "9df1a3a236b0ec07626fce9e85041291448963e1";
+const PRODUCTION = "5d9698d6b8d368ddcff358fc2645435b93c0c062";
+const WORKER_BLOB = "9df1a3a236b0ec07626fce9e85041291448963e1";
 const ROUTES = 5_000;
 const PAIRED_WORKERS_PER_CELL = 16;
 const CYCLES_PER_WORKER = 8;
 const BOOTSTRAP_REPS = 5_000;
-const NEUTRAL_LOW = 0.98;
-const NEUTRAL_HIGH = 1.02;
 const EXPECTED_LOCAL_LOGICAL_CPUS = 12;
+const CLEAR_IMPROVEMENT_UPPER = 0.98;
+const CLEAR_REGRESSION_LOWER = 1.02;
+const MATERIAL_IMPROVEMENT = 0.95;
+const MATERIAL_REGRESSION = 1.05;
 const HERE = dirname(fileURLToPath(import.meta.url));
-const WORKER = resolve(
-  HERE,
-  "cp4aq2-hotpath-detectability-frontier-worker.mts",
-);
+const WORKER = resolve(HERE, "cp4aq3-production-performance-decision-worker.mts");
 const REPOSITORY_ROOT = resolve(HERE, "../..");
 const RUN_TOKEN = `${process.pid}-${Date.now()}`;
-const WORKTREE_A = resolve(
-  REPOSITORY_ROOT,
-  "..",
-  `gelis-cp4aq2-a-${RUN_TOKEN}`,
-);
-const WORKTREE_B = resolve(
-  REPOSITORY_ROOT,
-  "..",
-  `gelis-cp4aq2-b-${RUN_TOKEN}`,
-);
 
 type Cell =
   | "static-only-raw"
@@ -40,20 +29,19 @@ type Cell =
   | "collision-dynamic-raw"
   | "all-dynamic-raw";
 
-type Classification = "CLEAR IMPROVEMENT" | "INCONCLUSIVE" | "CLEAR REGRESSION";
+type Classification =
+  | "CLEAR IMPROVEMENT"
+  | "INCONCLUSIVE"
+  | "CLEAR REGRESSION";
 
-type EffectKey = "minus10" | "minus5" | "control" | "plus5" | "plus10";
+type HotpathDecision =
+  | "ELIGIBLE FOR PRODUCTION PROMOTION"
+  | "HOLD / INCONCLUSIVE"
+  | "REJECTED FOR PRODUCTION PROMOTION";
 
 interface CellSpec {
   readonly cell: Cell;
   readonly label: string;
-}
-
-interface EffectSpec {
-  readonly key: EffectKey;
-  readonly label: string;
-  readonly factor: number;
-  readonly expected: Classification;
 }
 
 interface WorkerResult {
@@ -73,22 +61,16 @@ interface WorkerResult {
   readonly sink: number;
 }
 
-interface FrontierRow {
-  readonly cell: Cell;
-  readonly effect: EffectSpec;
-  readonly estimate: number;
+interface Diagnostics {
+  readonly rawMedianRatio: number;
+  readonly workerMedianRatio: number;
   readonly bootstrapLow: number;
   readonly bootstrapHigh: number;
   readonly classification: Classification;
-  readonly pass: boolean;
-}
-
-interface RawDiagnostics {
-  readonly median: number;
-  readonly bootstrapLow: number;
-  readonly bootstrapHigh: number;
-  readonly min: number;
-  readonly max: number;
+  readonly materialImprovement: boolean;
+  readonly materialRegressionEstimate: boolean;
+  readonly minWorkerRatio: number;
+  readonly maxWorkerRatio: number;
 }
 
 const CELLS: readonly CellSpec[] = [
@@ -99,45 +81,15 @@ const CELLS: readonly CellSpec[] = [
   { cell: "all-dynamic-raw", label: "ALL dynamic raw" },
 ];
 
-const EFFECTS: readonly EffectSpec[] = [
-  {
-    key: "minus10",
-    label: "-10% latency",
-    factor: 0.9,
-    expected: "CLEAR IMPROVEMENT",
-  },
-  {
-    key: "minus5",
-    label: "-5% latency",
-    factor: 0.95,
-    expected: "CLEAR IMPROVEMENT",
-  },
-  {
-    key: "control",
-    label: "0% control",
-    factor: 1,
-    expected: "INCONCLUSIVE",
-  },
-  {
-    key: "plus5",
-    label: "+5% latency",
-    factor: 1.05,
-    expected: "CLEAR REGRESSION",
-  },
-  {
-    key: "plus10",
-    label: "+10% latency",
-    factor: 1.1,
-    expected: "CLEAR REGRESSION",
-  },
-];
-
 const probeOnly = process.argv.includes("--probe-only");
+const candidate = readCandidate(process.argv.slice(2));
 const harnessSha = git(["rev-parse", "HEAD"]);
 const cpu = cpus()[0]?.model ?? "unknown";
 const logicalCpuCount = cpus().length;
 const affinityLogicalCpu = Math.max(0, logicalCpuCount - 2);
 const affinityMaskHex = (1n << BigInt(affinityLogicalCpu)).toString(16);
+const worktreeA = resolve(REPOSITORY_ROOT, "..", `gelis-cp4aq3-a-${RUN_TOKEN}`);
+const worktreeB = resolve(REPOSITORY_ROOT, "..", `gelis-cp4aq3-b-${RUN_TOKEN}`);
 let worktreeACreated = false;
 let worktreeBCreated = false;
 let completed = false;
@@ -146,9 +98,9 @@ let workerResultSequence = 0;
 preflight();
 
 try {
-  createWorktree(WORKTREE_A, SOURCE);
+  createWorktree(worktreeA, PRODUCTION);
   worktreeACreated = true;
-  createWorktree(WORKTREE_B, SOURCE);
+  createWorktree(worktreeB, candidate);
   worktreeBCreated = true;
 
   printHeader();
@@ -165,44 +117,37 @@ try {
 if (probeOnly) {
   console.log();
   console.log(
-    `CP4-AQ2 CORRECTNESS PROBE: PASS (${CELLS.length}/${CELLS.length} paired-source checks)`,
+    `CP4-AQ3 CORRECTNESS PROBE: PASS (${CELLS.length}/${CELLS.length} paired-source checks)`,
   );
 } else if (completed) {
   console.log();
-  console.log("CP4-AQ2 LOCAL HOTPATH DETECTABILITY FRONTIER RUN: COMPLETE");
+  console.log("CP4-AQ3 LOCAL PRODUCTION PERFORMANCE DECISION RUN: COMPLETE");
 }
 
 function printHeader(): void {
   console.log(
-    "Competitive Performance v0.1 — CP4-AQ2 hotpath detectability frontier",
+    "Competitive Performance v0.1 — CP4-AQ3 production performance decision protocol",
   );
   console.log(`Bun:             ${Bun.version}`);
   console.log(`Revision:        ${Bun.revision}`);
   console.log(`CPU:             ${cpu}`);
   console.log(`Logical CPUs:    ${logicalCpuCount}`);
   console.log(`Harness SHA:     ${harnessSha}`);
-  console.log(`Source A:        ${SOURCE}`);
-  console.log(`Source B:        ${SOURCE}`);
-  console.log(`Worker blob:     ${EXPECTED_WORKER_BLOB} (exact AQ1F2 worker)`);
+  console.log(`Production A:    ${PRODUCTION}`);
+  console.log(`Candidate B:     ${candidate}`);
+  console.log(`Worker blob:     ${WORKER_BLOB} (exact AQ1F2/AQ2 worker)`);
   console.log(`Routes:          ${ROUTES.toLocaleString("en-US")}`);
 
   if (probeOnly) {
     console.log("Mode:            correctness probe only");
   } else {
-    console.log(
-      `Paired workers:  ${PAIRED_WORKERS_PER_CELL} fresh workers/cell`,
-    );
+    console.log(`Paired workers:  ${PAIRED_WORKERS_PER_CELL} fresh workers/cell`);
     console.log(`Cycles/worker:   ${CYCLES_PER_WORKER}`);
     console.log("Cycle order:     balanced ABBA / BAAB within each process");
     console.log("Timed legs:      32 per worker (4 legs × 8 cycles)");
-    console.log("Cells:           5 representative hotpaths");
-    console.log("Synthetic bands: -10%, -5%, 0%, +5%, +10% latency");
-    console.log(
-      `Neutral zone:    ${NEUTRAL_LOW.toFixed(2)}x–${NEUTRAL_HIGH.toFixed(2)}x`,
-    );
-    console.log(
-      "Injection:       post-timing multiplicative shift of B/A ratios",
-    );
+    console.log("Cells:           5 calibrated representative hotpaths");
+    console.log("Classifier:      CI upper <= 0.98 improvement; CI lower >= 1.02 regression");
+    console.log("Material floor:  median <= 0.95 improvement; median >= 1.05 regression estimate");
     console.log(
       `Windows affinity: logical CPU ${affinityLogicalCpu} (0x${affinityMaskHex})`,
     );
@@ -220,7 +165,7 @@ function runProbe(): void {
     if (!result.probeOnly || result.cell !== spec.cell) {
       throw new Error(`Invalid paired probe for ${spec.cell}`);
     }
-    console.log(`PASS paired-a+b-${spec.cell}`);
+    console.log(`PASS paired-production+candidate-${spec.cell}`);
   }
 }
 
@@ -230,14 +175,13 @@ function runTiming(): void {
   for (let cellIndex = 0; cellIndex < CELLS.length; cellIndex++) {
     const spec = CELLS[cellIndex]!;
     const results: WorkerResult[] = [];
-
     for (
       let workerIndex = 0;
       workerIndex < PAIRED_WORKERS_PER_CELL;
       workerIndex++
     ) {
       console.log(
-        `PROGRESS aq2 ${cellIndex + 1}/${CELLS.length} ${spec.cell} worker ${workerIndex + 1}/${PAIRED_WORKERS_PER_CELL}`,
+        `PROGRESS aq3 ${cellIndex + 1}/${CELLS.length} ${spec.cell} worker ${workerIndex + 1}/${PAIRED_WORKERS_PER_CELL}`,
       );
       const result = runWorker(spec.cell, workerIndex, false);
       validateTimedResult(result, spec.cell, workerIndex);
@@ -246,10 +190,10 @@ function runTiming(): void {
     all.set(spec.cell, results);
   }
 
-  printRawDiagnostics(all);
-  const rows = buildFrontierRows(all);
-  printFrontierRows(rows);
-  printBandSummary(rows);
+  const diagnostics = buildDiagnostics(all);
+  printDiagnostics(diagnostics);
+  printWorkerRatios(all);
+  printDecision(diagnostics);
 }
 
 function validateTimedResult(
@@ -270,166 +214,149 @@ function validateTimedResult(
   if (
     result.cycleRatios.length !== CYCLES_PER_WORKER ||
     result.abbaRatios.length !== 4 ||
-    result.baabRatios.length !== 4
-  ) {
-    throw new Error(`Cycle shape mismatch for ${cell} #${workerIndex}`);
-  }
-  if (
+    result.baabRatios.length !== 4 ||
     result.aMetrics.length !== CYCLES_PER_WORKER * 2 ||
     result.bMetrics.length !== CYCLES_PER_WORKER * 2
   ) {
-    throw new Error(`Leg metric count mismatch for ${cell} #${workerIndex}`);
+    throw new Error(`Result shape mismatch for ${cell} #${workerIndex}`);
   }
 }
 
-function printRawDiagnostics(all: ReadonlyMap<Cell, WorkerResult[]>): void {
-  console.log(
-    "Raw same-source paired-worker diagnostics before synthetic shifting",
-  );
-  console.log("| comparison | median B/A | bootstrap 95% CI | min | max |");
-  console.log("| --- | ---: | ---: | ---: | ---: |");
-
-  for (const spec of CELLS) {
-    const values = getResults(all, spec.cell).map(
-      (result) => result.workerRatio!,
-    );
-    const diagnostic = rawDiagnostics(values, spec.cell);
-    console.log(
-      `| ${spec.label} | ${diagnostic.median.toFixed(4)}x | ${diagnostic.bootstrapLow.toFixed(4)}x–${diagnostic.bootstrapHigh.toFixed(4)}x | ${diagnostic.min.toFixed(4)}x | ${diagnostic.max.toFixed(4)}x |`,
-    );
-  }
-}
-
-function rawDiagnostics(values: readonly number[], cell: Cell): RawDiagnostics {
-  const sorted = [...values].sort((a, b) => a - b);
-  const bootstrap = bootstrapInterval(values, `${cell}:raw`);
-  return {
-    median: median(values),
-    bootstrapLow: bootstrap.low,
-    bootstrapHigh: bootstrap.high,
-    min: sorted[0]!,
-    max: sorted.at(-1)!,
-  };
-}
-
-function buildFrontierRows(
+function buildDiagnostics(
   all: ReadonlyMap<Cell, WorkerResult[]>,
-): readonly FrontierRow[] {
-  const rows: FrontierRow[] = [];
-
+): ReadonlyMap<Cell, Diagnostics> {
+  const output = new Map<Cell, Diagnostics>();
   for (const spec of CELLS) {
-    const rawRatios = getResults(all, spec.cell).map(
-      (result) => result.workerRatio!,
-    );
-
-    for (const effect of EFFECTS) {
-      const shifted = rawRatios.map((ratio) => ratio * effect.factor);
-      const bootstrap = bootstrapInterval(
-        shifted,
-        `${spec.cell}:${effect.key}`,
-      );
-      const classification = classify(bootstrap.low, bootstrap.high);
-      rows.push({
-        cell: spec.cell,
-        effect,
-        estimate: median(shifted),
-        bootstrapLow: bootstrap.low,
-        bootstrapHigh: bootstrap.high,
-        classification,
-        pass: classification === effect.expected,
-      });
-    }
+    const results = getResults(all, spec.cell);
+    const workerRatios = results.map((result) => result.workerRatio!);
+    const allA = results.flatMap((result) => result.aMetrics);
+    const allB = results.flatMap((result) => result.bMetrics);
+    const bootstrap = bootstrapInterval(workerRatios, `${spec.cell}:${candidate}`);
+    const workerMedianRatio = median(workerRatios);
+    const classification = classify(bootstrap.low, bootstrap.high);
+    output.set(spec.cell, {
+      rawMedianRatio: median(allB) / median(allA),
+      workerMedianRatio,
+      bootstrapLow: bootstrap.low,
+      bootstrapHigh: bootstrap.high,
+      classification,
+      materialImprovement:
+        classification === "CLEAR IMPROVEMENT" &&
+        workerMedianRatio <= MATERIAL_IMPROVEMENT,
+      materialRegressionEstimate: workerMedianRatio >= MATERIAL_REGRESSION,
+      minWorkerRatio: Math.min(...workerRatios),
+      maxWorkerRatio: Math.max(...workerRatios),
+    });
   }
-
-  return rows;
+  return output;
 }
 
 function classify(low: number, high: number): Classification {
-  if (high <= NEUTRAL_LOW) return "CLEAR IMPROVEMENT";
-  if (low >= NEUTRAL_HIGH) return "CLEAR REGRESSION";
+  if (high <= CLEAR_IMPROVEMENT_UPPER) return "CLEAR IMPROVEMENT";
+  if (low >= CLEAR_REGRESSION_LOWER) return "CLEAR REGRESSION";
   return "INCONCLUSIVE";
 }
 
-function printFrontierRows(rows: readonly FrontierRow[]): void {
-  console.log();
-  console.log("CP4-AQ2 synthetic multiplicative detectability matrix");
+function printDiagnostics(diagnostics: ReadonlyMap<Cell, Diagnostics>): void {
+  console.log("Production vs candidate hotpath diagnostics");
   console.log(
-    "| comparison | injected effect | expected ratio | estimate | bootstrap 95% CI | classification | expected class | result |",
+    "| comparison | raw leg median B/A | paired-worker median | bootstrap 95% CI | classification | material 5% |",
   );
-  console.log("| --- | --- | ---: | ---: | ---: | --- | --- | --- |");
-
+  console.log("| --- | ---: | ---: | ---: | --- | --- |");
   for (const spec of CELLS) {
-    for (const effect of EFFECTS) {
-      const row = getRow(rows, spec.cell, effect.key);
-      console.log(
-        `| ${spec.label} | ${effect.label} | ${effect.factor.toFixed(2)}x | ${row.estimate.toFixed(4)}x | ${row.bootstrapLow.toFixed(4)}x–${row.bootstrapHigh.toFixed(4)}x | ${row.classification} | ${effect.expected} | ${row.pass ? "PASS" : "FAIL"} |`,
-      );
-    }
+    const value = getDiagnostics(diagnostics, spec.cell);
+    const material = value.materialImprovement
+      ? "IMPROVEMENT"
+      : value.materialRegressionEstimate
+        ? "REGRESSION ESTIMATE"
+        : "NO";
+    console.log(
+      `| ${spec.label} | ${value.rawMedianRatio.toFixed(4)}x | ${value.workerMedianRatio.toFixed(4)}x | ${value.bootstrapLow.toFixed(4)}x–${value.bootstrapHigh.toFixed(4)}x | ${value.classification} | ${material} |`,
+    );
   }
 }
 
-function printBandSummary(rows: readonly FrontierRow[]): void {
-  const controlPass = CELLS.every(
-    (spec) => getRow(rows, spec.cell, "control").pass,
+function printWorkerRatios(all: ReadonlyMap<Cell, WorkerResult[]>): void {
+  console.log();
+  console.log("Fresh paired-worker median cycle ratios candidate / production");
+  console.log(
+    "| comparison | median | min | max | workers |",
   );
-  const fivePass = CELLS.every(
-    (spec) =>
-      getRow(rows, spec.cell, "minus5").pass &&
-      getRow(rows, spec.cell, "plus5").pass,
-  );
-  const tenPass = CELLS.every(
-    (spec) =>
-      getRow(rows, spec.cell, "minus10").pass &&
-      getRow(rows, spec.cell, "plus10").pass,
-  );
+  console.log("| --- | ---: | ---: | ---: | ---: |");
+  for (const spec of CELLS) {
+    const ratios = getResults(all, spec.cell).map((result) => result.workerRatio!);
+    console.log(
+      `| ${spec.label} | ${median(ratios).toFixed(4)}x | ${Math.min(...ratios).toFixed(4)}x | ${Math.max(...ratios).toFixed(4)}x | ${ratios.length} |`,
+    );
+  }
+}
 
-  const frontier = !controlPass
-    ? "INVALID CONTROL"
-    : fivePass
-      ? "5%"
-      : tenPass
-        ? "10%"
-        : ">10%";
+function printDecision(diagnostics: ReadonlyMap<Cell, Diagnostics>): void {
+  const values = CELLS.map((spec) => getDiagnostics(diagnostics, spec.cell));
+  const clearRegressions = values.filter(
+    (value) => value.classification === "CLEAR REGRESSION",
+  ).length;
+  const clearImprovements = values.filter(
+    (value) => value.classification === "CLEAR IMPROVEMENT",
+  ).length;
+  const materialImprovements = values.filter(
+    (value) => value.materialImprovement,
+  ).length;
+  const materialRegressionEstimates = values.filter(
+    (value) => value.materialRegressionEstimate,
+  ).length;
+
+  let decision: HotpathDecision;
+  if (clearRegressions > 0) {
+    decision = "REJECTED FOR PRODUCTION PROMOTION";
+  } else if (materialRegressionEstimates > 0) {
+    decision = "HOLD / INCONCLUSIVE";
+  } else if (materialImprovements > 0) {
+    decision = "ELIGIBLE FOR PRODUCTION PROMOTION";
+  } else {
+    decision = "HOLD / INCONCLUSIVE";
+  }
 
   console.log();
-  console.log("Frozen CP4-AQ2 universal detectability summary");
-  console.log("| check | requirement | result |");
-  console.log("| --- | --- | --- |");
+  console.log("Frozen CP4-AQ3 hotpath decision summary");
+  console.log("| check | count | meaning |");
+  console.log("| --- | ---: | --- |");
   console.log(
-    `| 0% control | all five cells remain INCONCLUSIVE inside ±2% neutral policy | ${controlPass ? "PASS" : "FAIL"} |`,
+    `| clear improvements | ${clearImprovements} | bootstrap CI entirely at or below 0.98x |`,
   );
   console.log(
-    `| ±5% latency | all five cells correctly classify both improvement and regression | ${fivePass ? "PASS" : "FAIL"} |`,
+    `| material improvements | ${materialImprovements} | clear improvement with median at or below 0.95x |`,
   );
   console.log(
-    `| ±10% latency | all five cells correctly classify both improvement and regression | ${tenPass ? "PASS" : "FAIL"} |`,
+    `| clear regressions | ${clearRegressions} | bootstrap CI entirely at or above 1.02x |`,
+  );
+  console.log(
+    `| material regression estimates | ${materialRegressionEstimates} | median at or above 1.05x, blocks promotion even if CI is inconclusive |`,
   );
   console.log();
-  console.log(`CP4-AQ2 UNIVERSAL HOTPATH DETECTION FLOOR: ${frontier}`);
+  console.log(`CP4-AQ3 HOTPATH DECISION: ${decision}`);
   console.log(
-    "AQ2 is same-source statistical detectability calibration only; synthetic shifts are applied after timing and cannot reclassify Gelis source performance.",
+    "AQ3 is candidate-vs-production hotpath evidence only. Final source promotion still requires repository Quality/correctness and any separately applicable memory gate.",
   );
 }
 
 function bootstrapInterval(
   values: readonly number[],
-  seedKey: string,
+  seedLabel: string,
 ): { readonly low: number; readonly high: number } {
-  const random = seededRandom(hashString(seedKey) ^ 0xa2022026);
-  const medians: number[] = [];
-
+  const random = seededRandom(hashString(seedLabel) ^ 0xa3000003);
+  const samples: number[] = [];
   for (let rep = 0; rep < BOOTSTRAP_REPS; rep++) {
     const sample: number[] = [];
     for (let index = 0; index < values.length; index++) {
       sample.push(values[Math.floor(random() * values.length)]!);
     }
-    medians.push(median(sample));
+    samples.push(median(sample));
   }
-
-  medians.sort((a, b) => a - b);
+  samples.sort((a, b) => a - b);
   return {
-    low: percentileSorted(medians, 0.025),
-    high: percentileSorted(medians, 0.975),
+    low: percentileSorted(samples, 0.025),
+    high: percentileSorted(samples, 0.975),
   };
 }
 
@@ -441,12 +368,11 @@ function runWorker(
   const args = [
     WORKER,
     `--cell=${cell}`,
-    `--source-root-a=${WORKTREE_A}`,
-    `--source-root-b=${WORKTREE_B}`,
+    `--source-root-a=${worktreeA}`,
+    `--source-root-b=${worktreeB}`,
     `--worker-index=${workerIndex}`,
     `--probe-only=${workerProbeOnly ? "true" : "false"}`,
   ];
-
   const result =
     workerProbeOnly || process.platform !== "win32"
       ? spawnSync(process.execPath, args, workerOptions())
@@ -457,7 +383,6 @@ function runWorker(
       `Worker failed for ${cell} #${workerIndex}\nstdout:\n${result.stdout}\nstderr:\n${result.stderr}`,
     );
   }
-
   const line = result.stdout.trim().split(/\r?\n/).filter(Boolean).at(-1);
   if (line === undefined) {
     throw new Error(`Worker emitted no result for ${cell} #${workerIndex}`);
@@ -470,7 +395,7 @@ function spawnPinnedWindowsWorker(args: readonly string[]) {
   const resultFile = resolve(
     REPOSITORY_ROOT,
     "..",
-    `gelis-cp4aq2-result-${process.pid}-${Date.now()}-${workerResultSequence++}.json`,
+    `gelis-cp4aq3-result-${process.pid}-${Date.now()}-${workerResultSequence++}.json`,
   );
   const argumentList = [...args, `--result-file=${resultFile}`]
     .map(quotePowerShell)
@@ -500,9 +425,7 @@ function spawnPinnedWindowsWorker(args: readonly string[]) {
 
   let resultText = "";
   try {
-    if (launched.status === 0) {
-      resultText = readFileSync(resultFile, "utf8");
-    }
+    if (launched.status === 0) resultText = readFileSync(resultFile, "utf8");
   } catch (error) {
     return {
       ...launched,
@@ -513,7 +436,6 @@ function spawnPinnedWindowsWorker(args: readonly string[]) {
   } finally {
     rmSync(resultFile, { force: true });
   }
-
   return { ...launched, stdout: resultText };
 }
 
@@ -526,45 +448,43 @@ function workerOptions() {
   };
 }
 
-function quotePowerShell(value: string): string {
-  return `'${value.replaceAll("'", "''")}'`;
-}
-
 function preflight(): void {
   if (Bun.version !== EXPECTED_BUN) {
-    throw new Error(`CP4-AQ2 requires Bun ${EXPECTED_BUN}, got ${Bun.version}`);
+    throw new Error(`CP4-AQ3 requires Bun ${EXPECTED_BUN}, got ${Bun.version}`);
   }
   if (Bun.revision !== EXPECTED_BUN_REVISION) {
     throw new Error(
-      `CP4-AQ2 requires Bun revision ${EXPECTED_BUN_REVISION}, got ${Bun.revision}`,
+      `CP4-AQ3 requires Bun revision ${EXPECTED_BUN_REVISION}, got ${Bun.revision}`,
     );
   }
-
   const dirty = git(["status", "--porcelain"]);
   if (dirty !== "") {
-    throw new Error(`CP4-AQ2 requires a clean worktree:\n${dirty}`);
+    throw new Error(`CP4-AQ3 requires a clean worktree:\n${dirty}`);
   }
-
-  const workerBlob = git(["hash-object", WORKER]);
-  if (workerBlob !== EXPECTED_WORKER_BLOB) {
-    throw new Error(
-      `CP4-AQ2 requires exact AQ1F2 worker blob ${EXPECTED_WORKER_BLOB}, got ${workerBlob}`,
-    );
+  git(["cat-file", "-e", `${PRODUCTION}^{commit}`]);
+  git(["cat-file", "-e", `${candidate}^{commit}`]);
+  if (!probeOnly && candidate === PRODUCTION) {
+    throw new Error("CP4-AQ3 timed decision requires candidate != production");
   }
-
   if (!probeOnly) {
     if (process.platform !== "win32") {
-      throw new Error(
-        "CP4-AQ2 timed calibration is authoritative only on Windows",
-      );
+      throw new Error("CP4-AQ3 timed decision is authoritative only on Windows");
     }
     if (logicalCpuCount !== EXPECTED_LOCAL_LOGICAL_CPUS) {
       throw new Error(
-        `CP4-AQ2 timed calibration requires ${EXPECTED_LOCAL_LOGICAL_CPUS} logical CPUs, got ${logicalCpuCount}`,
+        `CP4-AQ3 timed decision requires ${EXPECTED_LOCAL_LOGICAL_CPUS} logical CPUs, got ${logicalCpuCount}`,
       );
     }
   }
-  git(["cat-file", "-e", `${SOURCE}^{commit}`]);
+}
+
+function readCandidate(values: readonly string[]): string {
+  const prefix = "--candidate=";
+  const value = values.find((item) => item.startsWith(prefix))?.slice(prefix.length);
+  if (value === undefined || value.length === 0) {
+    throw new Error("CP4-AQ3 requires --candidate=<commit-sha>");
+  }
+  return value;
 }
 
 function createWorktree(path: string, source: string): void {
@@ -581,8 +501,8 @@ function createWorktree(path: string, source: string): void {
 }
 
 function cleanupWorktrees(): void {
-  if (worktreeBCreated) removeWorktree(WORKTREE_B);
-  if (worktreeACreated) removeWorktree(WORKTREE_A);
+  if (worktreeBCreated) removeWorktree(worktreeB);
+  if (worktreeACreated) removeWorktree(worktreeA);
 }
 
 function removeWorktree(path: string): void {
@@ -602,25 +522,17 @@ function getResults(
   return value;
 }
 
-function getRow(
-  rows: readonly FrontierRow[],
+function getDiagnostics(
+  all: ReadonlyMap<Cell, Diagnostics>,
   cell: Cell,
-  effectKey: EffectKey,
-): FrontierRow {
-  const value = rows.find(
-    (row) => row.cell === cell && row.effect.key === effectKey,
-  );
-  if (value === undefined) {
-    throw new Error(`Missing frontier row for ${cell}/${effectKey}`);
-  }
+): Diagnostics {
+  const value = all.get(cell);
+  if (value === undefined) throw new Error(`Missing diagnostics for ${cell}`);
   return value;
 }
 
 function median(values: readonly number[]): number {
-  return percentileSorted(
-    [...values].sort((a, b) => a - b),
-    0.5,
-  );
+  return percentileSorted([...values].sort((a, b) => a - b), 0.5);
 }
 
 function percentileSorted(values: readonly number[], quantile: number): number {
@@ -652,6 +564,10 @@ function seededRandom(seed: number): () => number {
     state ^= state << 5;
     return (state >>> 0) / 0x1_0000_0000;
   };
+}
+
+function quotePowerShell(value: string): string {
+  return `'${value.replaceAll("'", "''")}'`;
 }
 
 function git(args: readonly string[]): string {
