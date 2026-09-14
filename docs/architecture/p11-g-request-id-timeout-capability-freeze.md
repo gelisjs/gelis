@@ -75,10 +75,7 @@ The frozen public direction is:
 ```ts
 export type RequestIdGenerator = (request: Request) => string;
 
-export type RequestIdValidator = (
-  value: string,
-  request: Request,
-) => boolean;
+export type RequestIdValidator = (value: string, request: Request) => boolean;
 
 export interface RequestIdOptions {
   readonly header?: string;
