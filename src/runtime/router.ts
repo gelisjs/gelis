@@ -31,12 +31,8 @@ interface TrailingFingerprintUniqueEntry {
   readonly trailingRoute: TrailingParamRoute;
 }
 
-interface TrailingCollisionRoute extends TrailingParamRoute {
-  readonly prefix: string;
-}
-
 type TrailingSecondaryFingerprintEntry =
-  TrailingCollisionRoute | Map<string, TrailingCollisionRoute>;
+  TrailingParamRoute | Map<string, TrailingParamRoute>;
 
 interface TrailingFingerprintCollisionEntry {
   readonly kind: "collision";
@@ -252,8 +248,12 @@ export class Router {
                   );
                 } else if (
                   secondaryEntry !== undefined &&
-                  secondaryEntry.prefix.length === prefixEnd &&
-                  pathname.startsWith(secondaryEntry.prefix)
+                  trailingRoutePrefixMatches(
+                    secondaryEntry,
+                    pathname,
+                    0,
+                    prefixEnd,
+                  )
                 ) {
                   trailingRoute = secondaryEntry;
                 }
@@ -473,8 +473,12 @@ export class Router {
                   );
                 } else if (
                   secondaryEntry !== undefined &&
-                  secondaryEntry.prefix.length === prefixLength &&
-                  url.startsWith(secondaryEntry.prefix, pathStart)
+                  trailingRoutePrefixMatches(
+                    secondaryEntry,
+                    url,
+                    pathStart,
+                    prefixLength,
+                  )
                 ) {
                   trailingRoute = secondaryEntry;
                 }
@@ -651,8 +655,12 @@ function methodTableMatchesPath(
                 }
               } else if (
                 secondaryEntry !== undefined &&
-                secondaryEntry.prefix.length === prefixEnd &&
-                pathname.startsWith(secondaryEntry.prefix)
+                trailingRoutePrefixMatches(
+                  secondaryEntry,
+                  pathname,
+                  0,
+                  prefixEnd,
+                )
               ) {
                 return true;
               }
@@ -1146,14 +1154,9 @@ function registerTrailingSecondaryFingerprint(
 ): boolean {
   const key = secondaryPrefixFingerprint(prefix, prefix.length);
   const existing = secondary.get(key);
-  const collisionRoute: TrailingCollisionRoute = {
-    route: trailingRoute.route,
-    paramName: trailingRoute.paramName,
-    prefix,
-  };
 
   if (existing === undefined) {
-    secondary.set(key, collisionRoute);
+    secondary.set(key, trailingRoute);
     return true;
   }
 
@@ -1162,21 +1165,58 @@ function registerTrailingSecondaryFingerprint(
       return false;
     }
 
-    existing.set(prefix, collisionRoute);
+    existing.set(prefix, trailingRoute);
     return true;
   }
 
-  if (existing.prefix === prefix) {
+  if (trailingRoutePrefixEquals(existing, prefix)) {
     return false;
   }
+
+  const existingPrefixLength = trailingRoutePrefixLength(existing);
+  const existingPrefix = existing.route.path.slice(0, existingPrefixLength);
 
   secondary.set(
     key,
     new Map([
-      [existing.prefix, existing],
-      [prefix, collisionRoute],
+      [existingPrefix, existing],
+      [prefix, trailingRoute],
     ]),
   );
+
+  return true;
+}
+
+function trailingRoutePrefixLength(route: TrailingParamRoute): number {
+  return route.route.path.length - route.paramName.length - 1;
+}
+
+function trailingRoutePrefixEquals(
+  route: TrailingParamRoute,
+  prefix: string,
+): boolean {
+  const prefixLength = trailingRoutePrefixLength(route);
+
+  return prefixLength === prefix.length && route.route.path.startsWith(prefix);
+}
+
+function trailingRoutePrefixMatches(
+  route: TrailingParamRoute,
+  value: string,
+  start: number,
+  prefixLength: number,
+): boolean {
+  const routePath = route.route.path;
+
+  if (trailingRoutePrefixLength(route) !== prefixLength) {
+    return false;
+  }
+
+  for (let index = 0; index < prefixLength; index++) {
+    if (routePath.charCodeAt(index) !== value.charCodeAt(start + index)) {
+      return false;
+    }
+  }
 
   return true;
 }
