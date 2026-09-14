@@ -14,21 +14,18 @@ const SAMPLES = BLOCKS * PAIRS_PER_BLOCK;
 const BOOTSTRAP_REPS = 5_000;
 const EXPECTED_LOCAL_LOGICAL_CPUS = 12;
 const HERE = dirname(fileURLToPath(import.meta.url));
-const WORKER = resolve(
-  HERE,
-  "cp4aq1d-hardened-stability-calibration-worker.mts",
-);
+const WORKER = resolve(HERE, "cp4aq1e-main-stability-calibration-worker.mts");
 const REPOSITORY_ROOT = resolve(HERE, "../..");
 const RUN_TOKEN = `${process.pid}-${Date.now()}`;
 const WORKTREE_A = resolve(
   REPOSITORY_ROOT,
   "..",
-  `gelis-cp4aq1d-a-${RUN_TOKEN}`,
+  `gelis-cp4aq1e-main-a-${RUN_TOKEN}`,
 );
 const WORKTREE_B = resolve(
   REPOSITORY_ROOT,
   "..",
-  `gelis-cp4aq1d-b-${RUN_TOKEN}`,
+  `gelis-cp4aq1e-main-b-${RUN_TOKEN}`,
 );
 
 type Source = "a" | "b";
@@ -127,16 +124,10 @@ const CELLS: readonly CellSpec[] = [
     label: "static registration",
     kind: "registration",
   },
-  {
-    cell: "static-memory",
-    label: "static retained heap delta",
-    kind: "memory",
-  },
 ];
 
 const SOURCES: readonly Source[] = ["a", "b"];
 const probeOnly = process.argv.includes("--probe-only");
-const launcherProbeOnly = process.argv.includes("--launcher-probe");
 const harnessSha = git(["rev-parse", "HEAD"]);
 const cpu = cpus()[0]?.model ?? "unknown";
 const logicalCpuCount = cpus().length;
@@ -145,7 +136,6 @@ const affinityMaskHex = (1n << BigInt(affinityLogicalCpu)).toString(16);
 let worktreeACreated = false;
 let worktreeBCreated = false;
 let probeCompleted = false;
-let launcherProbeCompleted = false;
 let completed = false;
 let workerResultSequence = 0;
 
@@ -162,9 +152,6 @@ try {
   if (probeOnly) {
     runProbe();
     probeCompleted = true;
-  } else if (launcherProbeOnly) {
-    runLauncherProbe();
-    launcherProbeCompleted = true;
   } else {
     runTiming();
     completed = true;
@@ -176,19 +163,18 @@ try {
 if (probeCompleted) {
   console.log();
   console.log(
-    `CP4-AQ1D CORRECTNESS PROBE: PASS (${CELLS.length * SOURCES.length}/${CELLS.length * SOURCES.length})`,
+    `CP4-AQ1E-MAIN CORRECTNESS PROBE: PASS (${CELLS.length * SOURCES.length}/${CELLS.length * SOURCES.length})`,
   );
-} else if (launcherProbeCompleted) {
-  console.log();
-  console.log("CP4-AQ1D WINDOWS LAUNCHER IPC PROBE: PASS (16/16)");
 } else if (completed) {
   console.log();
-  console.log("CP4-AQ1D LOCAL HARDENED STABILITY CALIBRATION RUN: COMPLETE");
+  console.log(
+    "CP4-AQ1E-MAIN LOCAL HARDENED STABILITY CALIBRATION RUN: COMPLETE",
+  );
 }
 
 function printHeader(): void {
   console.log(
-    "Competitive Performance v0.1 — CP4-AQ1D hardened benchmark stability calibration",
+    "Competitive Performance v0.1 — CP4-AQ1E-MAIN hardened benchmark stability calibration",
   );
   console.log(`Bun:             ${Bun.version}`);
   console.log(`Revision:        ${Bun.revision}`);
@@ -200,17 +186,14 @@ function printHeader(): void {
   console.log(`Routes:          ${ROUTES.toLocaleString("en-US")}`);
   if (probeOnly) {
     console.log("Mode:            correctness probe only");
-  } else if (launcherProbeOnly) {
-    console.log("Mode:            Windows launcher infrastructure probe only");
-    console.log(
-      `Windows affinity: logical CPU ${affinityLogicalCpu} (0x${affinityMaskHex})`,
-    );
-    console.log("Worker priority: HIGH");
   } else {
     console.log(`Blocks:          ${BLOCKS}`);
     console.log(`Pairs/block:     ${PAIRS_PER_BLOCK}`);
     console.log(`Samples/source:  ${SAMPLES} fresh-worker measurements/cell`);
     console.log("Order:           4 A→B + 4 B→A pairs per block");
+    console.log(
+      "Cells:           10 hotpath + 1 registration; memory isolated in AQ1E-MEMORY",
+    );
     console.log(
       `Windows affinity: logical CPU ${affinityLogicalCpu} (0x${affinityMaskHex})`,
     );
@@ -234,41 +217,18 @@ function runProbe(): void {
   }
 }
 
-function runLauncherProbe(): void {
-  let completed = 0;
-  for (let index = 0; index < 8; index++) {
-    const source: Source = index % 2 === 0 ? "a" : "b";
-    const hotpath = runWorker("static-only-raw", source, false);
-    if (
-      hotpath.probeOnly ||
-      hotpath.metric === null ||
-      hotpath.unit !== "ns/op"
-    ) {
-      throw new Error(`Invalid AQ1D hotpath IPC probe result ${index + 1}`);
-    }
-    completed++;
-
-    const memory = runWorker(
-      "static-memory",
-      source === "a" ? "b" : "a",
-      false,
-    );
-    if (memory.probeOnly || memory.metric === null || memory.unit !== "bytes") {
-      throw new Error(`Invalid AQ1D memory IPC probe result ${index + 1}`);
-    }
-    completed++;
-  }
-  console.log(`PASS gated-result-file IPC stress probe (${completed}/16)`);
-}
-
 function runTiming(): void {
   const results = new Map<Cell, PairResult[]>();
   const units = new Map<Cell, Unit>();
 
-  for (const spec of CELLS) {
+  for (let cellIndex = 0; cellIndex < CELLS.length; cellIndex++) {
+    const spec = CELLS[cellIndex]!;
     const pairs: PairResult[] = [];
 
     for (let block = 0; block < BLOCKS; block++) {
+      console.log(
+        `PROGRESS main ${cellIndex + 1}/${CELLS.length} ${spec.cell} block ${block + 1}/${BLOCKS}`,
+      );
       for (let pair = 0; pair < PAIRS_PER_BLOCK; pair++) {
         const order: Order = pair % 2 === 0 ? "a-b" : "b-a";
         const first: Source = order === "a-b" ? "a" : "b";
@@ -416,7 +376,7 @@ function printReadiness(diagnostics: ReadonlyMap<Cell, CellDiagnostics>): void {
   let ready = true;
 
   console.log();
-  console.log("Frozen CP4-AQ1D benchmark-readiness criteria");
+  console.log("Frozen CP4-AQ1E-MAIN benchmark-readiness criteria");
   console.log(
     "| comparison | aggregate bias | bootstrap CI | order spread | block deviation | result |",
   );
@@ -443,10 +403,10 @@ function printReadiness(diagnostics: ReadonlyMap<Cell, CellDiagnostics>): void {
 
   console.log();
   console.log(
-    `CP4-AQ1D HARDENED BENCHMARK 2%-GATE READINESS: ${ready ? "PASS" : "FAIL"}`,
+    `CP4-AQ1E-MAIN HARDENED BENCHMARK 2%-GATE READINESS: ${ready ? "PASS" : "FAIL"}`,
   );
   console.log(
-    "AQ1 is environment/estimator calibration only; this readiness result does not reclassify Gelis source performance.",
+    "AQ1E-MAIN is environment/estimator calibration only; this readiness result does not reclassify Gelis source performance.",
   );
 }
 
@@ -558,7 +518,7 @@ function spawnPinnedWindowsWorker(args: readonly string[]) {
   const resultFile = resolve(
     REPOSITORY_ROOT,
     "..",
-    `gelis-cp4aq1d-result-${process.pid}-${Date.now()}-${workerResultSequence++}.json`,
+    `gelis-cp4aq1e-main-result-${process.pid}-${Date.now()}-${workerResultSequence++}.json`,
   );
   const argumentList = [...args, `--result-file=${resultFile}`]
     .map(quotePowerShell)
@@ -622,29 +582,29 @@ function quotePowerShell(value: string): string {
 function preflight(): void {
   if (Bun.version !== EXPECTED_BUN) {
     throw new Error(
-      `CP4-AQ1D requires Bun ${EXPECTED_BUN}, got ${Bun.version}`,
+      `CP4-AQ1E-MAIN requires Bun ${EXPECTED_BUN}, got ${Bun.version}`,
     );
   }
   if (Bun.revision !== EXPECTED_BUN_REVISION) {
     throw new Error(
-      `CP4-AQ1D requires Bun revision ${EXPECTED_BUN_REVISION}, got ${Bun.revision}`,
+      `CP4-AQ1E-MAIN requires Bun revision ${EXPECTED_BUN_REVISION}, got ${Bun.revision}`,
     );
   }
 
   const dirty = git(["status", "--porcelain"]);
   if (dirty !== "") {
-    throw new Error(`CP4-AQ1D requires a clean worktree:\n${dirty}`);
+    throw new Error(`CP4-AQ1E-MAIN requires a clean worktree:\n${dirty}`);
   }
 
   if (!probeOnly) {
     if (process.platform !== "win32") {
       throw new Error(
-        "CP4-AQ1D timed calibration is authoritative only on Windows",
+        "CP4-AQ1E-MAIN timed calibration is authoritative only on Windows",
       );
     }
     if (logicalCpuCount !== EXPECTED_LOCAL_LOGICAL_CPUS) {
       throw new Error(
-        `CP4-AQ1D timed calibration requires ${EXPECTED_LOCAL_LOGICAL_CPUS} logical CPUs, got ${logicalCpuCount}`,
+        `CP4-AQ1E-MAIN timed calibration requires ${EXPECTED_LOCAL_LOGICAL_CPUS} logical CPUs, got ${logicalCpuCount}`,
       );
     }
   }
