@@ -1,5 +1,6 @@
 name: P11-G6 Route Timeout Candidate
 
+# Retry after correcting the source import anchor.
 on:
   push:
     branches:
@@ -46,6 +47,6 @@ jobs:
           git rm .github/workflows/p11-g6-route-timeout-candidate.yml scripts/p11-g6-route-timeout-patch.py
           git add src/route.ts src/runtime/types.ts src/runtime/route-boundary.ts src/route-builder.ts src/app.ts src/timeout/application.ts src/timeout/index.ts src/timeout/route-policy.ts test/runtime/timeout-route.test.ts
           git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config user.email "41898282+rigenttio@users.noreply.github.com"
           git commit -m "feat(timeout): complete G6 route deadline boundary"
           git push origin HEAD:work/p11-g6-route-timeout
