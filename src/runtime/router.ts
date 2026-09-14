@@ -31,10 +31,21 @@ interface TrailingFingerprintUniqueEntry {
   readonly trailingRoute: TrailingParamRoute;
 }
 
+interface TrailingSecondaryFingerprintUniqueEntry {
+  readonly prefix: string;
+
+  readonly trailingRoute: TrailingParamRoute;
+}
+
+type TrailingSecondaryFingerprintEntry =
+  TrailingSecondaryFingerprintUniqueEntry | null;
+
 interface TrailingFingerprintCollisionEntry {
   readonly kind: "collision";
 
   readonly routes: Map<string, TrailingParamRoute>;
+
+  readonly secondary?: Map<number, TrailingSecondaryFingerprintEntry>;
 }
 
 type TrailingFingerprintEntry =
@@ -222,7 +233,27 @@ export class Router {
                 trailingRoute = entry.trailingRoute;
               }
             } else if (entry !== undefined) {
-              trailingRoute = entry.routes.get(pathname.slice(0, prefixEnd));
+              const secondary = entry.secondary;
+
+              if (secondary === undefined) {
+                trailingRoute = entry.routes.get(pathname.slice(0, prefixEnd));
+              } else {
+                const secondaryEntry = secondary.get(
+                  secondaryPrefixFingerprint(pathname, prefixEnd),
+                );
+
+                if (secondaryEntry === null) {
+                  trailingRoute = entry.routes.get(
+                    pathname.slice(0, prefixEnd),
+                  );
+                } else if (
+                  secondaryEntry !== undefined &&
+                  secondaryEntry.prefix.length === prefixEnd &&
+                  pathname.startsWith(secondaryEntry.prefix)
+                ) {
+                  trailingRoute = secondaryEntry.trailingRoute;
+                }
+              }
             }
           } else if (trailingParamRoutes !== undefined) {
             trailingRoute = trailingParamRoutes.get(
@@ -421,7 +452,29 @@ export class Router {
                 trailingRoute = entry.trailingRoute;
               }
             } else if (entry !== undefined) {
-              trailingRoute = entry.routes.get(url.slice(pathStart, prefixEnd));
+              const secondary = entry.secondary;
+
+              if (secondary === undefined) {
+                trailingRoute = entry.routes.get(
+                  url.slice(pathStart, prefixEnd),
+                );
+              } else {
+                const secondaryEntry = secondary.get(
+                  secondaryPrefixFingerprintRange(url, prefixEnd, prefixLength),
+                );
+
+                if (secondaryEntry === null) {
+                  trailingRoute = entry.routes.get(
+                    url.slice(pathStart, prefixEnd),
+                  );
+                } else if (
+                  secondaryEntry !== undefined &&
+                  secondaryEntry.prefix.length === prefixLength &&
+                  url.startsWith(secondaryEntry.prefix, pathStart)
+                ) {
+                  trailingRoute = secondaryEntry.trailingRoute;
+                }
+              }
             }
           } else if (trailingParamRoutes !== undefined) {
             trailingRoute = trailingParamRoutes.get(
@@ -576,11 +629,30 @@ function methodTableMatchesPath(
             );
           }
 
-          if (
-            entry !== undefined &&
-            entry.routes.has(pathname.slice(0, prefixEnd))
-          ) {
-            return true;
+          if (entry !== undefined) {
+            const secondary = entry.secondary;
+
+            if (secondary === undefined) {
+              if (entry.routes.has(pathname.slice(0, prefixEnd))) {
+                return true;
+              }
+            } else {
+              const secondaryEntry = secondary.get(
+                secondaryPrefixFingerprint(pathname, prefixEnd),
+              );
+
+              if (secondaryEntry === null) {
+                if (entry.routes.has(pathname.slice(0, prefixEnd))) {
+                  return true;
+                }
+              } else if (
+                secondaryEntry !== undefined &&
+                secondaryEntry.prefix.length === prefixEnd &&
+                pathname.startsWith(secondaryEntry.prefix)
+              ) {
+                return true;
+              }
+            }
           }
         } else if (
           trailingParamRoutes !== undefined &&
@@ -1001,6 +1073,15 @@ function registerTrailingFingerprint(
       return false;
     }
 
+    const secondary = new Map<number, TrailingSecondaryFingerprintEntry>();
+
+    registerTrailingSecondaryFingerprint(
+      secondary,
+      existing.prefix,
+      existing.trailingRoute,
+    );
+    registerTrailingSecondaryFingerprint(secondary, prefix, trailingRoute);
+
     fingerprints.set(key, {
       kind: "collision",
 
@@ -1008,6 +1089,8 @@ function registerTrailingFingerprint(
         [existing.prefix, existing.trailingRoute],
         [prefix, trailingRoute],
       ]),
+
+      secondary,
     });
 
     return true;
@@ -1019,7 +1102,33 @@ function registerTrailingFingerprint(
 
   existing.routes.set(prefix, trailingRoute);
 
+  if (existing.secondary !== undefined) {
+    registerTrailingSecondaryFingerprint(
+      existing.secondary,
+      prefix,
+      trailingRoute,
+    );
+  }
+
   return true;
+}
+
+function registerTrailingSecondaryFingerprint(
+  secondary: Map<number, TrailingSecondaryFingerprintEntry>,
+  prefix: string,
+  trailingRoute: TrailingParamRoute,
+): void {
+  const key = secondaryPrefixFingerprint(prefix, prefix.length);
+  const existing = secondary.get(key);
+
+  if (existing === undefined) {
+    secondary.set(key, { prefix, trailingRoute });
+    return;
+  }
+
+  if (existing !== null && existing.prefix !== prefix) {
+    secondary.set(key, null);
+  }
 }
 
 function cloneTrailingParamFingerprints(
@@ -1037,6 +1146,10 @@ function cloneTrailingParamFingerprints(
             kind: "collision",
 
             routes: new Map(entry.routes),
+
+            ...(entry.secondary === undefined
+              ? {}
+              : { secondary: new Map(entry.secondary) }),
           },
     );
   }
@@ -1069,6 +1182,32 @@ function prefixFingerprintRange(
   hash = Math.imul(hash ^ codeBefore(value, absoluteEnd, 3), -1028477387);
   hash = Math.imul(hash ^ codeBefore(value, absoluteEnd, 4), 668265263);
   hash = Math.imul(hash ^ codeBefore(value, absoluteEnd, 5), 374761393);
+
+  return hash | 0;
+}
+
+function secondaryPrefixFingerprint(value: string, end: number): number {
+  let hash = Math.imul(end ^ 0x51ed270b, -1640531527);
+
+  hash = Math.imul(hash ^ codeBefore(value, end, 6), -2048144789);
+  hash = Math.imul(hash ^ codeBefore(value, end, 7), -1028477387);
+  hash = Math.imul(hash ^ codeBefore(value, end, 8), 668265263);
+  hash = Math.imul(hash ^ codeBefore(value, end, 9), 374761393);
+
+  return hash | 0;
+}
+
+function secondaryPrefixFingerprintRange(
+  value: string,
+  absoluteEnd: number,
+  prefixLength: number,
+): number {
+  let hash = Math.imul(prefixLength ^ 0x51ed270b, -1640531527);
+
+  hash = Math.imul(hash ^ codeBefore(value, absoluteEnd, 6), -2048144789);
+  hash = Math.imul(hash ^ codeBefore(value, absoluteEnd, 7), -1028477387);
+  hash = Math.imul(hash ^ codeBefore(value, absoluteEnd, 8), 668265263);
+  hash = Math.imul(hash ^ codeBefore(value, absoluteEnd, 9), 374761393);
 
   return hash | 0;
 }
