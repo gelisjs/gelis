@@ -31,10 +31,34 @@ interface TrailingFingerprintUniqueEntry {
   readonly trailingRoute: TrailingParamRoute;
 }
 
+interface TrailingCollisionRoute {
+  readonly route: RuntimeRouteRecord;
+
+  readonly prefix: string;
+}
+
+type TrailingSecondaryFingerprintEntry =
+  TrailingCollisionRoute | Map<string, TrailingCollisionRoute>;
+
 interface TrailingFingerprintCollisionEntry {
   readonly kind: "collision";
 
-  readonly routes: Map<string, TrailingParamRoute>;
+  /*
+   * Legacy/AOT/prebuilt collision buckets may still carry the exact prefix
+   * map. Runtime-created collision buckets use `secondary` instead, so the
+   * optimized representation does not retain two full indexes for the same
+   * routes.
+   */
+  readonly routes?: Map<string, TrailingParamRoute>;
+
+  readonly secondary?: Map<number, TrailingSecondaryFingerprintEntry>;
+
+  /*
+   * Runtime collision buckets retain one shared parameter name when every
+   * route in the bucket uses the same trailing parameter. Mixed-name buckets
+   * clear this value and fall back to route-local derivation on match.
+   */
+  paramName?: string;
 }
 
 type TrailingFingerprintEntry =
@@ -207,7 +231,9 @@ export class Router {
         if (slash >= 0) {
           const prefixEnd = slash + 1;
 
-          let trailingRoute: TrailingParamRoute | undefined;
+          let trailingRoute:
+            TrailingParamRoute | TrailingCollisionRoute | undefined;
+          let collisionParamName: string | undefined;
 
           if (trailingParamFingerprints !== undefined) {
             const entry = trailingParamFingerprints.get(
@@ -222,7 +248,29 @@ export class Router {
                 trailingRoute = entry.trailingRoute;
               }
             } else if (entry !== undefined) {
-              trailingRoute = entry.routes.get(pathname.slice(0, prefixEnd));
+              const secondary = entry.secondary;
+
+              if (secondary === undefined) {
+                trailingRoute = entry.routes?.get(pathname.slice(0, prefixEnd));
+              } else {
+                collisionParamName = entry.paramName;
+
+                const secondaryEntry = secondary.get(
+                  secondaryPrefixFingerprint(pathname, prefixEnd),
+                );
+
+                if (secondaryEntry instanceof Map) {
+                  trailingRoute = secondaryEntry.get(
+                    pathname.slice(0, prefixEnd),
+                  );
+                } else if (
+                  secondaryEntry !== undefined &&
+                  secondaryEntry.prefix.length === prefixEnd &&
+                  pathname.startsWith(secondaryEntry.prefix)
+                ) {
+                  trailingRoute = secondaryEntry;
+                }
+              }
             }
           } else if (trailingParamRoutes !== undefined) {
             trailingRoute = trailingParamRoutes.get(
@@ -232,12 +280,14 @@ export class Router {
 
           if (trailingRoute) {
             const value = pathname.slice(prefixEnd);
+            const paramName =
+              collisionParamName ?? trailingRouteParamName(trailingRoute);
 
             return {
               route: trailingRoute.route,
 
               params: {
-                [trailingRoute.paramName]: decodeParam(value),
+                [paramName]: decodeParam(value),
               },
             };
           }
@@ -406,7 +456,9 @@ export class Router {
           const prefixEnd = slash + 1;
           const prefixLength = prefixEnd - pathStart;
 
-          let trailingRoute: TrailingParamRoute | undefined;
+          let trailingRoute:
+            TrailingParamRoute | TrailingCollisionRoute | undefined;
+          let collisionParamName: string | undefined;
 
           if (trailingParamFingerprints !== undefined) {
             const entry = trailingParamFingerprints.get(
@@ -421,7 +473,31 @@ export class Router {
                 trailingRoute = entry.trailingRoute;
               }
             } else if (entry !== undefined) {
-              trailingRoute = entry.routes.get(url.slice(pathStart, prefixEnd));
+              const secondary = entry.secondary;
+
+              if (secondary === undefined) {
+                trailingRoute = entry.routes?.get(
+                  url.slice(pathStart, prefixEnd),
+                );
+              } else {
+                collisionParamName = entry.paramName;
+
+                const secondaryEntry = secondary.get(
+                  secondaryPrefixFingerprintRange(url, prefixEnd, prefixLength),
+                );
+
+                if (secondaryEntry instanceof Map) {
+                  trailingRoute = secondaryEntry.get(
+                    url.slice(pathStart, prefixEnd),
+                  );
+                } else if (
+                  secondaryEntry !== undefined &&
+                  secondaryEntry.prefix.length === prefixLength &&
+                  url.startsWith(secondaryEntry.prefix, pathStart)
+                ) {
+                  trailingRoute = secondaryEntry;
+                }
+              }
             }
           } else if (trailingParamRoutes !== undefined) {
             trailingRoute = trailingParamRoutes.get(
@@ -431,11 +507,13 @@ export class Router {
 
           if (trailingRoute) {
             const value = url.slice(prefixEnd, pathEnd);
+            const paramName =
+              collisionParamName ?? trailingRouteParamName(trailingRoute);
 
             return {
               route: trailingRoute.route,
               params: {
-                [trailingRoute.paramName]: decodeParam(value),
+                [paramName]: decodeParam(value),
               },
             };
           }
@@ -576,11 +654,30 @@ function methodTableMatchesPath(
             );
           }
 
-          if (
-            entry !== undefined &&
-            entry.routes.has(pathname.slice(0, prefixEnd))
-          ) {
-            return true;
+          if (entry !== undefined) {
+            const secondary = entry.secondary;
+
+            if (secondary === undefined) {
+              if (entry.routes?.has(pathname.slice(0, prefixEnd))) {
+                return true;
+              }
+            } else {
+              const secondaryEntry = secondary.get(
+                secondaryPrefixFingerprint(pathname, prefixEnd),
+              );
+
+              if (secondaryEntry instanceof Map) {
+                if (secondaryEntry.has(pathname.slice(0, prefixEnd))) {
+                  return true;
+                }
+              } else if (
+                secondaryEntry !== undefined &&
+                secondaryEntry.prefix.length === prefixEnd &&
+                pathname.startsWith(secondaryEntry.prefix)
+              ) {
+                return true;
+              }
+            }
           }
         } else if (
           trailingParamRoutes !== undefined &&
@@ -932,8 +1029,26 @@ function migrateTrailingRoutesToTrie(table: MethodRoutes): void {
         continue;
       }
 
-      for (const trailingRoute of entry.routes.values()) {
-        registerDynamicRoute(table.dynamicRoot, trailingRoute.route);
+      const secondary = entry.secondary;
+
+      if (secondary === undefined) {
+        for (const trailingRoute of entry.routes?.values() ?? []) {
+          registerDynamicRoute(table.dynamicRoot, trailingRoute.route);
+        }
+
+        continue;
+      }
+
+      for (const secondaryEntry of secondary.values()) {
+        if (secondaryEntry instanceof Map) {
+          for (const trailingRoute of secondaryEntry.values()) {
+            registerDynamicRoute(table.dynamicRoot, trailingRoute.route);
+          }
+
+          continue;
+        }
+
+        registerDynamicRoute(table.dynamicRoot, secondaryEntry.route);
       }
     }
 
@@ -1001,25 +1116,110 @@ function registerTrailingFingerprint(
       return false;
     }
 
+    const secondary = new Map<number, TrailingSecondaryFingerprintEntry>();
+
+    registerTrailingSecondaryFingerprint(
+      secondary,
+      existing.prefix,
+      existing.trailingRoute,
+    );
+
+    registerTrailingSecondaryFingerprint(secondary, prefix, trailingRoute);
+
     fingerprints.set(key, {
       kind: "collision",
 
-      routes: new Map([
-        [existing.prefix, existing.trailingRoute],
-        [prefix, trailingRoute],
-      ]),
+      secondary,
+
+      ...(existing.trailingRoute.paramName === trailingRoute.paramName
+        ? { paramName: trailingRoute.paramName }
+        : {}),
     });
 
     return true;
   }
 
-  if (existing.routes.has(prefix)) {
+  const secondary = existing.secondary;
+
+  if (secondary !== undefined) {
+    if (
+      existing.paramName !== undefined &&
+      existing.paramName !== trailingRoute.paramName
+    ) {
+      delete existing.paramName;
+    }
+
+    return registerTrailingSecondaryFingerprint(
+      secondary,
+      prefix,
+      trailingRoute,
+    );
+  }
+
+  const routes = existing.routes;
+
+  if (routes === undefined) {
+    throw new Error("Invalid trailing fingerprint collision index");
+  }
+
+  if (routes.has(prefix)) {
     return false;
   }
 
-  existing.routes.set(prefix, trailingRoute);
+  routes.set(prefix, trailingRoute);
 
   return true;
+}
+
+function registerTrailingSecondaryFingerprint(
+  secondary: Map<number, TrailingSecondaryFingerprintEntry>,
+  prefix: string,
+  trailingRoute: TrailingParamRoute,
+): boolean {
+  const key = secondaryPrefixFingerprint(prefix, prefix.length);
+  const existing = secondary.get(key);
+  const collisionRoute: TrailingCollisionRoute = {
+    route: trailingRoute.route,
+    prefix,
+  };
+
+  if (existing === undefined) {
+    secondary.set(key, collisionRoute);
+    return true;
+  }
+
+  if (existing instanceof Map) {
+    if (existing.has(prefix)) {
+      return false;
+    }
+
+    existing.set(prefix, collisionRoute);
+    return true;
+  }
+
+  if (existing.prefix === prefix) {
+    return false;
+  }
+
+  secondary.set(
+    key,
+    new Map([
+      [existing.prefix, existing],
+      [prefix, collisionRoute],
+    ]),
+  );
+
+  return true;
+}
+
+function trailingRouteParamName(
+  route: TrailingParamRoute | TrailingCollisionRoute,
+): string {
+  if ("paramName" in route) {
+    return route.paramName;
+  }
+
+  return route.route.path.slice(route.prefix.length + 1);
 }
 
 function cloneTrailingParamFingerprints(
@@ -1028,17 +1228,45 @@ function cloneTrailingParamFingerprints(
   const cloned = new Map<number, TrailingFingerprintEntry>();
 
   for (const [key, entry] of fingerprints) {
-    cloned.set(
-      key,
+    if (entry.kind === "unique") {
+      cloned.set(key, entry);
+      continue;
+    }
 
-      entry.kind === "unique"
-        ? entry
-        : {
-            kind: "collision",
+    const secondary = entry.secondary;
 
-            routes: new Map(entry.routes),
-          },
-    );
+    if (secondary === undefined) {
+      cloned.set(key, {
+        kind: "collision",
+        ...(entry.routes === undefined
+          ? {}
+          : { routes: new Map(entry.routes) }),
+        ...(entry.paramName === undefined
+          ? {}
+          : { paramName: entry.paramName }),
+      });
+      continue;
+    }
+
+    const clonedSecondary = new Map<
+      number,
+      TrailingSecondaryFingerprintEntry
+    >();
+
+    for (const [secondaryKey, secondaryEntry] of secondary) {
+      clonedSecondary.set(
+        secondaryKey,
+        secondaryEntry instanceof Map
+          ? new Map(secondaryEntry)
+          : secondaryEntry,
+      );
+    }
+
+    cloned.set(key, {
+      kind: "collision",
+      secondary: clonedSecondary,
+      ...(entry.paramName === undefined ? {} : { paramName: entry.paramName }),
+    });
   }
 
   return cloned;
@@ -1069,6 +1297,32 @@ function prefixFingerprintRange(
   hash = Math.imul(hash ^ codeBefore(value, absoluteEnd, 3), -1028477387);
   hash = Math.imul(hash ^ codeBefore(value, absoluteEnd, 4), 668265263);
   hash = Math.imul(hash ^ codeBefore(value, absoluteEnd, 5), 374761393);
+
+  return hash | 0;
+}
+
+function secondaryPrefixFingerprint(value: string, end: number): number {
+  let hash = Math.imul(end ^ 0x51ed270b, -1640531527);
+
+  hash = Math.imul(hash ^ codeBefore(value, end, 6), -2048144789);
+  hash = Math.imul(hash ^ codeBefore(value, end, 7), -1028477387);
+  hash = Math.imul(hash ^ codeBefore(value, end, 8), 668265263);
+  hash = Math.imul(hash ^ codeBefore(value, end, 9), 374761393);
+
+  return hash | 0;
+}
+
+function secondaryPrefixFingerprintRange(
+  value: string,
+  absoluteEnd: number,
+  prefixLength: number,
+): number {
+  let hash = Math.imul(prefixLength ^ 0x51ed270b, -1640531527);
+
+  hash = Math.imul(hash ^ codeBefore(value, absoluteEnd, 6), -2048144789);
+  hash = Math.imul(hash ^ codeBefore(value, absoluteEnd, 7), -1028477387);
+  hash = Math.imul(hash ^ codeBefore(value, absoluteEnd, 8), 668265263);
+  hash = Math.imul(hash ^ codeBefore(value, absoluteEnd, 9), 374761393);
 
   return hash | 0;
 }
