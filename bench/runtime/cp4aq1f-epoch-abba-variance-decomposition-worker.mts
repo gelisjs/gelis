@@ -10,6 +10,7 @@ const PARAM_VALUE = "value-42";
 const WARMUP = 20_000;
 const TARGET_MS = 120;
 const MIN_CALIBRATION_MS = 20;
+const TIMED_EPOCHS = 5;
 
 type Variant = "production" | "candidate";
 type Unit = "ns/op" | "ms" | "bytes";
@@ -77,6 +78,7 @@ interface WorkerResult {
   readonly iterations: number;
   readonly warmups: number;
   readonly sink: number;
+  readonly epochMetrics: readonly number[];
 }
 
 interface PreparedCell {
@@ -146,6 +148,7 @@ if (probeOnly) {
     iterations: 0,
     warmups: 0,
     sink: 0,
+    epochMetrics: [],
   };
   emitResult(result, resultFile);
 } else if (prepared.singleMeasure !== undefined) {
@@ -159,6 +162,7 @@ if (probeOnly) {
     iterations: 1,
     warmups: 1,
     sink: measured.sink,
+    epochMetrics: [measured.metric],
   };
   emitResult(result, resultFile);
 } else {
@@ -175,17 +179,22 @@ if (probeOnly) {
 
   for (let index = 0; index < WARMUP; index++) operation();
   const iterations = calibrate(operation);
-  const elapsed = measure(operation, iterations);
+  const epochMetrics: number[] = [];
+  for (let epoch = 0; epoch < TIMED_EPOCHS; epoch++) {
+    const elapsed = measure(operation, iterations);
+    epochMetrics.push((elapsed * 1_000_000) / iterations);
+  }
 
   const result: WorkerResult = {
     cell,
     variant,
     probeOnly: false,
-    metric: (elapsed * 1_000_000) / iterations,
+    metric: median(epochMetrics),
     unit: prepared.unit,
     iterations,
     warmups: WARMUP,
     sink,
+    epochMetrics,
   };
   emitResult(result, resultFile);
 }
@@ -509,6 +518,15 @@ function calibrate(operation: () => void): number {
     }
     iterations *= 2;
   }
+}
+
+function median(values: readonly number[]): number {
+  if (values.length === 0)
+    throw new Error("Cannot take median of empty values");
+  const sorted = [...values].sort((a, b) => a - b);
+  const middle = Math.floor(sorted.length / 2);
+  if (sorted.length % 2 === 1) return sorted[middle]!;
+  return (sorted[middle - 1]! + sorted[middle]!) / 2;
 }
 
 function measure(operation: () => void, iterations: number): number {

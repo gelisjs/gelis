@@ -9,27 +9,31 @@ const EXPECTED_BUN_REVISION = "744846f844374847c902b5e7fd59b4342a51ef99";
 const SOURCE = "5d9698d6b8d368ddcff358fc2645435b93c0c062";
 const ROUTES = 5_000;
 const BLOCKS = 8;
-const PAIRS_PER_BLOCK = 8;
-const SAMPLES = BLOCKS * PAIRS_PER_BLOCK;
+const QUARTETS_PER_BLOCK = 2;
+const QUARTETS = BLOCKS * QUARTETS_PER_BLOCK;
+const TIMED_EPOCHS = 5;
 const BOOTSTRAP_REPS = 5_000;
 const EXPECTED_LOCAL_LOGICAL_CPUS = 12;
 const HERE = dirname(fileURLToPath(import.meta.url));
-const WORKER = resolve(HERE, "cp4aq1e-main-stability-calibration-worker.mts");
+const WORKER = resolve(
+  HERE,
+  "cp4aq1f-epoch-abba-variance-decomposition-worker.mts",
+);
 const REPOSITORY_ROOT = resolve(HERE, "../..");
 const RUN_TOKEN = `${process.pid}-${Date.now()}`;
 const WORKTREE_A = resolve(
   REPOSITORY_ROOT,
   "..",
-  `gelis-cp4aq1e-main-a-${RUN_TOKEN}`,
+  `gelis-cp4aq1f-a-${RUN_TOKEN}`,
 );
 const WORKTREE_B = resolve(
   REPOSITORY_ROOT,
   "..",
-  `gelis-cp4aq1e-main-b-${RUN_TOKEN}`,
+  `gelis-cp4aq1f-b-${RUN_TOKEN}`,
 );
 
 type Source = "a" | "b";
-type Order = "a-b" | "b-a";
+type Orientation = "a-b-b-a" | "b-a-a-b";
 type Unit = "ns/op" | "ms" | "bytes";
 type Cell =
   | "static-only-raw"
@@ -60,13 +64,16 @@ interface WorkerResult {
   readonly iterations: number;
   readonly warmups: number;
   readonly sink: number;
+  readonly epochMetrics: readonly number[];
 }
 
-interface PairResult {
+interface QuartetResult {
   readonly block: number;
-  readonly order: Order;
-  readonly a: number;
-  readonly b: number;
+  readonly orientation: Orientation;
+  readonly a: readonly [number, number];
+  readonly b: readonly [number, number];
+  readonly ratio: number;
+  readonly workerEpochSpreads: readonly [number, number, number, number];
 }
 
 interface Summary {
@@ -78,29 +85,24 @@ interface Summary {
 }
 
 interface CellDiagnostics {
-  readonly overallRatio: number;
+  readonly aggregateMedianRatio: number;
+  readonly quartetMedianRatio: number;
   readonly bootstrapLow: number;
   readonly bootstrapHigh: number;
-  readonly orderABRatio: number;
-  readonly orderBARatio: number;
-  readonly orderSpread: number;
+  readonly abbaRatio: number;
+  readonly baabRatio: number;
+  readonly orientationSpread: number;
   readonly blockRatios: readonly number[];
   readonly maxBlockDeviation: number;
+  readonly epochSpreadMedian: number;
+  readonly epochSpreadP95: number;
 }
 
 const CELLS: readonly CellSpec[] = [
   { cell: "static-only-raw", label: "static-only raw", kind: "hotpath" },
-  { cell: "mixed-static-raw", label: "mixed static raw", kind: "hotpath" },
-  { cell: "mixed-dynamic-raw", label: "mixed dynamic raw", kind: "hotpath" },
-  { cell: "mixed-dynamic-json", label: "mixed dynamic JSON", kind: "hotpath" },
   {
-    cell: "mixed-same-length-dynamic-raw",
-    label: "mixed same-length dynamic raw",
-    kind: "hotpath",
-  },
-  {
-    cell: "trailing-dynamic-raw",
-    label: "pure trailing dynamic raw",
+    cell: "generic-dynamic-raw",
+    label: "generic dynamic raw",
     kind: "hotpath",
   },
   {
@@ -109,21 +111,11 @@ const CELLS: readonly CellSpec[] = [
     kind: "hotpath",
   },
   {
-    cell: "generic-dynamic-raw",
-    label: "generic dynamic raw",
-    kind: "hotpath",
-  },
-  {
     cell: "collision-dynamic-raw",
     label: "forced collision raw",
     kind: "hotpath",
   },
   { cell: "all-dynamic-raw", label: "ALL dynamic raw", kind: "hotpath" },
-  {
-    cell: "static-registration",
-    label: "static registration",
-    kind: "registration",
-  },
 ];
 
 const SOURCES: readonly Source[] = ["a", "b"];
@@ -163,18 +155,16 @@ try {
 if (probeCompleted) {
   console.log();
   console.log(
-    `CP4-AQ1E-MAIN CORRECTNESS PROBE: PASS (${CELLS.length * SOURCES.length}/${CELLS.length * SOURCES.length})`,
+    `CP4-AQ1F CORRECTNESS PROBE: PASS (${CELLS.length * SOURCES.length}/${CELLS.length * SOURCES.length})`,
   );
 } else if (completed) {
   console.log();
-  console.log(
-    "CP4-AQ1E-MAIN LOCAL HARDENED STABILITY CALIBRATION RUN: COMPLETE",
-  );
+  console.log("CP4-AQ1F LOCAL EPOCH-ABBA VARIANCE DECOMPOSITION RUN: COMPLETE");
 }
 
 function printHeader(): void {
   console.log(
-    "Competitive Performance v0.1 — CP4-AQ1E-MAIN hardened benchmark stability calibration",
+    "Competitive Performance v0.1 — CP4-AQ1F epoch-ABBA variance decomposition",
   );
   console.log(`Bun:             ${Bun.version}`);
   console.log(`Revision:        ${Bun.revision}`);
@@ -188,12 +178,12 @@ function printHeader(): void {
     console.log("Mode:            correctness probe only");
   } else {
     console.log(`Blocks:          ${BLOCKS}`);
-    console.log(`Pairs/block:     ${PAIRS_PER_BLOCK}`);
-    console.log(`Samples/source:  ${SAMPLES} fresh-worker measurements/cell`);
-    console.log("Order:           4 A→B + 4 B→A pairs per block");
-    console.log(
-      "Cells:           10 hotpath + 1 registration; memory isolated in AQ1E-MEMORY",
-    );
+    console.log(`Quartets/block:  ${QUARTETS_PER_BLOCK}`);
+    console.log(`Quartets/cell:   ${QUARTETS}`);
+    console.log("Workers/source:  32 fresh workers/cell (64 total/cell)");
+    console.log(`Timed epochs:    ${TIMED_EPOCHS} per fresh worker`);
+    console.log("Orientation:     balanced A→B→B→A / B→A→A→B");
+    console.log("Cells:           5 representative hotpaths");
     console.log(
       `Windows affinity: logical CPU ${affinityLogicalCpu} (0x${affinityMaskHex})`,
     );
@@ -218,70 +208,98 @@ function runProbe(): void {
 }
 
 function runTiming(): void {
-  const results = new Map<Cell, PairResult[]>();
+  const results = new Map<Cell, QuartetResult[]>();
   const units = new Map<Cell, Unit>();
 
   for (let cellIndex = 0; cellIndex < CELLS.length; cellIndex++) {
     const spec = CELLS[cellIndex]!;
-    const pairs: PairResult[] = [];
+    const quartets: QuartetResult[] = [];
 
     for (let block = 0; block < BLOCKS; block++) {
       console.log(
-        `PROGRESS main ${cellIndex + 1}/${CELLS.length} ${spec.cell} block ${block + 1}/${BLOCKS}`,
+        `PROGRESS aq1f ${cellIndex + 1}/${CELLS.length} ${spec.cell} block ${block + 1}/${BLOCKS}`,
       );
-      for (let pair = 0; pair < PAIRS_PER_BLOCK; pair++) {
-        const order: Order = pair % 2 === 0 ? "a-b" : "b-a";
-        const first: Source = order === "a-b" ? "a" : "b";
-        const second: Source = order === "a-b" ? "b" : "a";
-        const firstResult = runWorker(spec.cell, first, false);
-        const secondResult = runWorker(spec.cell, second, false);
-
-        if (firstResult.metric === null || secondResult.metric === null) {
-          throw new Error(`Missing metric for ${spec.cell}`);
-        }
-        if (firstResult.unit !== secondResult.unit) {
-          throw new Error(`Pair unit mismatch for ${spec.cell}`);
-        }
+      for (let quartet = 0; quartet < QUARTETS_PER_BLOCK; quartet++) {
+        const orientation: Orientation =
+          (block + quartet) % 2 === 0 ? "a-b-b-a" : "b-a-a-b";
+        const sequence: readonly Source[] =
+          orientation === "a-b-b-a"
+            ? ["a", "b", "b", "a"]
+            : ["b", "a", "a", "b"];
+        const workerResults = sequence.map((source) =>
+          runWorker(spec.cell, source, false),
+        );
+        const metrics = workerResults.map((result) => {
+          if (result.metric === null)
+            throw new Error(`Missing metric for ${spec.cell}`);
+          if (result.epochMetrics.length !== TIMED_EPOCHS) {
+            throw new Error(`Expected ${TIMED_EPOCHS} epochs for ${spec.cell}`);
+          }
+          return result.metric;
+        });
         const knownUnit = units.get(spec.cell);
-        if (knownUnit !== undefined && knownUnit !== firstResult.unit) {
-          throw new Error(`Unit drift for ${spec.cell}`);
+        for (const result of workerResults) {
+          if (knownUnit !== undefined && knownUnit !== result.unit) {
+            throw new Error(`Unit drift for ${spec.cell}`);
+          }
+          units.set(spec.cell, result.unit);
         }
-        units.set(spec.cell, firstResult.unit);
 
-        const a = first === "a" ? firstResult.metric : secondResult.metric;
-        const b = first === "b" ? firstResult.metric : secondResult.metric;
-        pairs.push({ block, order, a, b });
+        const aValues = sequence
+          .map((source, index) => ({ source, metric: metrics[index]! }))
+          .filter((entry) => entry.source === "a")
+          .map((entry) => entry.metric) as [number, number];
+        const bValues = sequence
+          .map((source, index) => ({ source, metric: metrics[index]! }))
+          .filter((entry) => entry.source === "b")
+          .map((entry) => entry.metric) as [number, number];
+        const ratio = Math.sqrt(
+          (bValues[0] * bValues[1]) / (aValues[0] * aValues[1]),
+        );
+        const spreads = workerResults.map((result) =>
+          epochRelativeSpread(result.epochMetrics),
+        ) as [number, number, number, number];
+        quartets.push({
+          block,
+          orientation,
+          a: aValues,
+          b: bValues,
+          ratio,
+          workerEpochSpreads: spreads,
+        });
       }
     }
 
-    if (pairs.length !== SAMPLES) {
-      throw new Error(`Incomplete pair set for ${spec.cell}`);
+    if (quartets.length !== QUARTETS) {
+      throw new Error(`Incomplete quartet set for ${spec.cell}`);
     }
-    results.set(spec.cell, pairs);
+    results.set(spec.cell, quartets);
   }
 
   printAbsoluteMetrics(results, units);
   const diagnostics = buildDiagnostics(results);
   printEstimatorTable(diagnostics);
   printBlockwiseTable(diagnostics);
-  printReadiness(diagnostics);
+  printViability(diagnostics);
 }
 
 function printAbsoluteMetrics(
-  results: ReadonlyMap<Cell, PairResult[]>,
+  results: ReadonlyMap<Cell, QuartetResult[]>,
   units: ReadonlyMap<Cell, Unit>,
 ): void {
-  console.log("Same-source absolute metrics");
+  console.log("Same-source worker-median absolute metrics");
   console.log("| cell | source | median | p25 | p75 | min | max | unit |");
   console.log("| --- | --- | ---: | ---: | ---: | ---: | ---: | --- |");
-
   for (const spec of CELLS) {
-    const pairs = getPairs(results, spec.cell);
+    const quartets = getQuartets(results, spec.cell);
     const unit = units.get(spec.cell);
     if (unit === undefined) throw new Error(`Missing unit for ${spec.cell}`);
-
-    for (const source of SOURCES) {
-      const values = pairs.map((pair) => (source === "a" ? pair.a : pair.b));
+    const aValues = quartets.flatMap((quartet) => quartet.a);
+    const bValues = quartets.flatMap((quartet) => quartet.b);
+    for (const [source, values] of [
+      ["a", aValues],
+      ["b", bValues],
+    ] as const) {
       const summary = summarize(values);
       console.log(
         `| ${spec.cell} | ${source} | ${formatMetric(summary.median, unit)} | ${formatMetric(summary.p25, unit)} | ${formatMetric(summary.p75, unit)} | ${formatMetric(summary.min, unit)} | ${formatMetric(summary.max, unit)} | ${unit} |`,
@@ -291,43 +309,52 @@ function printAbsoluteMetrics(
 }
 
 function buildDiagnostics(
-  results: ReadonlyMap<Cell, PairResult[]>,
+  results: ReadonlyMap<Cell, QuartetResult[]>,
 ): ReadonlyMap<Cell, CellDiagnostics> {
   const output = new Map<Cell, CellDiagnostics>();
-
   for (const spec of CELLS) {
-    const pairs = getPairs(results, spec.cell);
-    const overallRatio = ratioOfMedians(pairs);
-    const bootstrap = blockBootstrapInterval(pairs, spec.cell);
-    const abPairs = pairs.filter((pair) => pair.order === "a-b");
-    const baPairs = pairs.filter((pair) => pair.order === "b-a");
-    const orderABRatio = ratioOfMedians(abPairs);
-    const orderBARatio = ratioOfMedians(baPairs);
-    const orderSpread = Math.abs(orderABRatio - orderBARatio);
+    const quartets = getQuartets(results, spec.cell);
+    const aValues = quartets.flatMap((quartet) => quartet.a);
+    const bValues = quartets.flatMap((quartet) => quartet.b);
+    const aggregateMedianRatio = median(bValues) / median(aValues);
+    const quartetMedianRatio = median(quartets.map((quartet) => quartet.ratio));
+    const bootstrap = blockBootstrapInterval(quartets, spec.cell);
+    const abbaRatio = median(
+      quartets.filter((q) => q.orientation === "a-b-b-a").map((q) => q.ratio),
+    );
+    const baabRatio = median(
+      quartets.filter((q) => q.orientation === "b-a-a-b").map((q) => q.ratio),
+    );
     const blockRatios: number[] = [];
-
     for (let block = 0; block < BLOCKS; block++) {
-      const blockPairs = pairs.filter((pair) => pair.block === block);
-      if (blockPairs.length !== PAIRS_PER_BLOCK) {
+      const blockQuartets = quartets.filter(
+        (quartet) => quartet.block === block,
+      );
+      if (blockQuartets.length !== QUARTETS_PER_BLOCK) {
         throw new Error(`Incomplete block ${block + 1} for ${spec.cell}`);
       }
-      blockRatios.push(ratioOfMedians(blockPairs));
+      blockRatios.push(median(blockQuartets.map((quartet) => quartet.ratio)));
     }
-
+    const epochSpreads = quartets.flatMap(
+      (quartet) => quartet.workerEpochSpreads,
+    );
+    const sortedSpreads = [...epochSpreads].sort((a, b) => a - b);
     output.set(spec.cell, {
-      overallRatio,
+      aggregateMedianRatio,
+      quartetMedianRatio,
       bootstrapLow: bootstrap.low,
       bootstrapHigh: bootstrap.high,
-      orderABRatio,
-      orderBARatio,
-      orderSpread,
+      abbaRatio,
+      baabRatio,
+      orientationSpread: Math.abs(abbaRatio - baabRatio),
       blockRatios,
       maxBlockDeviation: Math.max(
         ...blockRatios.map((ratio) => Math.abs(ratio - 1)),
       ),
+      epochSpreadMedian: percentileSorted(sortedSpreads, 0.5),
+      epochSpreadP95: percentileSorted(sortedSpreads, 0.95),
     });
   }
-
   return output;
 }
 
@@ -335,16 +362,15 @@ function printEstimatorTable(
   diagnostics: ReadonlyMap<Cell, CellDiagnostics>,
 ): void {
   console.log();
-  console.log("Hardened same-source estimator diagnostics");
+  console.log("AQ1F epoch-median + symmetric-quartet diagnostics");
   console.log(
-    "| comparison | median(B)/median(A) | block-bootstrap 95% CI | A→B ratio | B→A ratio | order spread |",
+    "| comparison | raw median(B)/median(A) | quartet median | block-bootstrap 95% CI | ABBA | BAAB | orientation spread | epoch spread median/p95 |",
   );
-  console.log("| --- | ---: | ---: | ---: | ---: | ---: |");
-
+  console.log("| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |");
   for (const spec of CELLS) {
     const value = getDiagnostics(diagnostics, spec.cell);
     console.log(
-      `| ${spec.label} | ${value.overallRatio.toFixed(4)}x | ${value.bootstrapLow.toFixed(4)}x–${value.bootstrapHigh.toFixed(4)}x | ${value.orderABRatio.toFixed(4)}x | ${value.orderBARatio.toFixed(4)}x | ${(value.orderSpread * 100).toFixed(2)}% |`,
+      `| ${spec.label} | ${value.aggregateMedianRatio.toFixed(4)}x | ${value.quartetMedianRatio.toFixed(4)}x | ${value.bootstrapLow.toFixed(4)}x–${value.bootstrapHigh.toFixed(4)}x | ${value.abbaRatio.toFixed(4)}x | ${value.baabRatio.toFixed(4)}x | ${(value.orientationSpread * 100).toFixed(2)}% | ${(value.epochSpreadMedian * 100).toFixed(2)}% / ${(value.epochSpreadP95 * 100).toFixed(2)}% |`,
     );
   }
 }
@@ -353,14 +379,13 @@ function printBlockwiseTable(
   diagnostics: ReadonlyMap<Cell, CellDiagnostics>,
 ): void {
   console.log();
-  console.log("Block ratio-of-medians B / A");
+  console.log("Block median symmetric-quartet ratio B / A");
   console.log(
     "| comparison | b1 | b2 | b3 | b4 | b5 | b6 | b7 | b8 | max deviation |",
   );
   console.log(
     "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
   );
-
   for (const spec of CELLS) {
     const value = getDiagnostics(diagnostics, spec.cell);
     const blocks = value.blockRatios
@@ -372,98 +397,58 @@ function printBlockwiseTable(
   }
 }
 
-function printReadiness(diagnostics: ReadonlyMap<Cell, CellDiagnostics>): void {
-  let ready = true;
-
+function printViability(diagnostics: ReadonlyMap<Cell, CellDiagnostics>): void {
+  let viable = true;
   console.log();
-  console.log("Frozen CP4-AQ1E-MAIN benchmark-readiness criteria");
+  console.log("Frozen CP4-AQ1F mechanism-viability criteria");
   console.log(
-    "| comparison | aggregate bias | bootstrap CI | order spread | block deviation | result |",
+    "| comparison | quartet bias | bootstrap CI | orientation spread | block deviation | result |",
   );
   console.log("| --- | ---: | ---: | ---: | ---: | --- |");
-
   for (const spec of CELLS) {
     const value = getDiagnostics(diagnostics, spec.cell);
-    const limits = readinessLimits(spec.kind);
-    const bias = Math.abs(value.overallRatio - 1);
-    const ciPass =
-      value.bootstrapLow >= 1 - limits.ciRadius &&
-      value.bootstrapHigh <= 1 + limits.ciRadius;
+    const bias = Math.abs(value.quartetMedianRatio - 1);
+    const ciPass = value.bootstrapLow >= 0.985 && value.bootstrapHigh <= 1.015;
     const pass =
-      bias <= limits.bias &&
+      bias <= 0.01 &&
       ciPass &&
-      value.orderSpread <= limits.orderSpread &&
-      value.maxBlockDeviation <= limits.blockDeviation;
-    if (!pass) ready = false;
-
+      value.orientationSpread <= 0.01 &&
+      value.maxBlockDeviation <= 0.02;
+    if (!pass) viable = false;
     console.log(
-      `| ${spec.label} | ${(bias * 100).toFixed(2)}% / <= ${(limits.bias * 100).toFixed(2)}% | ${value.bootstrapLow.toFixed(4)}x–${value.bootstrapHigh.toFixed(4)}x / ±${(limits.ciRadius * 100).toFixed(1)}% | ${(value.orderSpread * 100).toFixed(2)}% / <= ${(limits.orderSpread * 100).toFixed(2)}% | ${(value.maxBlockDeviation * 100).toFixed(2)}% / <= ${(limits.blockDeviation * 100).toFixed(2)}% | ${pass ? "PASS" : "FAIL"} |`,
+      `| ${spec.label} | ${(bias * 100).toFixed(2)}% / <= 1.00% | ${value.bootstrapLow.toFixed(4)}x–${value.bootstrapHigh.toFixed(4)}x / 0.9850x–1.0150x | ${(value.orientationSpread * 100).toFixed(2)}% / <= 1.00% | ${(value.maxBlockDeviation * 100).toFixed(2)}% / <= 2.00% | ${pass ? "PASS" : "FAIL"} |`,
     );
   }
-
   console.log();
   console.log(
-    `CP4-AQ1E-MAIN HARDENED BENCHMARK 2%-GATE READINESS: ${ready ? "PASS" : "FAIL"}`,
+    `CP4-AQ1F MECHANISM VIABILITY FOR FULL AQ1G: ${viable ? "PASS" : "FAIL"}`,
   );
   console.log(
-    "AQ1E-MAIN is environment/estimator calibration only; this readiness result does not reclassify Gelis source performance.",
+    "AQ1F is same-source variance decomposition only; it cannot reclassify Gelis performance or AQ1E.",
   );
-}
-
-function readinessLimits(kind: CellSpec["kind"]): {
-  readonly bias: number;
-  readonly ciRadius: number;
-  readonly orderSpread: number;
-  readonly blockDeviation: number;
-} {
-  if (kind === "hotpath") {
-    return {
-      bias: 0.01,
-      ciRadius: 0.015,
-      orderSpread: 0.01,
-      blockDeviation: 0.02,
-    };
-  }
-  if (kind === "registration") {
-    return {
-      bias: 0.02,
-      ciRadius: 0.04,
-      orderSpread: 0.03,
-      blockDeviation: 0.05,
-    };
-  }
-  return {
-    bias: 0.005,
-    ciRadius: 0.005,
-    orderSpread: 0.005,
-    blockDeviation: 0.005,
-  };
 }
 
 function blockBootstrapInterval(
-  pairs: readonly PairResult[],
+  quartets: readonly QuartetResult[],
   cell: Cell,
 ): { readonly low: number; readonly high: number } {
-  const blocks: PairResult[][] = [];
+  const blocks: QuartetResult[][] = [];
   for (let block = 0; block < BLOCKS; block++) {
-    const values = pairs.filter((pair) => pair.block === block);
-    if (values.length !== PAIRS_PER_BLOCK) {
+    const values = quartets.filter((quartet) => quartet.block === block);
+    if (values.length !== QUARTETS_PER_BLOCK) {
       throw new Error(`Incomplete bootstrap block ${block + 1} for ${cell}`);
     }
     blocks.push(values);
   }
-
-  const random = seededRandom(hashString(cell) ^ 0x51f15e);
+  const random = seededRandom(hashString(cell) ^ 0xa1f0abba);
   const ratios: number[] = [];
   for (let rep = 0; rep < BOOTSTRAP_REPS; rep++) {
-    const sampled: PairResult[] = [];
+    const sampled: QuartetResult[] = [];
     for (let index = 0; index < BLOCKS; index++) {
-      const selected = Math.floor(random() * BLOCKS);
-      sampled.push(...blocks[selected]!);
+      sampled.push(...blocks[Math.floor(random() * BLOCKS)]!);
     }
-    ratios.push(ratioOfMedians(sampled));
+    ratios.push(median(sampled.map((quartet) => quartet.ratio)));
   }
-
   ratios.sort((a, b) => a - b);
   return {
     low: percentileSorted(ratios, 0.025),
@@ -471,10 +456,10 @@ function blockBootstrapInterval(
   };
 }
 
-function ratioOfMedians(pairs: readonly PairResult[]): number {
-  return (
-    median(pairs.map((pair) => pair.b)) / median(pairs.map((pair) => pair.a))
-  );
+function epochRelativeSpread(values: readonly number[]): number {
+  if (values.length === 0) throw new Error("Missing epoch metrics");
+  const center = median(values);
+  return (Math.max(...values) - Math.min(...values)) / center;
 }
 
 function runWorker(
@@ -518,7 +503,7 @@ function spawnPinnedWindowsWorker(args: readonly string[]) {
   const resultFile = resolve(
     REPOSITORY_ROOT,
     "..",
-    `gelis-cp4aq1e-main-result-${process.pid}-${Date.now()}-${workerResultSequence++}.json`,
+    `gelis-cp4aq1f-result-${process.pid}-${Date.now()}-${workerResultSequence++}.json`,
   );
   const argumentList = [...args, `--result-file=${resultFile}`]
     .map(quotePowerShell)
@@ -582,29 +567,29 @@ function quotePowerShell(value: string): string {
 function preflight(): void {
   if (Bun.version !== EXPECTED_BUN) {
     throw new Error(
-      `CP4-AQ1E-MAIN requires Bun ${EXPECTED_BUN}, got ${Bun.version}`,
+      `CP4-AQ1F requires Bun ${EXPECTED_BUN}, got ${Bun.version}`,
     );
   }
   if (Bun.revision !== EXPECTED_BUN_REVISION) {
     throw new Error(
-      `CP4-AQ1E-MAIN requires Bun revision ${EXPECTED_BUN_REVISION}, got ${Bun.revision}`,
+      `CP4-AQ1F requires Bun revision ${EXPECTED_BUN_REVISION}, got ${Bun.revision}`,
     );
   }
 
   const dirty = git(["status", "--porcelain"]);
   if (dirty !== "") {
-    throw new Error(`CP4-AQ1E-MAIN requires a clean worktree:\n${dirty}`);
+    throw new Error(`CP4-AQ1F requires a clean worktree:\n${dirty}`);
   }
 
   if (!probeOnly) {
     if (process.platform !== "win32") {
       throw new Error(
-        "CP4-AQ1E-MAIN timed calibration is authoritative only on Windows",
+        "CP4-AQ1F timed calibration is authoritative only on Windows",
       );
     }
     if (logicalCpuCount !== EXPECTED_LOCAL_LOGICAL_CPUS) {
       throw new Error(
-        `CP4-AQ1E-MAIN timed calibration requires ${EXPECTED_LOCAL_LOGICAL_CPUS} logical CPUs, got ${logicalCpuCount}`,
+        `CP4-AQ1F timed calibration requires ${EXPECTED_LOCAL_LOGICAL_CPUS} logical CPUs, got ${logicalCpuCount}`,
       );
     }
   }
@@ -638,10 +623,10 @@ function removeWorktree(path: string): void {
   );
 }
 
-function getPairs(
-  results: ReadonlyMap<Cell, PairResult[]>,
+function getQuartets(
+  results: ReadonlyMap<Cell, QuartetResult[]>,
   cell: Cell,
-): readonly PairResult[] {
+): readonly QuartetResult[] {
   const value = results.get(cell);
   if (value === undefined) throw new Error(`Missing results for ${cell}`);
   return value;
