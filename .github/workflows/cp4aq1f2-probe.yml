@@ -1,0 +1,24 @@
+name: CP4-AQ1F2 probe
+
+on:
+  push:
+    branches:
+      - work/competitive-cp4aq1f2-paired-cycle-variance
+    paths:
+      - .github/workflows/cp4aq1f2-probe.yml
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+      - run: bun install --frozen-lockfile
+      - run: bun bench/runtime/cp4aq1f2-in-process-paired-cycle-variance-decomposition.mts --probe-only
