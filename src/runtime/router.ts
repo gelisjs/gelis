@@ -31,19 +31,23 @@ interface TrailingFingerprintUniqueEntry {
   readonly trailingRoute: TrailingParamRoute;
 }
 
-interface TrailingSecondaryFingerprintUniqueEntry {
+interface TrailingCollisionRoute extends TrailingParamRoute {
   readonly prefix: string;
-
-  readonly trailingRoute: TrailingParamRoute;
 }
 
 type TrailingSecondaryFingerprintEntry =
-  TrailingSecondaryFingerprintUniqueEntry | null;
+  TrailingCollisionRoute | Map<string, TrailingCollisionRoute>;
 
 interface TrailingFingerprintCollisionEntry {
   readonly kind: "collision";
 
-  readonly routes: Map<string, TrailingParamRoute>;
+  /*
+   * Legacy/AOT/prebuilt collision buckets may still carry the exact prefix
+   * map. Runtime-created collision buckets use `secondary` instead, so the
+   * optimized representation does not retain two full indexes for the same
+   * routes.
+   */
+  readonly routes?: Map<string, TrailingParamRoute>;
 
   readonly secondary?: Map<number, TrailingSecondaryFingerprintEntry>;
 }
@@ -236,14 +240,14 @@ export class Router {
               const secondary = entry.secondary;
 
               if (secondary === undefined) {
-                trailingRoute = entry.routes.get(pathname.slice(0, prefixEnd));
+                trailingRoute = entry.routes?.get(pathname.slice(0, prefixEnd));
               } else {
                 const secondaryEntry = secondary.get(
                   secondaryPrefixFingerprint(pathname, prefixEnd),
                 );
 
-                if (secondaryEntry === null) {
-                  trailingRoute = entry.routes.get(
+                if (secondaryEntry instanceof Map) {
+                  trailingRoute = secondaryEntry.get(
                     pathname.slice(0, prefixEnd),
                   );
                 } else if (
@@ -251,7 +255,7 @@ export class Router {
                   secondaryEntry.prefix.length === prefixEnd &&
                   pathname.startsWith(secondaryEntry.prefix)
                 ) {
-                  trailingRoute = secondaryEntry.trailingRoute;
+                  trailingRoute = secondaryEntry;
                 }
               }
             }
@@ -455,7 +459,7 @@ export class Router {
               const secondary = entry.secondary;
 
               if (secondary === undefined) {
-                trailingRoute = entry.routes.get(
+                trailingRoute = entry.routes?.get(
                   url.slice(pathStart, prefixEnd),
                 );
               } else {
@@ -463,8 +467,8 @@ export class Router {
                   secondaryPrefixFingerprintRange(url, prefixEnd, prefixLength),
                 );
 
-                if (secondaryEntry === null) {
-                  trailingRoute = entry.routes.get(
+                if (secondaryEntry instanceof Map) {
+                  trailingRoute = secondaryEntry.get(
                     url.slice(pathStart, prefixEnd),
                   );
                 } else if (
@@ -472,7 +476,7 @@ export class Router {
                   secondaryEntry.prefix.length === prefixLength &&
                   url.startsWith(secondaryEntry.prefix, pathStart)
                 ) {
-                  trailingRoute = secondaryEntry.trailingRoute;
+                  trailingRoute = secondaryEntry;
                 }
               }
             }
@@ -633,7 +637,7 @@ function methodTableMatchesPath(
             const secondary = entry.secondary;
 
             if (secondary === undefined) {
-              if (entry.routes.has(pathname.slice(0, prefixEnd))) {
+              if (entry.routes?.has(pathname.slice(0, prefixEnd))) {
                 return true;
               }
             } else {
@@ -641,8 +645,8 @@ function methodTableMatchesPath(
                 secondaryPrefixFingerprint(pathname, prefixEnd),
               );
 
-              if (secondaryEntry === null) {
-                if (entry.routes.has(pathname.slice(0, prefixEnd))) {
+              if (secondaryEntry instanceof Map) {
+                if (secondaryEntry.has(pathname.slice(0, prefixEnd))) {
                   return true;
                 }
               } else if (
@@ -1004,8 +1008,26 @@ function migrateTrailingRoutesToTrie(table: MethodRoutes): void {
         continue;
       }
 
-      for (const trailingRoute of entry.routes.values()) {
-        registerDynamicRoute(table.dynamicRoot, trailingRoute.route);
+      const secondary = entry.secondary;
+
+      if (secondary === undefined) {
+        for (const trailingRoute of entry.routes?.values() ?? []) {
+          registerDynamicRoute(table.dynamicRoot, trailingRoute.route);
+        }
+
+        continue;
+      }
+
+      for (const secondaryEntry of secondary.values()) {
+        if (secondaryEntry instanceof Map) {
+          for (const trailingRoute of secondaryEntry.values()) {
+            registerDynamicRoute(table.dynamicRoot, trailingRoute.route);
+          }
+
+          continue;
+        }
+
+        registerDynamicRoute(table.dynamicRoot, secondaryEntry.route);
       }
     }
 
@@ -1080,15 +1102,11 @@ function registerTrailingFingerprint(
       existing.prefix,
       existing.trailingRoute,
     );
+
     registerTrailingSecondaryFingerprint(secondary, prefix, trailingRoute);
 
     fingerprints.set(key, {
       kind: "collision",
-
-      routes: new Map([
-        [existing.prefix, existing.trailingRoute],
-        [prefix, trailingRoute],
-      ]),
 
       secondary,
     });
@@ -1096,19 +1114,27 @@ function registerTrailingFingerprint(
     return true;
   }
 
-  if (existing.routes.has(prefix)) {
-    return false;
-  }
+  const secondary = existing.secondary;
 
-  existing.routes.set(prefix, trailingRoute);
-
-  if (existing.secondary !== undefined) {
-    registerTrailingSecondaryFingerprint(
-      existing.secondary,
+  if (secondary !== undefined) {
+    return registerTrailingSecondaryFingerprint(
+      secondary,
       prefix,
       trailingRoute,
     );
   }
+
+  const routes = existing.routes;
+
+  if (routes === undefined) {
+    throw new Error("Invalid trailing fingerprint collision index");
+  }
+
+  if (routes.has(prefix)) {
+    return false;
+  }
+
+  routes.set(prefix, trailingRoute);
 
   return true;
 }
@@ -1117,18 +1143,42 @@ function registerTrailingSecondaryFingerprint(
   secondary: Map<number, TrailingSecondaryFingerprintEntry>,
   prefix: string,
   trailingRoute: TrailingParamRoute,
-): void {
+): boolean {
   const key = secondaryPrefixFingerprint(prefix, prefix.length);
   const existing = secondary.get(key);
+  const collisionRoute: TrailingCollisionRoute = {
+    route: trailingRoute.route,
+    paramName: trailingRoute.paramName,
+    prefix,
+  };
 
   if (existing === undefined) {
-    secondary.set(key, { prefix, trailingRoute });
-    return;
+    secondary.set(key, collisionRoute);
+    return true;
   }
 
-  if (existing !== null && existing.prefix !== prefix) {
-    secondary.set(key, null);
+  if (existing instanceof Map) {
+    if (existing.has(prefix)) {
+      return false;
+    }
+
+    existing.set(prefix, collisionRoute);
+    return true;
   }
+
+  if (existing.prefix === prefix) {
+    return false;
+  }
+
+  secondary.set(
+    key,
+    new Map([
+      [existing.prefix, existing],
+      [prefix, collisionRoute],
+    ]),
+  );
+
+  return true;
 }
 
 function cloneTrailingParamFingerprints(
@@ -1137,21 +1187,41 @@ function cloneTrailingParamFingerprints(
   const cloned = new Map<number, TrailingFingerprintEntry>();
 
   for (const [key, entry] of fingerprints) {
-    cloned.set(
-      key,
+    if (entry.kind === "unique") {
+      cloned.set(key, entry);
+      continue;
+    }
 
-      entry.kind === "unique"
-        ? entry
-        : {
-            kind: "collision",
+    const secondary = entry.secondary;
 
-            routes: new Map(entry.routes),
+    if (secondary === undefined) {
+      cloned.set(key, {
+        kind: "collision",
+        ...(entry.routes === undefined
+          ? {}
+          : { routes: new Map(entry.routes) }),
+      });
+      continue;
+    }
 
-            ...(entry.secondary === undefined
-              ? {}
-              : { secondary: new Map(entry.secondary) }),
-          },
-    );
+    const clonedSecondary = new Map<
+      number,
+      TrailingSecondaryFingerprintEntry
+    >();
+
+    for (const [secondaryKey, secondaryEntry] of secondary) {
+      clonedSecondary.set(
+        secondaryKey,
+        secondaryEntry instanceof Map
+          ? new Map(secondaryEntry)
+          : secondaryEntry,
+      );
+    }
+
+    cloned.set(key, {
+      kind: "collision",
+      secondary: clonedSecondary,
+    });
   }
 
   return cloned;
