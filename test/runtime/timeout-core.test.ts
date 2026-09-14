@@ -47,9 +47,9 @@ describe("P11-G timeout core", () => {
 
     expect(state.signal.aborted).toBe(true);
     expect(state.signal.reason).toBe(reason);
-    expect(
-      state.abortDeadline(new GelisTimeoutError(100, "application")),
-    ).toBe(false);
+    expect(state.abortDeadline(new GelisTimeoutError(100, "application"))).toBe(
+      false,
+    );
     expect(state.signal.reason).toBe(reason);
   });
 
@@ -67,9 +67,9 @@ describe("P11-G timeout core", () => {
 
     expect(state.signal.aborted).toBe(true);
     expect(state.signal.reason).toBe(reason);
-    expect(
-      state.abortDeadline(new GelisTimeoutError(100, "application")),
-    ).toBe(false);
+    expect(state.abortDeadline(new GelisTimeoutError(100, "application"))).toBe(
+      false,
+    );
     expect(state.signal.reason).toBe(reason);
   });
 
