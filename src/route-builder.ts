@@ -17,9 +17,12 @@ import type { StandardSchemaV1 } from "./schema";
 
 import { createRuntimeInputPlan } from "./runtime/input";
 
+import { resolveRuntimeRouteExecutionBoundary } from "./runtime/route-boundary";
+
 import {
   RUNTIME_ROUTE_AFTER_HANDLE,
   RUNTIME_ROUTE_BEFORE_HANDLE,
+  RUNTIME_ROUTE_EXECUTION_BOUNDARY,
   RUNTIME_ROUTE_INPUT,
   RUNTIME_ROUTE_RESPONSE,
 } from "./runtime/types";
@@ -1428,6 +1431,11 @@ export class RouteBuilder<Prefix extends string = ""> {
 
     const afterHandle = lifecycle?.afterHandle;
 
+    const executionBoundary =
+      options?.timeout === undefined
+        ? undefined
+        : resolveRuntimeRouteExecutionBoundary(options.timeout);
+
     let flags = 0;
 
     if (input !== undefined) {
@@ -1446,6 +1454,10 @@ export class RouteBuilder<Prefix extends string = ""> {
       flags |= RUNTIME_ROUTE_RESPONSE;
     }
 
+    if (executionBoundary !== undefined) {
+      flags |= RUNTIME_ROUTE_EXECUTION_BOUNDARY;
+    }
+
     const runtimeRoute: RuntimeRouteRecord = {
       method,
       path: fullPath,
@@ -1462,6 +1474,13 @@ export class RouteBuilder<Prefix extends string = ""> {
 
       responses,
     };
+
+    if (executionBoundary !== undefined) {
+      Object.defineProperty(runtimeRoute, "executionBoundary", {
+        enumerable: true,
+        value: executionBoundary,
+      });
+    }
 
     if (contractMetadata !== undefined) {
       Object.defineProperty(runtimeRoute, RUNTIME_ROUTE_CONTRACT_METADATA, {

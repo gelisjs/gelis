@@ -8,6 +8,8 @@ import type { RuntimeInputPlan } from "./input";
 
 import type { RuntimeResponsePlan } from "./response-plan";
 
+import type { RuntimeRouteExecutionBoundary } from "./route-boundary";
+
 export const RUNTIME_ROUTE_PLAIN = 0;
 
 export const RUNTIME_ROUTE_INPUT = 1;
@@ -21,6 +23,8 @@ export const RUNTIME_ROUTE_RESPONSE = 8;
 export const RUNTIME_ROUTE_REQUEST_SCOPE = 16;
 
 export const RUNTIME_ROUTE_MODULE_REQUEST_SCOPE = 32;
+
+export const RUNTIME_ROUTE_EXECUTION_BOUNDARY = 64;
 
 export const RUNTIME_ROUTE_INPUT_BEFORE_HANDLE =
   RUNTIME_ROUTE_INPUT | RUNTIME_ROUTE_BEFORE_HANDLE;
@@ -293,6 +297,12 @@ export interface RuntimeRouteRecord {
   readonly moduleRequestScope?: RuntimeModuleRequestScopePlan;
 
   readonly moduleScope?: object;
+
+  /*
+   * Present only on routes carrying an opt-in execution boundary.
+   * Plain and untimed routes deliberately omit this property.
+   */
+  readonly executionBoundary?: RuntimeRouteExecutionBoundary;
 
   beforeHandle: RuntimeBeforeHandle | undefined;
 

@@ -84,6 +84,7 @@ import {
   RUNTIME_ROUTE_BEFORE_AFTER_HANDLE,
   RUNTIME_ROUTE_BEFORE_AFTER_HANDLE_RESPONSE,
   RUNTIME_ROUTE_BEFORE_HANDLE,
+  RUNTIME_ROUTE_EXECUTION_BOUNDARY,
   RUNTIME_ROUTE_BEFORE_HANDLE_RESPONSE,
   RUNTIME_ROUTE_INPUT,
   RUNTIME_ROUTE_INPUT_AFTER_HANDLE,
@@ -719,6 +720,20 @@ export class Gelis extends RouteBuilder<""> {
       return normalizeResponse(result);
     }
 
+    if ((route.flags & RUNTIME_ROUTE_EXECUTION_BOUNDARY) !== 0) {
+      const boundary = route.executionBoundary;
+
+      if (boundary === undefined) {
+        throw new Error("Missing Gelis route execution boundary");
+      }
+
+      const flags = route.flags & ~RUNTIME_ROUTE_EXECUTION_BOUNDARY;
+
+      return boundary.run(request, () =>
+        invokeRuntimeRouteWithoutBoundary(route, request, params, flags),
+      );
+    }
+
     /*
      * Response-only routes are the second critical
      * execution shape after completely plain routes.
@@ -1011,6 +1026,319 @@ export class Gelis extends RouteBuilder<""> {
 
         throw new Error("Invalid Gelis runtime route flags");
       }
+    }
+  }
+}
+
+function invokeRuntimeRouteWithoutBoundary(
+  route: RuntimeRouteRecord,
+  request: Request,
+  params: Record<string, string>,
+  flags: number,
+): Response | Promise<Response> {
+  if (flags === RUNTIME_ROUTE_PLAIN) {
+    const result = route.handler({
+      request,
+      params,
+      query: undefined,
+      body: undefined,
+      reply: runtimeReply,
+    });
+
+    if (isPromiseLike(result)) {
+      return Promise.resolve(result).then(normalizeResponse);
+    }
+
+    return normalizeResponse(result);
+  }
+
+  /*
+   * Response-only routes are the second critical
+   * execution shape after completely plain routes.
+   *
+   * Promote them ahead of the generic route-plan
+   * switch so executable response contracts do not
+   * pay generic lifecycle dispatch overhead.
+   *
+   * Plain routes return above, so this comparison
+   * adds no cost to the zero-unused fast path.
+   */
+  if (flags === RUNTIME_ROUTE_RESPONSE) {
+    const result = route.handler({
+      request,
+      params,
+
+      query: undefined,
+
+      body: undefined,
+
+      reply: runtimeReply,
+    });
+
+    const finalize = route.responsePlan!.finalize;
+
+    if (isPromiseLike(result)) {
+      return Promise.resolve(result).then(finalize);
+    }
+
+    return finalize(result);
+  }
+
+  switch (flags) {
+    case RUNTIME_ROUTE_INPUT: {
+      return runInputPlan(
+        route,
+        request,
+        params,
+
+        invokeHandlerRoute,
+      );
+    }
+
+    case RUNTIME_ROUTE_BEFORE_HANDLE: {
+      return invokeBeforeHandleRoute(
+        route,
+        request,
+        params,
+        undefined,
+        undefined,
+      );
+    }
+
+    case RUNTIME_ROUTE_INPUT_BEFORE_HANDLE: {
+      return runInputPlan(
+        route,
+        request,
+        params,
+
+        invokeBeforeHandleRoute,
+      );
+    }
+
+    case RUNTIME_ROUTE_AFTER_HANDLE: {
+      return invokeAfterHandleRoute(
+        route,
+        request,
+        params,
+        undefined,
+        undefined,
+      );
+    }
+
+    case RUNTIME_ROUTE_INPUT_AFTER_HANDLE: {
+      return runInputPlan(
+        route,
+        request,
+        params,
+
+        invokeAfterHandleRoute,
+      );
+    }
+
+    case RUNTIME_ROUTE_BEFORE_AFTER_HANDLE: {
+      return invokeBeforeAfterHandleRoute(
+        route,
+        request,
+        params,
+        undefined,
+        undefined,
+      );
+    }
+
+    case RUNTIME_ROUTE_INPUT_BEFORE_AFTER_HANDLE: {
+      return runInputPlan(
+        route,
+        request,
+        params,
+
+        invokeBeforeAfterHandleRoute,
+      );
+    }
+
+    case RUNTIME_ROUTE_INPUT_RESPONSE: {
+      return runInputPlan(
+        route,
+        request,
+        params,
+
+        invokeResponseRoute,
+      );
+    }
+
+    case RUNTIME_ROUTE_BEFORE_HANDLE_RESPONSE: {
+      return invokeBeforeHandleResponseRoute(
+        route,
+        request,
+        params,
+        undefined,
+        undefined,
+      );
+    }
+
+    case RUNTIME_ROUTE_INPUT_BEFORE_HANDLE_RESPONSE: {
+      return runInputPlan(
+        route,
+        request,
+        params,
+
+        invokeBeforeHandleResponseRoute,
+      );
+    }
+
+    case RUNTIME_ROUTE_AFTER_HANDLE_RESPONSE: {
+      return invokeAfterHandleResponseRoute(
+        route,
+        request,
+        params,
+        undefined,
+        undefined,
+      );
+    }
+
+    case RUNTIME_ROUTE_INPUT_AFTER_HANDLE_RESPONSE: {
+      return runInputPlan(
+        route,
+        request,
+        params,
+
+        invokeAfterHandleResponseRoute,
+      );
+    }
+
+    case RUNTIME_ROUTE_BEFORE_AFTER_HANDLE_RESPONSE: {
+      return invokeBeforeAfterHandleResponseRoute(
+        route,
+        request,
+        params,
+        undefined,
+        undefined,
+      );
+    }
+
+    case RUNTIME_ROUTE_INPUT_BEFORE_AFTER_HANDLE_RESPONSE: {
+      return runInputPlan(
+        route,
+        request,
+        params,
+
+        invokeBeforeAfterHandleResponseRoute,
+      );
+    }
+
+    default: {
+      /*
+       * Module request scope gets a dedicated compiled execution path.
+       *
+       * Ordinary app.requestScope() keeps its existing runtime path
+       * completely unchanged.
+       */
+      if (flags === RUNTIME_ROUTE_MODULE_REQUEST_SCOPE) {
+        return invokePlainModuleRequestScopeRoute(route, request, params);
+      }
+
+      /*
+       * Fully local module request-scope lifecycle.
+       *
+       * No application-global lifecycle is present when both ordinary
+       * route lifecycle fields remain undefined, so this path stays
+       * linear just like the existing request-scope specialization.
+       */
+      if (
+        flags ===
+          (RUNTIME_ROUTE_MODULE_REQUEST_SCOPE |
+            RUNTIME_ROUTE_BEFORE_HANDLE |
+            RUNTIME_ROUTE_AFTER_HANDLE) &&
+        route.beforeHandle === undefined &&
+        route.afterHandle === undefined
+      ) {
+        return invokeLocalModuleRequestScopeBeforeAfterRoute(
+          route,
+          request,
+          params,
+        );
+      }
+
+      if ((flags & RUNTIME_ROUTE_MODULE_REQUEST_SCOPE) !== 0) {
+        if ((flags & RUNTIME_ROUTE_INPUT) !== 0) {
+          return runInputPlan(
+            route,
+            request,
+            params,
+
+            invokeModuleRequestScopeValidatedRoute,
+          );
+        }
+
+        return invokeModuleRequestScopeValidatedRoute(
+          route,
+          request,
+          params,
+          undefined,
+          undefined,
+        );
+      }
+
+      /*
+       * Request-scoped route without input, lifecycle,
+       * or response contract.
+       *
+       * Keep this execution shape close to the ordinary
+       * plain-route fast path. The scope is derived once
+       * and passed directly as the handler's second
+       * argument.
+       */
+      if (flags === RUNTIME_ROUTE_REQUEST_SCOPE) {
+        return invokePlainRequestScopeRoute(route, request, params);
+      }
+
+      /*
+       * Request scope with local beforeHandle + afterHandle,
+       * but without application-global lifecycle.
+       *
+       * Global lifecycle compilation stores its effective
+       * hooks on route.beforeHandle / route.afterHandle, so
+       * both fields being undefined proves this route can use
+       * the fully local specialized executor.
+       */
+      if (
+        flags ===
+          (RUNTIME_ROUTE_REQUEST_SCOPE |
+            RUNTIME_ROUTE_BEFORE_HANDLE |
+            RUNTIME_ROUTE_AFTER_HANDLE) &&
+        route.beforeHandle === undefined &&
+        route.afterHandle === undefined
+      ) {
+        return invokeLocalRequestScopeBeforeAfterRoute(route, request, params);
+      }
+
+      if ((flags & RUNTIME_ROUTE_REQUEST_SCOPE) !== 0) {
+        /*
+         * Input validation remains owned by the canonical
+         * Gelis input pipeline.
+         *
+         * Request-scope derivation therefore receives
+         * validated/transformed query and body values.
+         */
+        if ((flags & RUNTIME_ROUTE_INPUT) !== 0) {
+          return runInputPlan(
+            route,
+            request,
+            params,
+
+            invokeRequestScopeValidatedRoute,
+          );
+        }
+
+        return invokeRequestScopeValidatedRoute(
+          route,
+          request,
+          params,
+          undefined,
+          undefined,
+        );
+      }
+
+      throw new Error("Invalid Gelis runtime route flags");
     }
   }
 }
@@ -1461,6 +1789,10 @@ function applyLifecyclePlan(
    */
   if (route.responsePlan !== undefined) {
     flags |= RUNTIME_ROUTE_RESPONSE;
+  }
+
+  if (route.executionBoundary !== undefined) {
+    flags |= RUNTIME_ROUTE_EXECUTION_BOUNDARY;
   }
 
   route.flags = flags;

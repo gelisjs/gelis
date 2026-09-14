@@ -1,5 +1,7 @@
 import type { StandardSchemaV1 } from "./schema";
 
+import type { TimeoutRoutePolicy } from "./timeout/route-policy";
+
 import type { OpenAPIRouteMetadata } from "./openapi";
 
 import type { InferPathParams } from "./types/path";
@@ -91,6 +93,8 @@ export interface RouteOptions {
   readonly bodyContentTypes?: readonly string[];
 
   readonly bodyLimit?: number;
+
+  readonly timeout?: TimeoutRoutePolicy;
 
   readonly responses?: ResponseContractMap;
 
@@ -286,6 +290,8 @@ export type RouteOptionsFor<
   readonly bodyContentTypes?: readonly string[];
 
   readonly bodyLimit?: number;
+
+  readonly timeout?: TimeoutRoutePolicy;
 
   readonly responses?: Responses;
 

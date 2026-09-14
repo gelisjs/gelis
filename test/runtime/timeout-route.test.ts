@@ -1,10 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
 import { Gelis } from "../../src/app";
-import {
-  GelisTimeoutError,
-  timeout,
-} from "../../src/timeout/index";
+import { GelisTimeoutError, timeout } from "../../src/timeout/index";
 
 function neverResponse(): Promise<Response> {
   return new Promise<Response>(() => undefined);
@@ -42,19 +39,15 @@ describe("P11-G6 route timeout boundary", () => {
       expect(deadlines.signal(request)).toBeUndefined();
     });
 
-    app.get(
-      "/slow",
-      { timeout: routeDeadline },
-      async ({ request }) => {
-        const signal = deadlines.signal(request);
-        expect(signal).toBeDefined();
+    app.get("/slow", { timeout: routeDeadline }, async ({ request }) => {
+      const signal = deadlines.signal(request);
+      expect(signal).toBeDefined();
 
-        await waitForAbort(signal!);
-        observedReason = signal!.reason;
+      await waitForAbort(signal!);
+      observedReason = signal!.reason;
 
-        return new Response("late route result");
-      },
-    );
+      return new Response("late route result");
+    });
 
     const request = new Request("https://api.example/slow");
     const response = await app.fetch(request);
@@ -119,14 +112,10 @@ describe("P11-G6 route timeout boundary", () => {
       expect(applicationSignal).toBeDefined();
     });
 
-    app.get(
-      "/tight",
-      { timeout: deadlines.route(5) },
-      ({ request }) => {
-        expect(deadlines.signal(request)).toBe(applicationSignal);
-        return neverResponse();
-      },
-    );
+    app.get("/tight", { timeout: deadlines.route(5) }, ({ request }) => {
+      expect(deadlines.signal(request)).toBe(applicationSignal);
+      return neverResponse();
+    });
 
     const response = await app.fetch(new Request("https://api.example/tight"));
 
@@ -151,11 +140,7 @@ describe("P11-G6 route timeout boundary", () => {
     const app = new Gelis();
     app.use(deadlines);
 
-    app.get(
-      "/cannot-extend",
-      { timeout: deadlines.route(50) },
-      neverResponse,
-    );
+    app.get("/cannot-extend", { timeout: deadlines.route(50) }, neverResponse);
 
     const response = await app.fetch(
       new Request("https://api.example/cannot-extend"),
@@ -253,14 +238,10 @@ describe("P11-G6 route timeout boundary", () => {
       return new Promise<{ ready: boolean }>(() => undefined);
     });
 
-    scoped.get(
-      "/scope",
-      { timeout: deadlines.route(5) },
-      () => {
-        handlerRan = true;
-        return "must not run";
-      },
-    );
+    scoped.get("/scope", { timeout: deadlines.route(5) }, () => {
+      handlerRan = true;
+      return "must not run";
+    });
 
     const response = await app.fetch(new Request("https://api.example/scope"));
 
@@ -280,11 +261,7 @@ describe("P11-G6 route timeout boundary", () => {
     });
 
     const app = new Gelis();
-    app.get(
-      "/custom",
-      { timeout: deadlines.route(5) },
-      neverResponse,
-    );
+    app.get("/custom", { timeout: deadlines.route(5) }, neverResponse);
 
     const response = await app.fetch(new Request("https://api.example/custom"));
 
