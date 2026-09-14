@@ -1,0 +1,134 @@
+name: CP4-AQ1F prepare
+
+on:
+  push:
+    branches:
+      - work/competitive-cp4aq1f-epoch-abba-variance-decomposition
+
+permissions:
+  contents: write
+
+jobs:
+  prepare:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Generate AQ1F variance decomposition
+        shell: python
+        run: |
+          from pathlib import Path
+          import re
+
+          old_h = Path('bench/runtime/cp4aq1e-main-stability-calibration.mts')
+          old_w = Path('bench/runtime/cp4aq1e-main-stability-calibration-worker.mts')
+          old_mem_h = Path('bench/runtime/cp4aq1e-memory-stability-calibration.mts')
+          old_mem_w = Path('bench/runtime/cp4aq1e-memory-stability-calibration-worker.mts')
+          old_f = Path('docs/benchmarks/competitive-cp4aq1e-split-main-memory-stability-freeze.md')
+          new_h = Path('bench/runtime/cp4aq1f-epoch-abba-variance-decomposition.mts')
+          new_w = Path('bench/runtime/cp4aq1f-epoch-abba-variance-decomposition-worker.mts')
+          new_f = Path('docs/benchmarks/competitive-cp4aq1f-epoch-abba-variance-decomposition-freeze.md')
+
+          # Worker: keep exact workloads/launcher contract, change only timed sampling to 5 epochs.
+          w = old_w.read_text().replace('CP4-AQ1E-MAIN', 'CP4-AQ1F').replace('cp4aq1e-main', 'cp4aq1f')
+          w = w.replace('const MIN_CALIBRATION_MS = 20;', 'const MIN_CALIBRATION_MS = 20;\nconst TIMED_EPOCHS = 5;')
+          w = w.replace('  readonly sink: number;\n}', '  readonly sink: number;\n  readonly epochMetrics: readonly number[];\n}', 1)
+          w = w.replace('    sink: 0,\n  };', '    sink: 0,\n    epochMetrics: [],\n  };', 1)
+          w = w.replace('    sink: measured.sink,\n  };', '    sink: measured.sink,\n    epochMetrics: [measured.metric],\n  };', 1)
+          old_timed = '''  const iterations = calibrate(operation);\n  const elapsed = measure(operation, iterations);\n\n  const result: WorkerResult = {\n    cell,\n    variant,\n    probeOnly: false,\n    metric: (elapsed * 1_000_000) / iterations,\n    unit: prepared.unit,\n    iterations,\n    warmups: WARMUP,\n    sink,\n  };\n  emitResult(result, resultFile);'''
+          new_timed = '''  const iterations = calibrate(operation);\n  const epochMetrics: number[] = [];\n  for (let epoch = 0; epoch < TIMED_EPOCHS; epoch++) {\n    const elapsed = measure(operation, iterations);\n    epochMetrics.push((elapsed * 1_000_000) / iterations);\n  }\n\n  const result: WorkerResult = {\n    cell,\n    variant,\n    probeOnly: false,\n    metric: median(epochMetrics),\n    unit: prepared.unit,\n    iterations,\n    warmups: WARMUP,\n    sink,\n    epochMetrics,\n  };\n  emitResult(result, resultFile);'''
+          if old_timed not in w:
+              raise SystemExit('worker timed block not found')
+          w = w.replace(old_timed, new_timed, 1)
+          marker = 'function measure(operation: () => void, iterations: number): number {\n'
+          median_helper = '''function median(values: readonly number[]): number {\n  if (values.length === 0) throw new Error("Cannot take median of empty values");\n  const sorted = [...values].sort((a, b) => a - b);\n  const middle = Math.floor(sorted.length / 2);\n  if (sorted.length % 2 === 1) return sorted[middle]!;\n  return (sorted[middle - 1]! + sorted[middle]!) / 2;\n}\n\nfunction measure(operation: () => void, iterations: number): number {\n'''
+          if marker not in w:
+              raise SystemExit('worker measure marker not found')
+          w = w.replace(marker, median_helper, 1)
+          new_w.write_text(w)
+
+          h = old_h.read_text().replace('CP4-AQ1E-MAIN', 'CP4-AQ1F').replace('cp4aq1e-main', 'cp4aq1f')
+          h = h.replace('"cp4aq1f-stability-calibration-worker.mts"', '"cp4aq1f-epoch-abba-variance-decomposition-worker.mts"')
+          h = h.replace('const PAIRS_PER_BLOCK = 8;\nconst SAMPLES = BLOCKS * PAIRS_PER_BLOCK;', 'const QUARTETS_PER_BLOCK = 2;\nconst QUARTETS = BLOCKS * QUARTETS_PER_BLOCK;\nconst TIMED_EPOCHS = 5;')
+          h = h.replace('type Order = "a-b" | "b-a";', 'type Orientation = "a-b-b-a" | "b-a-a-b";')
+          h = h.replace('  readonly sink: number;\n}', '  readonly sink: number;\n  readonly epochMetrics: readonly number[];\n}', 1)
+
+          h, count = re.subn(
+              r'interface PairResult \{.*?\n\}\n\ninterface Summary',
+              '''interface QuartetResult {\n  readonly block: number;\n  readonly orientation: Orientation;\n  readonly a: readonly [number, number];\n  readonly b: readonly [number, number];\n  readonly ratio: number;\n  readonly workerEpochSpreads: readonly [number, number, number, number];\n}\n\ninterface Summary''',
+              h, count=1, flags=re.S,
+          )
+          if count != 1:
+              raise SystemExit('PairResult replacement failed')
+
+          h, count = re.subn(
+              r'interface CellDiagnostics \{.*?\n\}',
+              '''interface CellDiagnostics {\n  readonly aggregateMedianRatio: number;\n  readonly quartetMedianRatio: number;\n  readonly bootstrapLow: number;\n  readonly bootstrapHigh: number;\n  readonly abbaRatio: number;\n  readonly baabRatio: number;\n  readonly orientationSpread: number;\n  readonly blockRatios: readonly number[];\n  readonly maxBlockDeviation: number;\n  readonly epochSpreadMedian: number;\n  readonly epochSpreadP95: number;\n}''',
+              h, count=1, flags=re.S,
+          )
+          if count != 1:
+              raise SystemExit('CellDiagnostics replacement failed')
+
+          h, count = re.subn(
+              r'const CELLS: readonly CellSpec\[\] = \[.*?\n\];',
+              '''const CELLS: readonly CellSpec[] = [\n  { cell: "static-only-raw", label: "static-only raw", kind: "hotpath" },\n  { cell: "generic-dynamic-raw", label: "generic dynamic raw", kind: "hotpath" },\n  { cell: "trailing-dynamic-json", label: "pure trailing dynamic JSON", kind: "hotpath" },\n  { cell: "collision-dynamic-raw", label: "forced collision raw", kind: "hotpath" },\n  { cell: "all-dynamic-raw", label: "ALL dynamic raw", kind: "hotpath" },\n];''',
+              h, count=1, flags=re.S,
+          )
+          if count != 1:
+              raise SystemExit('CELLS replacement failed')
+
+          h = h.replace('    console.log(`Pairs/block:     ${PAIRS_PER_BLOCK}`);\n    console.log(`Samples/source:  ${SAMPLES} fresh-worker measurements/cell`);\n    console.log("Order:           4 A→B + 4 B→A pairs per block");\n    console.log(\n      "Cells:           10 hotpath + 1 registration; memory isolated in AQ1E-MEMORY",\n    );', '    console.log(`Quartets/block:  ${QUARTETS_PER_BLOCK}`);\n    console.log(`Quartets/cell:   ${QUARTETS}`);\n    console.log("Workers/source:  32 fresh workers/cell (64 total/cell)");\n    console.log(`Timed epochs:    ${TIMED_EPOCHS} per fresh worker`);\n    console.log("Orientation:     balanced A→B→B→A / B→A→A→B");\n    console.log("Cells:           5 representative hotpaths");')
+
+          h, count = re.subn(
+              r'function runTiming\(\): void \{.*?\n\}\n\nfunction printAbsoluteMetrics',
+              '''function runTiming(): void {\n  const results = new Map<Cell, QuartetResult[]>();\n  const units = new Map<Cell, Unit>();\n\n  for (let cellIndex = 0; cellIndex < CELLS.length; cellIndex++) {\n    const spec = CELLS[cellIndex]!;\n    const quartets: QuartetResult[] = [];\n\n    for (let block = 0; block < BLOCKS; block++) {\n      console.log(\n        `PROGRESS aq1f ${cellIndex + 1}/${CELLS.length} ${spec.cell} block ${block + 1}/${BLOCKS}`,\n      );\n      for (let quartet = 0; quartet < QUARTETS_PER_BLOCK; quartet++) {\n        const orientation: Orientation =\n          (block + quartet) % 2 === 0 ? "a-b-b-a" : "b-a-a-b";\n        const sequence: readonly Source[] =\n          orientation === "a-b-b-a" ? ["a", "b", "b", "a"] : ["b", "a", "a", "b"];\n        const workerResults = sequence.map((source) => runWorker(spec.cell, source, false));\n        const metrics = workerResults.map((result) => {\n          if (result.metric === null) throw new Error(`Missing metric for ${spec.cell}`);\n          if (result.epochMetrics.length !== TIMED_EPOCHS) {\n            throw new Error(`Expected ${TIMED_EPOCHS} epochs for ${spec.cell}`);\n          }\n          return result.metric;\n        });\n        const knownUnit = units.get(spec.cell);\n        for (const result of workerResults) {\n          if (knownUnit !== undefined && knownUnit !== result.unit) {\n            throw new Error(`Unit drift for ${spec.cell}`);\n          }\n          units.set(spec.cell, result.unit);\n        }\n\n        const aValues = sequence\n          .map((source, index) => ({ source, metric: metrics[index]! }))\n          .filter((entry) => entry.source === "a")\n          .map((entry) => entry.metric) as [number, number];\n        const bValues = sequence\n          .map((source, index) => ({ source, metric: metrics[index]! }))\n          .filter((entry) => entry.source === "b")\n          .map((entry) => entry.metric) as [number, number];\n        const ratio = Math.sqrt(\n          (bValues[0] * bValues[1]) / (aValues[0] * aValues[1]),\n        );\n        const spreads = workerResults.map((result) => epochRelativeSpread(result.epochMetrics)) as [\n          number,\n          number,\n          number,\n          number,\n        ];\n        quartets.push({\n          block,\n          orientation,\n          a: aValues,\n          b: bValues,\n          ratio,\n          workerEpochSpreads: spreads,\n        });\n      }\n    }\n\n    if (quartets.length !== QUARTETS) {\n      throw new Error(`Incomplete quartet set for ${spec.cell}`);\n    }\n    results.set(spec.cell, quartets);\n  }\n\n  printAbsoluteMetrics(results, units);\n  const diagnostics = buildDiagnostics(results);\n  printEstimatorTable(diagnostics);\n  printBlockwiseTable(diagnostics);\n  printViability(diagnostics);\n}\n\nfunction printAbsoluteMetrics''',
+              h, count=1, flags=re.S,
+          )
+          if count != 1:
+              raise SystemExit('runTiming replacement failed')
+
+          h, count = re.subn(
+              r'function printAbsoluteMetrics\(.*?\nfunction runWorker\(',
+              '''function printAbsoluteMetrics(\n  results: ReadonlyMap<Cell, QuartetResult[]>,\n  units: ReadonlyMap<Cell, Unit>,\n): void {\n  console.log("Same-source worker-median absolute metrics");\n  console.log("| cell | source | median | p25 | p75 | min | max | unit |");\n  console.log("| --- | --- | ---: | ---: | ---: | ---: | ---: | --- |");\n  for (const spec of CELLS) {\n    const quartets = getQuartets(results, spec.cell);\n    const unit = units.get(spec.cell);\n    if (unit === undefined) throw new Error(`Missing unit for ${spec.cell}`);\n    const aValues = quartets.flatMap((quartet) => quartet.a);\n    const bValues = quartets.flatMap((quartet) => quartet.b);\n    for (const [source, values] of [["a", aValues], ["b", bValues]] as const) {\n      const summary = summarize(values);\n      console.log(\n        `| ${spec.cell} | ${source} | ${formatMetric(summary.median, unit)} | ${formatMetric(summary.p25, unit)} | ${formatMetric(summary.p75, unit)} | ${formatMetric(summary.min, unit)} | ${formatMetric(summary.max, unit)} | ${unit} |`,\n      );\n    }\n  }\n}\n\nfunction buildDiagnostics(\n  results: ReadonlyMap<Cell, QuartetResult[]>,\n): ReadonlyMap<Cell, CellDiagnostics> {\n  const output = new Map<Cell, CellDiagnostics>();\n  for (const spec of CELLS) {\n    const quartets = getQuartets(results, spec.cell);\n    const aValues = quartets.flatMap((quartet) => quartet.a);\n    const bValues = quartets.flatMap((quartet) => quartet.b);\n    const aggregateMedianRatio = median(bValues) / median(aValues);\n    const quartetMedianRatio = median(quartets.map((quartet) => quartet.ratio));\n    const bootstrap = blockBootstrapInterval(quartets, spec.cell);\n    const abbaRatio = median(\n      quartets.filter((q) => q.orientation === "a-b-b-a").map((q) => q.ratio),\n    );\n    const baabRatio = median(\n      quartets.filter((q) => q.orientation === "b-a-a-b").map((q) => q.ratio),\n    );\n    const blockRatios: number[] = [];\n    for (let block = 0; block < BLOCKS; block++) {\n      const blockQuartets = quartets.filter((quartet) => quartet.block === block);\n      if (blockQuartets.length !== QUARTETS_PER_BLOCK) {\n        throw new Error(`Incomplete block ${block + 1} for ${spec.cell}`);\n      }\n      blockRatios.push(median(blockQuartets.map((quartet) => quartet.ratio)));\n    }\n    const epochSpreads = quartets.flatMap((quartet) => quartet.workerEpochSpreads);\n    const sortedSpreads = [...epochSpreads].sort((a, b) => a - b);\n    output.set(spec.cell, {\n      aggregateMedianRatio,\n      quartetMedianRatio,\n      bootstrapLow: bootstrap.low,\n      bootstrapHigh: bootstrap.high,\n      abbaRatio,\n      baabRatio,\n      orientationSpread: Math.abs(abbaRatio - baabRatio),\n      blockRatios,\n      maxBlockDeviation: Math.max(...blockRatios.map((ratio) => Math.abs(ratio - 1))),\n      epochSpreadMedian: percentileSorted(sortedSpreads, 0.5),\n      epochSpreadP95: percentileSorted(sortedSpreads, 0.95),\n    });\n  }\n  return output;\n}\n\nfunction printEstimatorTable(\n  diagnostics: ReadonlyMap<Cell, CellDiagnostics>,\n): void {\n  console.log();\n  console.log("AQ1F epoch-median + symmetric-quartet diagnostics");\n  console.log(\n    "| comparison | raw median(B)/median(A) | quartet median | block-bootstrap 95% CI | ABBA | BAAB | orientation spread | epoch spread median/p95 |",\n  );\n  console.log("| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |");\n  for (const spec of CELLS) {\n    const value = getDiagnostics(diagnostics, spec.cell);\n    console.log(\n      `| ${spec.label} | ${value.aggregateMedianRatio.toFixed(4)}x | ${value.quartetMedianRatio.toFixed(4)}x | ${value.bootstrapLow.toFixed(4)}x–${value.bootstrapHigh.toFixed(4)}x | ${value.abbaRatio.toFixed(4)}x | ${value.baabRatio.toFixed(4)}x | ${(value.orientationSpread * 100).toFixed(2)}% | ${(value.epochSpreadMedian * 100).toFixed(2)}% / ${(value.epochSpreadP95 * 100).toFixed(2)}% |`,\n    );\n  }\n}\n\nfunction printBlockwiseTable(\n  diagnostics: ReadonlyMap<Cell, CellDiagnostics>,\n): void {\n  console.log();\n  console.log("Block median symmetric-quartet ratio B / A");\n  console.log(\n    "| comparison | b1 | b2 | b3 | b4 | b5 | b6 | b7 | b8 | max deviation |",\n  );\n  console.log(\n    "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",\n  );\n  for (const spec of CELLS) {\n    const value = getDiagnostics(diagnostics, spec.cell);\n    const blocks = value.blockRatios.map((ratio) => `${ratio.toFixed(4)}x`).join(" | ");\n    console.log(\n      `| ${spec.label} | ${blocks} | ${(value.maxBlockDeviation * 100).toFixed(2)}% |`,\n    );\n  }\n}\n\nfunction printViability(diagnostics: ReadonlyMap<Cell, CellDiagnostics>): void {\n  let viable = true;\n  console.log();\n  console.log("Frozen CP4-AQ1F mechanism-viability criteria");\n  console.log(\n    "| comparison | quartet bias | bootstrap CI | orientation spread | block deviation | result |",\n  );\n  console.log("| --- | ---: | ---: | ---: | ---: | --- |");\n  for (const spec of CELLS) {\n    const value = getDiagnostics(diagnostics, spec.cell);\n    const bias = Math.abs(value.quartetMedianRatio - 1);\n    const ciPass = value.bootstrapLow >= 0.985 && value.bootstrapHigh <= 1.015;\n    const pass =\n      bias <= 0.01 &&\n      ciPass &&\n      value.orientationSpread <= 0.01 &&\n      value.maxBlockDeviation <= 0.02;\n    if (!pass) viable = false;\n    console.log(\n      `| ${spec.label} | ${(bias * 100).toFixed(2)}% / <= 1.00% | ${value.bootstrapLow.toFixed(4)}x–${value.bootstrapHigh.toFixed(4)}x / 0.9850x–1.0150x | ${(value.orientationSpread * 100).toFixed(2)}% / <= 1.00% | ${(value.maxBlockDeviation * 100).toFixed(2)}% / <= 2.00% | ${pass ? "PASS" : "FAIL"} |`,\n    );\n  }\n  console.log();\n  console.log(\n    `CP4-AQ1F MECHANISM VIABILITY FOR FULL AQ1G: ${viable ? "PASS" : "FAIL"}`,\n  );\n  console.log(\n    "AQ1F is same-source variance decomposition only; it cannot reclassify Gelis performance or AQ1E.",\n  );\n}\n\nfunction blockBootstrapInterval(\n  quartets: readonly QuartetResult[],\n  cell: Cell,\n): { readonly low: number; readonly high: number } {\n  const blocks: QuartetResult[][] = [];\n  for (let block = 0; block < BLOCKS; block++) {\n    const values = quartets.filter((quartet) => quartet.block === block);\n    if (values.length !== QUARTETS_PER_BLOCK) {\n      throw new Error(`Incomplete bootstrap block ${block + 1} for ${cell}`);\n    }\n    blocks.push(values);\n  }\n  const random = seededRandom(hashString(cell) ^ 0xa1f0abba);\n  const ratios: number[] = [];\n  for (let rep = 0; rep < BOOTSTRAP_REPS; rep++) {\n    const sampled: QuartetResult[] = [];\n    for (let index = 0; index < BLOCKS; index++) {\n      sampled.push(...blocks[Math.floor(random() * BLOCKS)]!);\n    }\n    ratios.push(median(sampled.map((quartet) => quartet.ratio)));\n  }\n  ratios.sort((a, b) => a - b);\n  return {\n    low: percentileSorted(ratios, 0.025),\n    high: percentileSorted(ratios, 0.975),\n  };\n}\n\nfunction epochRelativeSpread(values: readonly number[]): number {\n  if (values.length === 0) throw new Error("Missing epoch metrics");\n  const center = median(values);\n  return (Math.max(...values) - Math.min(...values)) / center;\n}\n\nfunction runWorker(''',
+              h, count=1, flags=re.S,
+          )
+          if count != 1:
+              raise SystemExit('analysis-section replacement failed')
+
+          h = h.replace('`CP4-AQ1F CORRECTNESS PROBE: PASS (${CELLS.length * SOURCES.length}/${CELLS.length * SOURCES.length})`', '`CP4-AQ1F CORRECTNESS PROBE: PASS (${CELLS.length * SOURCES.length}/${CELLS.length * SOURCES.length})`')
+          h = h.replace('"CP4-AQ1F LOCAL HARDENED STABILITY CALIBRATION RUN: COMPLETE"', '"CP4-AQ1F LOCAL EPOCH-ABBA VARIANCE DECOMPOSITION RUN: COMPLETE"')
+          h = h.replace('Competitive Performance v0.1 — CP4-AQ1F hardened benchmark stability calibration', 'Competitive Performance v0.1 — CP4-AQ1F epoch-ABBA variance decomposition')
+          h = h.replace('`gelis-cp4aq1f-result-', '`gelis-cp4aq1f-result-')
+
+          h, count = re.subn(
+              r'function getPairs\(.*?\n\}\n\nfunction getDiagnostics',
+              '''function getQuartets(\n  results: ReadonlyMap<Cell, QuartetResult[]>,\n  cell: Cell,\n): readonly QuartetResult[] {\n  const value = results.get(cell);\n  if (value === undefined) throw new Error(`Missing results for ${cell}`);\n  return value;\n}\n\nfunction getDiagnostics''',
+              h, count=1, flags=re.S,
+          )
+          if count != 1:
+              raise SystemExit('getPairs replacement failed')
+
+          # Remove unreachable registration/memory readiness helper if left behind by text shape.
+          h = re.sub(r'function readinessLimits\(.*?\n\}\n\n', '', h, count=1, flags=re.S)
+          new_h.write_text(h)
+
+          new_f.write_text('''# CP4-AQ1F epoch-median + symmetric-quartet variance decomposition freeze\n\n## Purpose\n\nAQ1E-MAIN completed authoritatively and failed 2% readiness because same-source temporal/order dispersion remained too large, especially trailing JSON, collision, and ALL. AQ1F is a prospective mechanism experiment. It tests whether two changed mechanisms reduce that dispersion before any full 11-cell AQ1G calibration is allowed.\n\nAQ1F is calibration only. It cannot reclassify CP4-AO, CP4-AP, AQ1E-MAIN, AQ1E-MEMORY, or Gelis source performance.\n\n## Frozen identity\n\n- Bun `1.4.2`\n- revision `744846f844374847c902b5e7fd59b4342a51ef99`\n- source A = source B = `5d9698d6b8d368ddcff358fc2645435b93c0c062`\n- routes `5,000`\n- authoritative host Windows / 12 logical CPUs\n- timed workers logical CPU `10` / affinity `0x400` / priority `HIGH`\n- gated launch and synchronous result-file IPC are unchanged from accepted AQ1D/AQ1E infrastructure\n\n## Representative cells\n\nExactly five hotpaths are frozen: static-only raw, generic dynamic raw, trailing dynamic JSON, forced collision raw, and ALL dynamic raw. They cover a stable control, a near-stable dynamic control, and the three strongest AQ1E variance failures.\n\n## Mechanism 1: five timed epochs per worker\n\nEach fresh worker keeps the existing 20,000 warmups and calibration rule. After calibration it executes exactly **5** timed epochs using the same calibrated iteration count. Each epoch targets the existing 120 ms duration. The worker metric is the median of the five epoch ns/op values. Epoch result-file serialization occurs only after all measured epochs. The harness also reports each worker's `(max epoch - min epoch) / median epoch` as a diagnostic; epoch spread is not itself an acceptance gate.\n\n## Mechanism 2: symmetric quartets\n\nEach quartet consists of four fresh workers in one of two balanced symmetric orientations: `A→B→B→A` or `B→A→A→B`. Orientations alternate by block/quartet position. For worker medians `A1,A2,B1,B2`, the quartet ratio is `sqrt((B1*B2)/(A1*A2))`. This is the primary same-source estimator unit and is intended to cancel first-order multiplicative drift in log space.\n\n## Frozen sampling\n\n- 8 blocks\n- 2 quartets/block\n- 16 quartets/cell\n- 32 fresh workers/source/cell; 64 total workers/cell\n- 320 timed workers total across five cells\n- 5 timed epochs/worker\n- 5,000 deterministic complete-block bootstrap resamples\n\nThe harness reports raw worker-median `median(B)/median(A)` only as a diagnostic. Primary viability uses the median symmetric-quartet ratio. Bootstrap resamples complete blocks and recomputes the median quartet ratio. Orientation spread is the absolute difference between median ABBA and BAAB quartet ratios. Each block ratio is the median of its two quartet ratios.\n\n## Frozen mechanism-viability criteria\n\nEvery one of the five representative cells must satisfy all four:\n\n- primary quartet-ratio bias `<= 1.00%`\n- block-bootstrap 95% CI entirely within `0.9850x–1.0150x`\n- ABBA-vs-BAAB orientation spread `<= 1.00%`\n- maximum block median-quartet deviation from `1.0` `<= 2.00%`\n\nAll five PASS => `CP4-AQ1F MECHANISM VIABILITY FOR FULL AQ1G: PASS`. Only then is a full AQ1G all-hotpath calibration justified. Any completed AQ1F FAIL is authoritative for this mechanism and cannot be rerun unchanged to seek a PASS. An abort before the completion marker is infrastructure/methodology failure rather than viability PASS/FAIL.\n\n## Correctness and interpretation contract\n\nThe correctness probe runs both byte-identical sources for all five frozen cells (10 checks). Once accepted locally it is never rerun. The first valid completed local timed AQ1F run under this frozen SHA is authoritative regardless of PASS/FAIL. No ratios from AQ1E are multiplied or chained into AQ1F.\n''')
+
+          for path in [old_h, old_w, old_mem_h, old_mem_w, old_f]:
+              path.unlink()
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+      - run: bun install --frozen-lockfile
+      - run: bunx prettier --write bench/runtime/cp4aq1f-epoch-abba-variance-decomposition.mts bench/runtime/cp4aq1f-epoch-abba-variance-decomposition-worker.mts docs/benchmarks/competitive-cp4aq1f-epoch-abba-variance-decomposition-freeze.md
+      - run: bun run typecheck
+      - name: Commit AQ1F
+        shell: bash
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add -A
+          git commit -m "bench(competitive): add CP4-AQ1F variance decomposition"
+          git push
