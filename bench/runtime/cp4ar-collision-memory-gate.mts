@@ -63,7 +63,11 @@ const calibration = process.argv.includes("--calibrate");
 if (probeOnly && calibration) {
   throw new Error("Choose either --probe-only or --calibrate, not both");
 }
-const mode: Mode = probeOnly ? "probe" : calibration ? "calibration" : "candidate";
+const mode: Mode = probeOnly
+  ? "probe"
+  : calibration
+    ? "calibration"
+    : "candidate";
 const sourceA = PRODUCTION;
 const sourceB = calibration ? PRODUCTION : CANDIDATE;
 const harnessSha = git(["rev-parse", "HEAD"]);
@@ -71,8 +75,16 @@ const cpu = cpus()[0]?.model ?? "unknown";
 const logicalCpuCount = cpus().length;
 const affinityLogicalCpu = Math.max(0, logicalCpuCount - 2);
 const affinityMaskHex = (1n << BigInt(affinityLogicalCpu)).toString(16);
-const worktreeA = resolve(REPOSITORY_ROOT, "..", `gelis-cp4ar-memory-a-${RUN_TOKEN}`);
-const worktreeB = resolve(REPOSITORY_ROOT, "..", `gelis-cp4ar-memory-b-${RUN_TOKEN}`);
+const worktreeA = resolve(
+  REPOSITORY_ROOT,
+  "..",
+  `gelis-cp4ar-memory-a-${RUN_TOKEN}`,
+);
+const worktreeB = resolve(
+  REPOSITORY_ROOT,
+  "..",
+  `gelis-cp4ar-memory-b-${RUN_TOKEN}`,
+);
 let worktreeACreated = false;
 let worktreeBCreated = false;
 let completed = false;
@@ -118,18 +130,26 @@ function printHeader(): void {
   console.log(`Mode:            ${mode}`);
   console.log(`Source A:        ${sourceA}`);
   console.log(`Source B:        ${sourceB}`);
-  console.log(`Routes:          ${ROUTES.toLocaleString("en-US")} forced-collision trailing routes`);
+  console.log(
+    `Routes:          ${ROUTES.toLocaleString("en-US")} forced-collision trailing routes`,
+  );
 
   if (!probeOnly) {
     console.log(`Blocks:          ${BLOCKS}`);
     console.log(`Pairs/block:     ${PAIRS_PER_BLOCK}`);
-    console.log(`Samples/source:  ${SAMPLES_PER_SOURCE} fresh-worker measurements`);
+    console.log(
+      `Samples/source:  ${SAMPLES_PER_SOURCE} fresh-worker measurements`,
+    );
     console.log("Order:           2 A→B + 2 B→A pairs per block");
     console.log(`Retained routers/sample: ${RETAINED_ROUTERS}`);
     console.log("Metric:          retained heap bytes/router");
-    console.log(`Windows affinity: logical CPU ${affinityLogicalCpu} (0x${affinityMaskHex})`);
+    console.log(
+      `Windows affinity: logical CPU ${affinityLogicalCpu} (0x${affinityMaskHex})`,
+    );
     console.log("Worker priority: HIGH");
-    console.log(`Bootstrap:       ${BOOTSTRAP_REPS.toLocaleString("en-US")} deterministic block resamples`);
+    console.log(
+      `Bootstrap:       ${BOOTSTRAP_REPS.toLocaleString("en-US")} deterministic block resamples`,
+    );
   }
   console.log();
 }
@@ -221,14 +241,18 @@ function buildDiagnostics(pairs: readonly PairResult[]): Diagnostics {
     orderBARatio,
     orderSpread,
     blockRatios,
-    maxBlockDeviation: Math.max(...blockRatios.map((value) => Math.abs(value - 1))),
+    maxBlockDeviation: Math.max(
+      ...blockRatios.map((value) => Math.abs(value - 1)),
+    ),
   };
 }
 
 function printDiagnostics(value: Diagnostics): void {
   console.log();
   console.log("Collision-memory estimator diagnostics");
-  console.log("| median(B)/median(A) | block-bootstrap 95% CI | A→B ratio | B→A ratio | order spread |");
+  console.log(
+    "| median(B)/median(A) | block-bootstrap 95% CI | A→B ratio | B→A ratio | order spread |",
+  );
   console.log("| ---: | ---: | ---: | ---: | ---: |");
   console.log(
     `| ${value.ratio.toFixed(4)}x | ${value.bootstrapLow.toFixed(4)}x–${value.bootstrapHigh.toFixed(4)}x | ${value.orderABRatio.toFixed(4)}x | ${value.orderBARatio.toFixed(4)}x | ${(value.orderSpread * 100).toFixed(2)}% |`,
@@ -239,7 +263,9 @@ function printBlocks(value: Diagnostics): void {
   console.log();
   console.log("Block ratio-of-medians B / A");
   console.log("| b1 | b2 | b3 | b4 | b5 | b6 | b7 | b8 | max deviation |");
-  console.log("| ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |");
+  console.log(
+    "| ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
+  );
   console.log(
     `| ${value.blockRatios.map((ratio) => `${ratio.toFixed(4)}x`).join(" | ")} | ${(value.maxBlockDeviation * 100).toFixed(2)}% |`,
   );
@@ -258,13 +284,17 @@ function printCalibrationDecision(value: Diagnostics): void {
 
   console.log();
   console.log("Frozen CP4-AR collision-memory calibration criteria");
-  console.log("| bias | bootstrap CI | order spread | block deviation | result |");
+  console.log(
+    "| bias | bootstrap CI | order spread | block deviation | result |",
+  );
   console.log("| ---: | ---: | ---: | ---: | --- |");
   console.log(
     `| ${(bias * 100).toFixed(2)}% / <= 1.00% | ${value.bootstrapLow.toFixed(4)}x–${value.bootstrapHigh.toFixed(4)}x / 0.9850x–1.0150x | ${(value.orderSpread * 100).toFixed(2)}% / <= 1.00% | ${(value.maxBlockDeviation * 100).toFixed(2)}% / <= 2.00% | ${pass ? "PASS" : "FAIL"} |`,
   );
   console.log();
-  console.log(`CP4-AR COLLISION-MEMORY 5%-GATE READINESS: ${pass ? "PASS" : "FAIL"}`);
+  console.log(
+    `CP4-AR COLLISION-MEMORY 5%-GATE READINESS: ${pass ? "PASS" : "FAIL"}`,
+  );
 }
 
 function printCandidateDecision(value: Diagnostics): void {
@@ -288,9 +318,10 @@ function printCandidateDecision(value: Diagnostics): void {
   console.log(`CP4-AR COLLISION-MEMORY DECISION: ${decision}`);
 }
 
-function blockBootstrapInterval(
-  pairs: readonly PairResult[],
-): { readonly low: number; readonly high: number } {
+function blockBootstrapInterval(pairs: readonly PairResult[]): {
+  readonly low: number;
+  readonly high: number;
+} {
   const blocks: PairResult[][] = [];
   for (let block = 0; block < BLOCKS; block++) {
     const values = pairs.filter((pair) => pair.block === block);
@@ -317,10 +348,15 @@ function blockBootstrapInterval(
 }
 
 function ratioOfMedians(pairs: readonly PairResult[]): number {
-  return median(pairs.map((pair) => pair.b)) / median(pairs.map((pair) => pair.a));
+  return (
+    median(pairs.map((pair) => pair.b)) / median(pairs.map((pair) => pair.a))
+  );
 }
 
-function runWorker(source: SourceLabel, workerProbeOnly: boolean): WorkerResult {
+function runWorker(
+  source: SourceLabel,
+  workerProbeOnly: boolean,
+): WorkerResult {
   const sourceRoot = source === "a" ? worktreeA : worktreeB;
   const args = [
     WORKER,
@@ -413,7 +449,9 @@ function workerOptions() {
 
 function preflight(): void {
   if (Bun.version !== EXPECTED_BUN) {
-    throw new Error(`CP4-AR memory gate requires Bun ${EXPECTED_BUN}, got ${Bun.version}`);
+    throw new Error(
+      `CP4-AR memory gate requires Bun ${EXPECTED_BUN}, got ${Bun.version}`,
+    );
   }
   if (Bun.revision !== EXPECTED_BUN_REVISION) {
     throw new Error(
@@ -426,7 +464,9 @@ function preflight(): void {
   }
   if (!probeOnly) {
     if (process.platform !== "win32") {
-      throw new Error("CP4-AR timed memory runs are authoritative only on Windows");
+      throw new Error(
+        "CP4-AR timed memory runs are authoritative only on Windows",
+      );
     }
     if (logicalCpuCount !== EXPECTED_LOCAL_LOGICAL_CPUS) {
       throw new Error(
@@ -488,7 +528,10 @@ function median(values: readonly number[]): number {
   return (sorted[middle - 1]! + sorted[middle]!) / 2;
 }
 
-function percentileSorted(values: readonly number[], percentile: number): number {
+function percentileSorted(
+  values: readonly number[],
+  percentile: number,
+): number {
   if (values.length === 0) throw new Error("percentile requires values");
   const index = (values.length - 1) * percentile;
   const lower = Math.floor(index);

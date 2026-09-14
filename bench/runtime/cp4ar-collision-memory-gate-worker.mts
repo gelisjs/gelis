@@ -12,7 +12,9 @@ type SourceLabel = "a" | "b";
 interface RuntimeRouteLike {
   readonly method: string;
   readonly path: string;
-  readonly handler: (context: { readonly params: Record<string, string> }) => unknown;
+  readonly handler: (context: {
+    readonly params: Record<string, string>;
+  }) => unknown;
   readonly flags: number;
   readonly input: undefined;
   readonly beforeHandle: undefined;
@@ -99,7 +101,9 @@ if (probeOnly) {
   const match = assertCorrectness(lastRouter);
   const delta = after - before;
   if (delta <= 0) {
-    throw new Error(`non-positive amplified collision router heap delta: ${delta}`);
+    throw new Error(
+      `non-positive amplified collision router heap delta: ${delta}`,
+    );
   }
 
   emitResult(
