@@ -39,14 +39,8 @@ describe("secondary trailing fingerprint routing", () => {
   test("preserves route-local parameter names when a collision bucket mixes names", async () => {
     const app = new Gelis();
 
-    app.get(
-      "/mixed/0000aaaa/:left",
-      ({ params }) => `left:${params.left}`,
-    );
-    app.get(
-      "/mixed/0001aaaa/:right",
-      ({ params }) => `right:${params.right}`,
-    );
+    app.get("/mixed/0000aaaa/:left", ({ params }) => `left:${params.left}`);
+    app.get("/mixed/0001aaaa/:right", ({ params }) => `right:${params.right}`);
 
     const left = await app.fetch(
       new Request("http://gelis.test/mixed/0000aaaa/alpha"),
