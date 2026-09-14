@@ -4,10 +4,7 @@ import { Gelis } from "../../src/app";
 import { cors } from "../../src/cors/index";
 import { requestId } from "../../src/request-id/index";
 import { secureHeaders } from "../../src/secure-headers/index";
-import {
-  GelisTimeoutError,
-  timeout,
-} from "../../src/timeout/index";
+import { GelisTimeoutError, timeout } from "../../src/timeout/index";
 
 const ORIGIN = "https://client.example";
 

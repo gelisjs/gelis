@@ -8,11 +8,7 @@ import { createApplicationTimeoutPolicy } from "./application";
 import { assertTimeoutDuration, GelisTimeoutError } from "./error";
 import { createTimeoutRoutePolicy } from "./route-policy";
 
-import type {
-  TimeoutHandler,
-  TimeoutRequestStateStore,
-} from "./application";
-import type { TimeoutSource } from "./error";
+import type { TimeoutHandler, TimeoutRequestStateStore } from "./application";
 import type { TimeoutRoutePolicy } from "./route-policy";
 import type { TimeoutSignalState } from "./signal";
 
@@ -86,7 +82,9 @@ interface CompiledTimeoutOptions {
   readonly onTimeout: TimeoutHandler | undefined;
 }
 
-function compileTimeoutOptions(options?: TimeoutOptions): CompiledTimeoutOptions {
+function compileTimeoutOptions(
+  options?: TimeoutOptions,
+): CompiledTimeoutOptions {
   if (options !== undefined) {
     assertOptionsObject(options);
   }
@@ -117,5 +115,3 @@ function assertOptionsObject(options: TimeoutOptions): void {
     throw new TypeError("Timeout options must be an object");
   }
 }
-
-void (undefined as unknown as TimeoutSource);

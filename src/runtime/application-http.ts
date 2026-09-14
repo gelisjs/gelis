@@ -25,16 +25,26 @@ export interface RuntimeApplicationHttpPolicy {
   ): Response | PromiseLike<Response>;
 }
 
+export interface RuntimeApplicationTimeoutPolicy {
+  run(request: Request, innerFetch: RuntimeFetch): Response | Promise<Response>;
+}
+
 export interface RuntimeApplicationHttpPlan {
   readonly cors?: RuntimeApplicationHttpPolicy;
+  readonly timeout?: RuntimeApplicationTimeoutPolicy;
   readonly secureHeaders?: RuntimeApplicationHttpPolicy;
   readonly requestId?: RuntimeApplicationHttpPolicy;
 }
 
-interface RuntimeApplicationHttpMarker {
-  readonly kind: "cors" | "secure-headers" | "request-id";
-  readonly policy: RuntimeApplicationHttpPolicy;
-}
+type RuntimeApplicationHttpMarker =
+  | {
+      readonly kind: "cors" | "secure-headers" | "request-id";
+      readonly policy: RuntimeApplicationHttpPolicy;
+    }
+  | {
+      readonly kind: "timeout";
+      readonly policy: RuntimeApplicationTimeoutPolicy;
+    };
 
 const GELIS_APPLICATION_HTTP_MARKER = Symbol(
   "gelis.internal.application-http.marker",
@@ -85,6 +95,7 @@ export function extractApplicationHttpPlan(
   }
 
   let cors: RuntimeApplicationHttpPolicy | undefined;
+  let timeout: RuntimeApplicationTimeoutPolicy | undefined;
   let secureHeaders: RuntimeApplicationHttpPolicy | undefined;
   let requestId: RuntimeApplicationHttpPolicy | undefined;
   let ordinaryCount = 0;
@@ -106,6 +117,17 @@ export function extractApplicationHttpPlan(
       }
 
       cors = marker.policy;
+      continue;
+    }
+
+    if (marker.kind === "timeout") {
+      if (timeout !== undefined) {
+        throw new Error(
+          "Multiple Gelis timeout application policies were compiled",
+        );
+      }
+
+      timeout = marker.policy;
       continue;
     }
 
@@ -131,6 +153,7 @@ export function extractApplicationHttpPlan(
 
   if (
     cors === undefined &&
+    timeout === undefined &&
     secureHeaders === undefined &&
     requestId === undefined
   ) {
@@ -161,23 +184,29 @@ export function extractApplicationHttpPlan(
 
   return {
     onRequestHooks: ordinaryHooks,
-    plan: createApplicationHttpPlan(cors, secureHeaders, requestId),
+    plan: createApplicationHttpPlan(cors, timeout, secureHeaders, requestId),
   };
 }
 
 function createApplicationHttpPlan(
   cors: RuntimeApplicationHttpPolicy | undefined,
+  timeout: RuntimeApplicationTimeoutPolicy | undefined,
   secureHeaders: RuntimeApplicationHttpPolicy | undefined,
   requestId: RuntimeApplicationHttpPolicy | undefined,
 ): RuntimeApplicationHttpPlan {
   const plan: {
     cors?: RuntimeApplicationHttpPolicy;
+    timeout?: RuntimeApplicationTimeoutPolicy;
     secureHeaders?: RuntimeApplicationHttpPolicy;
     requestId?: RuntimeApplicationHttpPolicy;
   } = {};
 
   if (cors !== undefined) {
     plan.cors = cors;
+  }
+
+  if (timeout !== undefined) {
+    plan.timeout = timeout;
   }
 
   if (secureHeaders !== undefined) {
@@ -209,6 +238,11 @@ export function compileApplicationHttpFetch(
   runtime: RuntimeApplicationHttpRuntime,
 ): RuntimeFetch {
   let fetch = innerFetch;
+
+  const timeout = plan.timeout;
+  if (timeout !== undefined) {
+    fetch = compileTimeoutPolicyFetch(timeout, fetch);
+  }
 
   const cors = plan.cors;
   if (cors !== undefined) {
@@ -322,6 +356,13 @@ function resolveAdvertisedMethods(
   }
 
   return resolved;
+}
+
+function compileTimeoutPolicyFetch(
+  policy: RuntimeApplicationTimeoutPolicy,
+  innerFetch: RuntimeFetch,
+): RuntimeFetch {
+  return (request) => policy.run(request, innerFetch);
 }
 
 function compilePolicyFetch(
