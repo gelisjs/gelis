@@ -1,9 +1,6 @@
 export type RequestIdGenerator = (request: Request) => string;
 
-export type RequestIdValidator = (
-  value: string,
-  request: Request,
-) => boolean;
+export type RequestIdValidator = (value: string, request: Request) => boolean;
 
 export interface RequestIdOptions {
   readonly header?: string;
@@ -71,7 +68,10 @@ export function resolveRequestId(
   return generated;
 }
 
-export function isRequestIdValue(value: unknown, maxLength: number): value is string {
+export function isRequestIdValue(
+  value: unknown,
+  maxLength: number,
+): value is string {
   if (
     typeof value !== "string" ||
     value.length === 0 ||
@@ -113,10 +113,7 @@ function readAdoptableIncomingId(
 
   const incoming = request.headers.get(policy.header);
 
-  if (
-    incoming === null ||
-    !isRequestIdValue(incoming, policy.maxLength)
-  ) {
+  if (incoming === null || !isRequestIdValue(incoming, policy.maxLength)) {
     return undefined;
   }
 
@@ -146,9 +143,7 @@ function assertGenerator(generator: RequestIdGenerator): void {
   }
 }
 
-function assertAcceptIncoming(
-  value: boolean | RequestIdValidator,
-): void {
+function assertAcceptIncoming(value: boolean | RequestIdValidator): void {
   if (typeof value !== "boolean" && typeof value !== "function") {
     throw new TypeError(
       "Request ID acceptIncoming must be a boolean or validator function",
@@ -166,7 +161,9 @@ function assertMaxLength(value: number): void {
 
 function assertHeaderName(value: string): void {
   if (typeof value !== "string" || value.length === 0) {
-    throw new TypeError("Request ID header must be a non-empty HTTP field name");
+    throw new TypeError(
+      "Request ID header must be a non-empty HTTP field name",
+    );
   }
 
   for (let index = 0; index < value.length; index++) {

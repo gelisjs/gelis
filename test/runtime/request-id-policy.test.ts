@@ -50,9 +50,7 @@ describe("P11-G request ID policy", () => {
       generator: () => "fallback",
     });
 
-    expect(resolveRequestId(policy, request)).toBe(
-      "trusted.upstream:42_A-B",
-    );
+    expect(resolveRequestId(policy, request)).toBe("trusted.upstream:42_A-B");
   });
 
   test("replaces malformed, ambiguous, unicode and overlong inbound IDs", () => {
@@ -170,7 +168,7 @@ describe("P11-G request ID policy", () => {
       "slash/value",
       "plus+value",
       "comma,value",
-      "quote\"value",
+      'quote"value',
       "unicode-é",
     ]) {
       expect(isRequestIdValue(value, 255)).toBe(false);
@@ -182,16 +180,22 @@ describe("P11-G request ID policy", () => {
       expect(() => compileRequestIdPolicy({ header })).toThrow(TypeError);
     }
 
-    for (const maxLength of [0, -1, 1.5, Number.NaN, Number.POSITIVE_INFINITY]) {
+    for (const maxLength of [
+      0,
+      -1,
+      1.5,
+      Number.NaN,
+      Number.POSITIVE_INFINITY,
+    ]) {
       expect(() => compileRequestIdPolicy({ maxLength })).toThrow(RangeError);
     }
   });
 
   test("validates runtime option shapes for untyped callers", () => {
     expect(() =>
-      compileRequestIdPolicy(null as unknown as Parameters<
-        typeof compileRequestIdPolicy
-      >[0]),
+      compileRequestIdPolicy(
+        null as unknown as Parameters<typeof compileRequestIdPolicy>[0],
+      ),
     ).toThrow(TypeError);
 
     expect(() =>
