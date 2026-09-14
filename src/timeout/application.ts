@@ -2,6 +2,8 @@ import type { RuntimeApplicationTimeoutPolicy } from "../runtime/application-htt
 import { normalizeResponseForRequest } from "../runtime/response";
 
 import { GelisTimeoutError } from "./error";
+
+import type { TimeoutSource } from "./error";
 import { createTimeoutSignalState } from "./signal";
 
 import type { TimeoutSignalState } from "./signal";
@@ -20,112 +22,142 @@ export function createApplicationTimeoutPolicy(
 ): RuntimeApplicationTimeoutPolicy {
   return {
     run(request, innerFetch) {
-      const state = createTimeoutSignalState(request);
-      const timeoutError = new GelisTimeoutError(duration, "application");
+      return runTimeoutBoundary(
+        request,
+        duration,
+        "application",
+        onTimeout,
+        states,
+        () => innerFetch(request),
+      );
+    },
+  };
+}
 
-      states.set(request, state);
+export function runTimeoutBoundary(
+  request: Request,
+  duration: number,
+  source: TimeoutSource,
+  onTimeout: TimeoutHandler | undefined,
+  states: TimeoutRequestStateStore,
+  execute: () => Response | Promise<Response>,
+): Response | Promise<Response> {
+  const existingState = states.get(request);
+  const ownsState = existingState === undefined;
+  const state = existingState ?? createTimeoutSignalState(request);
+  const timeoutError = new GelisTimeoutError(duration, source);
 
-      let terminalSelected = false;
-      let resolveBoundary: ((response: Response) => void) | undefined;
-      let rejectBoundary: ((error: unknown) => void) | undefined;
+  if (ownsState) {
+    states.set(request, state);
+  }
 
-      const timer = setTimeout(() => {
-        if (terminalSelected) {
-          return;
-        }
+  let terminalSelected = false;
+  let resolveBoundary: ((response: Response) => void) | undefined;
+  let rejectBoundary: ((error: unknown) => void) | undefined;
 
-        /*
-         * Select the framework deadline before running onTimeout.
-         *
-         * An asynchronous timeout handler must not allow a later user
-         * execution result to replace the already-winning deadline.
-         */
-        terminalSelected = true;
-        state.abortDeadline(timeoutError);
-        state.cleanup.run();
+  const deleteOwnedState = () => {
+    if (ownsState) {
+      states.delete(request);
+    }
+  };
 
-        let timeoutResponse: Response | PromiseLike<Response>;
+  const timer = setTimeout(() => {
+    if (terminalSelected) {
+      return;
+    }
 
-        try {
-          timeoutResponse =
-            onTimeout === undefined
-              ? defaultTimeoutResponse()
-              : onTimeout(request, timeoutError);
-        } catch (error) {
-          states.delete(request);
-          rejectBoundary!(error);
-          return;
-        }
+    /*
+     * Deadline selection itself is the terminal race event.
+     *
+     * Shared timeout state means a route deadline and its enclosing
+     * application deadline cancel each other's pending timers through the
+     * same cleanup set. The earlier deadline therefore wins without ever
+     * replacing the AbortSignal object exposed to user code.
+     */
+    terminalSelected = true;
+    state.abortDeadline(timeoutError);
+    state.cleanup.run();
 
-        if (isPromiseLike(timeoutResponse)) {
-          Promise.resolve(timeoutResponse).then(
-            (response) => {
-              states.delete(request);
-              resolveBoundary!(normalizeResponseForRequest(request, response));
-            },
-            (error) => {
-              states.delete(request);
-              rejectBoundary!(error);
-            },
-          );
-          return;
-        }
+    let timeoutResponse: Response | PromiseLike<Response>;
 
-        states.delete(request);
-        resolveBoundary!(normalizeResponseForRequest(request, timeoutResponse));
-      }, duration);
+    try {
+      timeoutResponse =
+        onTimeout === undefined
+          ? defaultTimeoutResponse()
+          : onTimeout(request, timeoutError);
+    } catch (error) {
+      deleteOwnedState();
+      rejectBoundary!(error);
+      return;
+    }
 
-      state.cleanup.add(() => clearTimeout(timer));
-
-      let execution: Response | Promise<Response>;
-
-      try {
-        execution = innerFetch(request);
-      } catch (error) {
-        terminalSelected = true;
-        state.cleanup.run();
-        states.delete(request);
-        throw error;
-      }
-
-      if (!(execution instanceof Promise)) {
-        terminalSelected = true;
-        state.cleanup.run();
-        states.delete(request);
-        return execution;
-      }
-
-      const boundary = new Promise<Response>((resolve, reject) => {
-        resolveBoundary = resolve;
-        rejectBoundary = reject;
-      });
-
-      execution.then(
+    if (isPromiseLike(timeoutResponse)) {
+      Promise.resolve(timeoutResponse).then(
         (response) => {
-          if (terminalSelected) {
-            return;
-          }
-
-          terminalSelected = true;
-          state.cleanup.run();
-          states.delete(request);
-          resolveBoundary!(response);
+          deleteOwnedState();
+          resolveBoundary!(normalizeResponseForRequest(request, response));
         },
         (error) => {
-          if (terminalSelected) {
-            return;
-          }
-
-          terminalSelected = true;
-          state.cleanup.run();
-          states.delete(request);
+          deleteOwnedState();
           rejectBoundary!(error);
         },
       );
+      return;
+    }
 
-      return boundary;
+    deleteOwnedState();
+    resolveBoundary!(normalizeResponseForRequest(request, timeoutResponse));
+  }, duration);
+
+  state.cleanup.add(() => clearTimeout(timer));
+
+  let execution: Response | Promise<Response>;
+
+  try {
+    execution = execute();
+  } catch (error) {
+    terminalSelected = true;
+    state.cleanup.run();
+    deleteOwnedState();
+    throw error;
+  }
+
+  if (!(execution instanceof Promise)) {
+    terminalSelected = true;
+    state.cleanup.run();
+    deleteOwnedState();
+    return execution;
+  }
+
+  const boundary = new Promise<Response>((resolve, reject) => {
+    resolveBoundary = resolve;
+    rejectBoundary = reject;
+  });
+
+  execution.then(
+    (response) => {
+      if (terminalSelected) {
+        return;
+      }
+
+      terminalSelected = true;
+      state.cleanup.run();
+      deleteOwnedState();
+      resolveBoundary!(response);
     },
-  };
+    (error) => {
+      if (terminalSelected) {
+        return;
+      }
+
+      terminalSelected = true;
+      state.cleanup.run();
+      deleteOwnedState();
+      rejectBoundary!(error);
+    },
+  );
+
+  return boundary;
 }
 
 function defaultTimeoutResponse(): Response {
