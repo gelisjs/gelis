@@ -30,6 +30,10 @@ describe("secondary trailing fingerprint routing", () => {
     );
 
     expect(missing.status).toBe(404);
+
+    expect(() =>
+      app.get("/collision/0000aaaa/:value", () => "duplicate"),
+    ).toThrow("Duplicate route");
   });
 
   test("falls back to exact prefixes when the secondary fingerprint also collides", async () => {
