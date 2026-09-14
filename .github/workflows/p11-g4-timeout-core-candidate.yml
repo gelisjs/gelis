@@ -1,0 +1,47 @@
+name: P11-G4 Timeout Core Candidate
+
+on:
+  push:
+    branches:
+      - work/p11-g4-timeout-core
+    paths:
+      - .github/workflows/p11-g4-timeout-core-candidate.yml
+
+permissions:
+  contents: write
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.0
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Format G4 files
+        run: |
+          bunx prettier --write src/timeout/error.ts src/timeout/cleanup.ts src/timeout/signal.ts test/runtime/timeout-core.test.ts
+
+      - name: Targeted timeout core tests
+        run: bun test test/runtime/timeout-core.test.ts
+
+      - name: Full quality gate
+        run: bun run check
+
+      - name: Commit candidate and remove temporary workflow
+        run: |
+          git rm .github/workflows/p11-g4-timeout-core-candidate.yml
+          git add src/timeout/error.ts src/timeout/cleanup.ts src/timeout/signal.ts test/runtime/timeout-core.test.ts
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "feat(timeout): complete G4 timeout core"
+          git push origin HEAD:work/p11-g4-timeout-core
