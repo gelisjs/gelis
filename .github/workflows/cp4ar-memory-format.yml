@@ -1,0 +1,32 @@
+name: CP4-AR memory format
+
+on:
+  push:
+    branches:
+      - work/competitive-cp4ar-collision-memory-gate
+    paths:
+      - .github/workflows/cp4ar-memory-format.yml
+
+permissions:
+  contents: write
+
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+      - run: bun install --frozen-lockfile
+      - run: bunx prettier --write bench/runtime/cp4ar-collision-memory-gate.mts bench/runtime/cp4ar-collision-memory-gate-worker.mts docs/benchmarks/competitive-cp4ar-collision-memory-gate-freeze.md
+      - run: bun run typecheck:bench
+      - name: Commit formatted gate
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add bench/runtime/cp4ar-collision-memory-gate.mts bench/runtime/cp4ar-collision-memory-gate-worker.mts docs/benchmarks/competitive-cp4ar-collision-memory-gate-freeze.md
+          git diff --cached --quiet || git commit -m "bench: format CP4-AR collision memory gate"
+          git push
