@@ -18,7 +18,10 @@ const CLEAR_REGRESSION_LOWER = 1.02;
 const MATERIAL_IMPROVEMENT = 0.95;
 const MATERIAL_REGRESSION = 1.05;
 const HERE = dirname(fileURLToPath(import.meta.url));
-const WORKER = resolve(HERE, "cp4aq3-production-performance-decision-worker.mts");
+const WORKER = resolve(
+  HERE,
+  "cp4aq3-production-performance-decision-worker.mts",
+);
 const REPOSITORY_ROOT = resolve(HERE, "../..");
 const RUN_TOKEN = `${process.pid}-${Date.now()}`;
 
@@ -29,10 +32,7 @@ type Cell =
   | "collision-dynamic-raw"
   | "all-dynamic-raw";
 
-type Classification =
-  | "CLEAR IMPROVEMENT"
-  | "INCONCLUSIVE"
-  | "CLEAR REGRESSION";
+type Classification = "CLEAR IMPROVEMENT" | "INCONCLUSIVE" | "CLEAR REGRESSION";
 
 type HotpathDecision =
   | "ELIGIBLE FOR PRODUCTION PROMOTION"
@@ -141,13 +141,19 @@ function printHeader(): void {
   if (probeOnly) {
     console.log("Mode:            correctness probe only");
   } else {
-    console.log(`Paired workers:  ${PAIRED_WORKERS_PER_CELL} fresh workers/cell`);
+    console.log(
+      `Paired workers:  ${PAIRED_WORKERS_PER_CELL} fresh workers/cell`,
+    );
     console.log(`Cycles/worker:   ${CYCLES_PER_WORKER}`);
     console.log("Cycle order:     balanced ABBA / BAAB within each process");
     console.log("Timed legs:      32 per worker (4 legs × 8 cycles)");
     console.log("Cells:           5 calibrated representative hotpaths");
-    console.log("Classifier:      CI upper <= 0.98 improvement; CI lower >= 1.02 regression");
-    console.log("Material floor:  median <= 0.95 improvement; median >= 1.05 regression estimate");
+    console.log(
+      "Classifier:      CI upper <= 0.98 improvement; CI lower >= 1.02 regression",
+    );
+    console.log(
+      "Material floor:  median <= 0.95 improvement; median >= 1.05 regression estimate",
+    );
     console.log(
       `Windows affinity: logical CPU ${affinityLogicalCpu} (0x${affinityMaskHex})`,
     );
@@ -231,7 +237,10 @@ function buildDiagnostics(
     const workerRatios = results.map((result) => result.workerRatio!);
     const allA = results.flatMap((result) => result.aMetrics);
     const allB = results.flatMap((result) => result.bMetrics);
-    const bootstrap = bootstrapInterval(workerRatios, `${spec.cell}:${candidate}`);
+    const bootstrap = bootstrapInterval(
+      workerRatios,
+      `${spec.cell}:${candidate}`,
+    );
     const workerMedianRatio = median(workerRatios);
     const classification = classify(bootstrap.low, bootstrap.high);
     output.set(spec.cell, {
@@ -279,12 +288,12 @@ function printDiagnostics(diagnostics: ReadonlyMap<Cell, Diagnostics>): void {
 function printWorkerRatios(all: ReadonlyMap<Cell, WorkerResult[]>): void {
   console.log();
   console.log("Fresh paired-worker median cycle ratios candidate / production");
-  console.log(
-    "| comparison | median | min | max | workers |",
-  );
+  console.log("| comparison | median | min | max | workers |");
   console.log("| --- | ---: | ---: | ---: | ---: |");
   for (const spec of CELLS) {
-    const ratios = getResults(all, spec.cell).map((result) => result.workerRatio!);
+    const ratios = getResults(all, spec.cell).map(
+      (result) => result.workerRatio!,
+    );
     console.log(
       `| ${spec.label} | ${median(ratios).toFixed(4)}x | ${Math.min(...ratios).toFixed(4)}x | ${Math.max(...ratios).toFixed(4)}x | ${ratios.length} |`,
     );
@@ -468,7 +477,9 @@ function preflight(): void {
   }
   if (!probeOnly) {
     if (process.platform !== "win32") {
-      throw new Error("CP4-AQ3 timed decision is authoritative only on Windows");
+      throw new Error(
+        "CP4-AQ3 timed decision is authoritative only on Windows",
+      );
     }
     if (logicalCpuCount !== EXPECTED_LOCAL_LOGICAL_CPUS) {
       throw new Error(
@@ -480,7 +491,9 @@ function preflight(): void {
 
 function readCandidate(values: readonly string[]): string {
   const prefix = "--candidate=";
-  const value = values.find((item) => item.startsWith(prefix))?.slice(prefix.length);
+  const value = values
+    .find((item) => item.startsWith(prefix))
+    ?.slice(prefix.length);
   if (value === undefined || value.length === 0) {
     throw new Error("CP4-AQ3 requires --candidate=<commit-sha>");
   }
@@ -532,7 +545,10 @@ function getDiagnostics(
 }
 
 function median(values: readonly number[]): number {
-  return percentileSorted([...values].sort((a, b) => a - b), 0.5);
+  return percentileSorted(
+    [...values].sort((a, b) => a - b),
+    0.5,
+  );
 }
 
 function percentileSorted(values: readonly number[], quantile: number): number {
