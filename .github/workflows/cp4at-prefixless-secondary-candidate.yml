@@ -12,7 +12,6 @@ permissions:
 
 jobs:
   generate:
-    if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
@@ -31,219 +30,20 @@ jobs:
         run: bun install --frozen-lockfile
 
       - name: Generate candidate
-        shell: bash
-        run: |
-          python3 <<'PY'
-          from pathlib import Path
-
-          path = Path('src/runtime/router.ts')
-          text = path.read_text()
-
-          def replace_once(old: str, new: str, label: str) -> None:
-              global text
-              count = text.count(old)
-              if count != 1:
-                  raise SystemExit(f'{label}: expected one match, got {count}')
-              text = text.replace(old, new, 1)
-
-          replace_once(
-              '''interface TrailingCollisionRoute extends TrailingParamRoute {
-            readonly prefix: string;
-          }
-
-          type TrailingSecondaryFingerprintEntry =
-            TrailingCollisionRoute | Map<string, TrailingCollisionRoute>;
-          ''',
-              '''type TrailingSecondaryFingerprintEntry =
-            | TrailingParamRoute
-            | Map<string, TrailingParamRoute>;
-          ''',
-              'secondary entry type',
-          )
-
-          text = text.replace(
-              '''                  secondaryEntry.prefix.length === prefixEnd &&
-                  pathname.startsWith(secondaryEntry.prefix)
-                ) {
-                  trailingRoute = secondaryEntry;
-''',
-              '''                  trailingRoutePrefixMatches(
-                    secondaryEntry,
-                    pathname,
-                    0,
-                    prefixEnd,
-                  )
-                ) {
-                  trailingRoute = secondaryEntry;
-''',
-          )
-
-          text = text.replace(
-              '''                  secondaryEntry.prefix.length === prefixLength &&
-                  url.startsWith(secondaryEntry.prefix, pathStart)
-                ) {
-                  trailingRoute = secondaryEntry;
-''',
-              '''                  trailingRoutePrefixMatches(
-                    secondaryEntry,
-                    url,
-                    pathStart,
-                    prefixLength,
-                  )
-                ) {
-                  trailingRoute = secondaryEntry;
-''',
-          )
-
-          text = text.replace(
-              '''                secondaryEntry.prefix.length === prefixEnd &&
-                pathname.startsWith(secondaryEntry.prefix)
-              ) {
-                return true;
-''',
-              '''                trailingRoutePrefixMatches(
-                  secondaryEntry,
-                  pathname,
-                  0,
-                  prefixEnd,
-                )
-              ) {
-                return true;
-''',
-          )
-
-          old = '''function registerTrailingSecondaryFingerprint(
-            secondary: Map<number, TrailingSecondaryFingerprintEntry>,
-            prefix: string,
-            trailingRoute: TrailingParamRoute,
-          ): boolean {
-            const key = secondaryPrefixFingerprint(prefix, prefix.length);
-            const existing = secondary.get(key);
-            const collisionRoute: TrailingCollisionRoute = {
-              route: trailingRoute.route,
-              paramName: trailingRoute.paramName,
-              prefix,
-            };
-
-            if (existing === undefined) {
-              secondary.set(key, collisionRoute);
-              return true;
-            }
-
-            if (existing instanceof Map) {
-              if (existing.has(prefix)) {
-                return false;
-              }
-
-              existing.set(prefix, collisionRoute);
-              return true;
-            }
-
-            if (existing.prefix === prefix) {
-              return false;
-            }
-
-            secondary.set(
-              key,
-              new Map([
-                [existing.prefix, existing],
-                [prefix, collisionRoute],
-              ]),
-            );
-
-            return true;
-          }
-          '''
-          new = '''function registerTrailingSecondaryFingerprint(
-            secondary: Map<number, TrailingSecondaryFingerprintEntry>,
-            prefix: string,
-            trailingRoute: TrailingParamRoute,
-          ): boolean {
-            const key = secondaryPrefixFingerprint(prefix, prefix.length);
-            const existing = secondary.get(key);
-
-            if (existing === undefined) {
-              secondary.set(key, trailingRoute);
-              return true;
-            }
-
-            if (existing instanceof Map) {
-              if (existing.has(prefix)) {
-                return false;
-              }
-
-              existing.set(prefix, trailingRoute);
-              return true;
-            }
-
-            if (trailingRoutePrefixEquals(existing, prefix)) {
-              return false;
-            }
-
-            const existingPrefixLength = trailingRoutePrefixLength(existing);
-            const existingPrefix = existing.route.path.slice(0, existingPrefixLength);
-
-            secondary.set(
-              key,
-              new Map([
-                [existingPrefix, existing],
-                [prefix, trailingRoute],
-              ]),
-            );
-
-            return true;
-          }
-
-          function trailingRoutePrefixLength(route: TrailingParamRoute): number {
-            return route.route.path.length - route.paramName.length - 1;
-          }
-
-          function trailingRoutePrefixEquals(
-            route: TrailingParamRoute,
-            prefix: string,
-          ): boolean {
-            const prefixLength = trailingRoutePrefixLength(route);
-
-            return prefixLength === prefix.length && route.route.path.startsWith(prefix);
-          }
-
-          function trailingRoutePrefixMatches(
-            route: TrailingParamRoute,
-            value: string,
-            start: number,
-            prefixLength: number,
-          ): boolean {
-            const routePath = route.route.path;
-
-            if (trailingRoutePrefixLength(route) !== prefixLength) {
-              return false;
-            }
-
-            for (let index = 0; index < prefixLength; index++) {
-              if (routePath.charCodeAt(index) !== value.charCodeAt(start + index)) {
-                return false;
-              }
-            }
-
-            return true;
-          }
-          '''
-          replace_once(old, new, 'secondary registration')
-
-          path.write_text(text)
-          PY
+        run: python3 scripts/cp4at-prefixless-secondary-patch.py
 
       - name: Format and validate
         run: |
-          bunx prettier --write src/runtime/router.ts
+          bunx prettier --write src/runtime/router.ts test/runtime/router-secondary-fingerprint.test.ts
           bun test test/runtime/router-secondary-fingerprint.test.ts
           bun run check
 
-      - name: Commit candidate
-        shell: bash
+      - name: Commit candidate and clean temporary generator
         run: |
+          rm .github/workflows/cp4at-prefixless-secondary-candidate.yml
+          rm scripts/cp4at-prefixless-secondary-patch.py
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add src/runtime/router.ts
+          git add src/runtime/router.ts test/runtime/router-secondary-fingerprint.test.ts .github/workflows/cp4at-prefixless-secondary-candidate.yml scripts/cp4at-prefixless-secondary-patch.py
           git commit -m "perf(router): remove retained collision-prefix wrapper"
           git push origin HEAD:work/competitive-cp4at-prefixless-secondary-index
