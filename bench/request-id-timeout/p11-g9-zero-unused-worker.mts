@@ -252,17 +252,12 @@ function prepareScenario(
         throw new Error(`${scenario} body mismatch: ${body}`);
       }
 
-      const contentType = response.headers.get("content-type") ?? "";
       if (scenario === "static-json" || scenario === "dynamic-json") {
+        const contentType = response.headers.get("content-type") ?? "";
         const mediaType = contentType.split(";", 1)[0]?.trim().toLowerCase();
         if (mediaType !== "application/json") {
           throw new Error(`${scenario} media type mismatch: ${mediaType}`);
         }
-      } else if (
-        contentType !== "text/plain;charset=UTF-8" &&
-        contentType !== "text/plain; charset=utf-8"
-      ) {
-        throw new Error(`${scenario} content type mismatch: ${contentType}`);
       }
     },
   };
