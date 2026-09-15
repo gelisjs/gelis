@@ -28,7 +28,9 @@ jobs:
         run: bun install --frozen-lockfile
 
       - name: Apply G8 package and AOT patch
-        run: python scripts/p11-g8-package-types-aot-patch.py
+        run: |
+          python scripts/p11-g8-package-types-aot-patch.py
+          python scripts/p11-g8-timeout-optional-fix.py
 
       - name: Format candidate
         run: >-
@@ -59,6 +61,7 @@ jobs:
         run: |
           git rm .github/workflows/p11-g8-candidate.yml
           git rm scripts/p11-g8-package-types-aot-patch.py
+          git rm scripts/p11-g8-timeout-optional-fix.py
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add package.json src/tooling/aot-source-analyzer.ts src/runtime/flat-aot-managed-input.ts test/package/package-exports.test.ts test/package/portable/consumer.ts test/runtime/body-limit-aot.test.ts test/runtime/request-id-timeout-aot.test.ts bench/types/p11-g8-timeout-acceptance.mts
