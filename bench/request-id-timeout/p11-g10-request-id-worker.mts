@@ -179,11 +179,11 @@ function gelisOptionsFor(
   scenario: RequestIdScenario,
 ): Record<string, unknown> | undefined {
   if (scenario === "trusted-valid-inbound") {
-    return { trustIncoming: true };
+    return { acceptIncoming: true };
   }
 
   if (scenario === "invalid-inbound-fallback") {
-    return { trustIncoming: true };
+    return { acceptIncoming: true };
   }
 
   if (scenario === "custom-generator") {
