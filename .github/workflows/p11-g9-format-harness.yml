@@ -1,0 +1,47 @@
+name: P11-G9 format harness
+
+on:
+  push:
+    branches:
+      - work/p11-g9-zero-unused-acceptance
+
+permissions:
+  contents: write
+
+jobs:
+  format-and-validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.0
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Format G9 harness
+        run: >-
+          bunx prettier
+          bench/request-id-timeout/p11-g9-zero-unused-acceptance.mts
+          bench/request-id-timeout/p11-g9-zero-unused-worker.mts
+          --write
+
+      - name: Run full quality gates
+        run: bun run check
+
+      - name: Commit clean G9 harness
+        run: |
+          git rm .github/workflows/p11-g9-format-harness.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add bench/request-id-timeout/p11-g9-zero-unused-acceptance.mts bench/request-id-timeout/p11-g9-zero-unused-worker.mts
+          git commit -m "style(bench): format P11-G9 zero-unused harness"
+          git push origin HEAD:work/p11-g9-zero-unused-acceptance
