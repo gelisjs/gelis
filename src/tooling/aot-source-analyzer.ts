@@ -9,6 +9,7 @@ const MANAGED_BODY_OPTION_KEYS = new Set([
   "bodyContentTypes",
   "bodyLimit",
   "openapi",
+  "timeout",
 ]);
 
 export interface AotSourceRoute {
@@ -375,6 +376,8 @@ function assertManagedBodyOptions(
   }
 
   let hasBody = false;
+  let hasManagedBodyOption = false;
+  let hasTimeout = false;
 
   for (const property of options.properties) {
     if (ts.isSpreadAssignment(property)) {
@@ -422,18 +425,91 @@ function assertManagedBodyOptions(
       );
     }
 
+    if (name === "timeout") {
+      if (hasTimeout) {
+        throw unsupported(
+          sourceFile,
+          property,
+          "route timeout AOT option must be declared exactly once",
+        );
+      }
+
+      assertCanonicalRouteTimeoutOption(sourceFile, property);
+      hasTimeout = true;
+      continue;
+    }
+
+    hasManagedBodyOption = true;
+
     if (name === "body") {
       hasBody = true;
     }
   }
 
-  if (!hasBody) {
+  if (hasManagedBodyOption && !hasBody) {
     throw unsupported(
       sourceFile,
 
       options,
 
       `${legacyPrefix}; managed request-body AOT options require a body property`,
+    );
+  }
+
+  if (!hasManagedBodyOption && !hasTimeout) {
+    throw unsupported(
+      sourceFile,
+      options,
+      `${legacyPrefix}; AOT route options require a managed body or canonical route timeout`,
+    );
+  }
+}
+
+function assertCanonicalRouteTimeoutOption(
+  sourceFile: ts.SourceFile,
+  property: ts.ObjectLiteralElementLike,
+): void {
+  if (!ts.isPropertyAssignment(property)) {
+    throw unsupported(
+      sourceFile,
+      property,
+      "route timeout AOT option must be a direct capability.route(<duration>) call",
+    );
+  }
+
+  const initializer = property.initializer;
+
+  if (
+    !ts.isCallExpression(initializer) ||
+    initializer.arguments.length !== 1 ||
+    !ts.isPropertyAccessExpression(initializer.expression) ||
+    initializer.expression.name.text !== "route" ||
+    !ts.isIdentifier(initializer.expression.expression)
+  ) {
+    throw unsupported(
+      sourceFile,
+      initializer,
+      "route timeout AOT option must be a direct capability.route(<duration>) call",
+    );
+  }
+
+  const duration = initializer.arguments[0];
+
+  if (duration === undefined || !ts.isNumericLiteral(duration)) {
+    throw unsupported(
+      sourceFile,
+      initializer,
+      "route timeout AOT duration must be a positive safe integer literal",
+    );
+  }
+
+  const value = Number(duration.text);
+
+  if (!Number.isSafeInteger(value) || value <= 0) {
+    throw unsupported(
+      sourceFile,
+      duration,
+      "route timeout AOT duration must be a positive safe integer literal",
     );
   }
 }

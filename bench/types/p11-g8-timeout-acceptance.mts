@@ -142,7 +142,11 @@ function generateTimeoutRoutes(size: BenchmarkSize): void {
     ].join("\n"),
   );
 
-  for (let start = 0, fileIndex = 0; start < size; start += ROUTES_PER_FILE, fileIndex++) {
+  for (
+    let start = 0, fileIndex = 0;
+    start < size;
+    start += ROUTES_PER_FILE, fileIndex++
+  ) {
     const end = Math.min(start + ROUTES_PER_FILE, size);
     const name = `routes-${String(fileIndex).padStart(3, "0")}.ts`;
     imports.push(`import './${name}'`);
@@ -203,7 +207,15 @@ function compile(scenario: Scenario, size: BenchmarkSize): TypeDiagnostics {
   );
   const result = spawnSync(
     process.execPath,
-    [TSC, "--project", project, "--noEmit", "--pretty", "false", "--extendedDiagnostics"],
+    [
+      TSC,
+      "--project",
+      project,
+      "--noEmit",
+      "--pretty",
+      "false",
+      "--extendedDiagnostics",
+    ],
     { cwd: ROOT, encoding: "utf8", env: process.env },
   );
   if (result.status !== 0) {
@@ -243,7 +255,9 @@ function parseDiagnostics(output: string): TypeDiagnostics {
   return { instantiations, memoryMB, checkTime, totalTime };
 }
 
-function medianDiagnostics(samples: readonly TypeDiagnostics[]): TypeDiagnostics {
+function medianDiagnostics(
+  samples: readonly TypeDiagnostics[],
+): TypeDiagnostics {
   return {
     instantiations: median(samples.map((sample) => sample.instantiations)),
     memoryMB: median(samples.map((sample) => sample.memoryMB)),
@@ -256,7 +270,8 @@ function findCase(scenario: Scenario, size: BenchmarkSize): CaseSummary {
   const result = cases.find(
     (row) => row.scenario === scenario && row.routes === size,
   );
-  if (result === undefined) throw new Error(`Missing TypeScript case: ${scenario}/${size}`);
+  if (result === undefined)
+    throw new Error(`Missing TypeScript case: ${scenario}/${size}`);
   return result;
 }
 

@@ -21,14 +21,24 @@ import { createRuntimeInputPlan } from "./input";
 
 import type { RuntimeInputPlan } from "./input";
 
-import { RUNTIME_ROUTE_INPUT, RUNTIME_ROUTE_PLAIN } from "./types";
+import { resolveRuntimeRouteExecutionBoundary } from "./route-boundary";
+
+import type { RuntimeRouteExecutionBoundary } from "./route-boundary";
+
+import {
+  RUNTIME_ROUTE_EXECUTION_BOUNDARY,
+  RUNTIME_ROUTE_INPUT,
+  RUNTIME_ROUTE_PLAIN,
+} from "./types";
 
 import type { RuntimeRouteHandler, RuntimeRouteRecord } from "./types";
 
 export interface FlatAotManagedInputBinding {
   readonly handler: RuntimeRouteHandler;
 
-  readonly input: RuntimeInputPlan;
+  readonly input: RuntimeInputPlan | undefined;
+
+  readonly executionBoundary: RuntimeRouteExecutionBoundary | undefined;
 
   readonly contractMetadata: RuntimeRouteContractMetadata | undefined;
 }
@@ -65,10 +75,20 @@ export function captureFlatAotManagedInput(
   }
 
   const input = createRuntimeInputPlan(options);
+  const executionBoundary =
+    options.timeout === undefined
+      ? undefined
+      : resolveRuntimeRouteExecutionBoundary(options.timeout);
 
-  if (input === undefined || input.body === undefined) {
+  if (input !== undefined && input.body === undefined) {
     throw new TypeError(
       "Gelis managed request-body AOT requires a body schema",
+    );
+  }
+
+  if (input === undefined && executionBoundary === undefined) {
+    throw new TypeError(
+      "Gelis AOT route options require a managed body schema or execution boundary",
     );
   }
 
@@ -76,6 +96,8 @@ export function captureFlatAotManagedInput(
     handler,
 
     input,
+
+    executionBoundary,
 
     contractMetadata: createRuntimeRouteContractMetadata(options.openapi),
   };
@@ -195,12 +217,25 @@ function bindFlatManagedRoutes(
       continue;
     }
 
+    const input = inputBinding.input;
+    const executionBoundary = inputBinding.executionBoundary;
+    let flags = RUNTIME_ROUTE_PLAIN;
+
+    if (input !== undefined) {
+      flags |= RUNTIME_ROUTE_INPUT;
+    }
+
+    if (executionBoundary !== undefined) {
+      flags |= RUNTIME_ROUTE_EXECUTION_BOUNDARY;
+    }
+
     const route: RuntimeRouteRecord = {
       method: methodName,
       path,
       handler: inputBinding.handler,
-      flags: RUNTIME_ROUTE_INPUT,
-      input: inputBinding.input,
+      flags,
+      input,
+      ...(executionBoundary === undefined ? {} : { executionBoundary }),
       beforeHandle: undefined,
       afterHandle: undefined,
       responses: undefined,

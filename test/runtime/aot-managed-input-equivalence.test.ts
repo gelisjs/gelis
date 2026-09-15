@@ -677,7 +677,7 @@ describe("managed request-body AOT equivalence", () => {
     const binding = installedBindings?.[0] as
       FlatAotManagedInputBinding | undefined;
 
-    expect(binding?.input.bodyContentTypes).toEqual(["text/plain"]);
+    expect(binding?.input?.bodyContentTypes).toEqual(["text/plain"]);
   });
 
   test("emits managed capture imports only when the source needs them", async () => {

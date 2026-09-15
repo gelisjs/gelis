@@ -8,6 +8,13 @@ import {
 import { generateCookie, getCookie, setCookie } from "gelis/cookie";
 import { cors } from "gelis/cors";
 import {
+  requestId,
+  type RequestIdCapability,
+  type RequestIdGenerator,
+  type RequestIdOptions,
+  type RequestIdValidator,
+} from "gelis/request-id";
+import {
   secureHeaders,
   type SecureHeadersCrossOriginEmbedderPolicy,
   type SecureHeadersCrossOriginOpenerPolicy,
@@ -16,8 +23,56 @@ import {
   type SecureHeadersReferrerPolicy,
   type SecureHeadersStrictTransportSecurityOptions,
 } from "gelis/secure-headers";
+import {
+  GelisTimeoutError,
+  timeout,
+  type TimeoutCapability,
+  type TimeoutHandler,
+  type TimeoutOptions,
+  type TimeoutRoutePolicy,
+  type TimeoutSource,
+} from "gelis/timeout";
 
 const app = new Gelis();
+
+const requestIdGenerator: RequestIdGenerator = () => "portable-id";
+const requestIdValidator: RequestIdValidator = (value, request) => {
+  request.headers.get("x-request-id");
+  return value.startsWith("edge-");
+};
+const requestIdOptions: RequestIdOptions = {
+  generator: requestIdGenerator,
+  acceptIncoming: requestIdValidator,
+};
+const ids: RequestIdCapability = requestId(requestIdOptions);
+app.use(ids);
+
+const timeoutHandler: TimeoutHandler = (_request, error) => {
+  const source: TimeoutSource = error.source;
+  void source;
+  return new Response(error.message, { status: 503 });
+};
+const timeoutOptions: TimeoutOptions = {
+  duration: 1_000,
+  onTimeout: timeoutHandler,
+};
+const deadlines: TimeoutCapability = timeout(timeoutOptions);
+const routeDeadline: TimeoutRoutePolicy = deadlines.route(500);
+app.use(deadlines);
+app.get("/timed", { timeout: routeDeadline }, () => "timed");
+
+const timeoutError = new GelisTimeoutError(500, "route");
+timeoutError.duration;
+timeoutError.source;
+
+// @ts-expect-error duration must be numeric.
+timeout({ duration: "1000" });
+// @ts-expect-error route duration must be numeric.
+deadlines.route("500");
+// @ts-expect-error route timeout must be an opaque timeout policy.
+app.get("/invalid-timeout", { timeout: 500 }, () => "invalid");
+// @ts-expect-error request-ID header must be a string.
+requestId({ header: 123 });
 
 app.use(
   cors({
@@ -96,8 +151,8 @@ async function inspectLimitedBody(request: Request): Promise<void> {
   }
 }
 
-// Portable consumers must not receive Bun globals through `gelis`,
-// `gelis/cookie`, `gelis/cors`, `gelis/body-limit`, or `gelis/secure-headers`.
+// Portable consumers must not receive Bun globals through `gelis` or any
+// portable Gelis subpath, including request-ID and timeout capabilities.
 // @ts-expect-error Bun must not exist in the portable consumer graph.
 Bun.serve;
 

@@ -8,7 +8,10 @@ import {
   createFlatAotRuntimeAdapter,
 } from "../../src/runtime/flat-aot-runtime-adapter";
 import { compileFlatAotArtifact } from "../../src/tooling/flat-aot-artifact-compiler";
-import { createAotAppSession, createAotBuildAppSession } from "../../src/tooling/aot-app";
+import {
+  createAotAppSession,
+  createAotBuildAppSession,
+} from "../../src/tooling/aot-app";
 import { analyzeAotSource } from "../../src/tooling/aot-source-analyzer";
 import { compileAotSource } from "../../src/tooling/aot-source-compiler";
 import { compileRouterSnapshot } from "../../src/tooling/router-snapshot-compiler";
@@ -169,7 +172,9 @@ describe("P11-G8 request-ID and timeout AOT preservation", () => {
 
     fixture.install(app, fixture.handlers, fixture.bindings);
 
-    expect(() => app.use(foreign)).toThrow("distinct timeout capability owners");
+    expect(() => app.use(foreign)).toThrow(
+      "distinct timeout capability owners",
+    );
 
     app.use(owner);
     const response = await app.fetch(new Request(`${API_URL}/slow`));

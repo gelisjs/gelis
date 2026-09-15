@@ -80,7 +80,7 @@ describe("Gelis body-limit AOT preservation", () => {
     const fixture = await createManagedAotFixture(5);
     const binding = fixture.inputBindings[0];
 
-    expect(binding?.input.bodyLimit).toBe(5);
+    expect(binding?.input?.bodyLimit).toBe(5);
 
     const app = new Gelis();
 
@@ -137,7 +137,7 @@ describe("Gelis body-limit AOT preservation", () => {
     expect(equal.status).toBe(200);
     expect(await equal.text()).toBe("123");
     expect(overRouteLimit.status).toBe(413);
-    expect(fixture.inputBindings[0]?.input.bodyLimit).toBe(3);
+    expect(fixture.inputBindings[0]?.input?.bodyLimit).toBe(3);
   });
 
   test("keeps plain AOT installation free of managed input bindings with bodyLimit enabled", async () => {
