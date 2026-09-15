@@ -1,0 +1,68 @@
+name: P11-G9 repair raw probe
+
+on:
+  push:
+    branches:
+      - work/p11-g9-zero-unused-acceptance
+    paths:
+      - .github/workflows/p11-g9-fix-raw-probe.yml
+
+permissions:
+  contents: write
+
+jobs:
+  repair-and-validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: work/p11-g9-zero-unused-acceptance
+          fetch-depth: 0
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.0
+      - run: bun install --frozen-lockfile
+      - name: Repair raw-response correctness assertion
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path("bench/request-id-timeout/p11-g9-zero-unused-worker.mts")
+          text = path.read_text()
+          old = '''      const contentType = response.headers.get("content-type") ?? "";
+      if (scenario === "static-json" || scenario === "dynamic-json") {
+        const mediaType = contentType.split(";", 1)[0]?.trim().toLowerCase();
+        if (mediaType !== "application/json") {
+          throw new Error(`${scenario} media type mismatch: ${mediaType}`);
+        }
+      } else if (
+        contentType !== "text/plain;charset=UTF-8" &&
+        contentType !== "text/plain; charset=utf-8"
+      ) {
+        throw new Error(`${scenario} content type mismatch: ${contentType}`);
+      }
+'''
+          new = '''      if (scenario === "static-json" || scenario === "dynamic-json") {
+        const contentType = response.headers.get("content-type") ?? "";
+        const mediaType = contentType.split(";", 1)[0]?.trim().toLowerCase();
+        if (mediaType !== "application/json") {
+          throw new Error(`${scenario} media type mismatch: ${mediaType}`);
+        }
+      }
+'''
+          if old not in text:
+              raise SystemExit("expected G9 raw-response assertion block not found")
+          path.write_text(text.replace(old, new, 1))
+          PY
+      - name: Format worker
+        run: bunx prettier@3.9.6 --write bench/request-id-timeout/p11-g9-zero-unused-worker.mts
+      - name: Run full quality gates
+        run: bun run check
+      - name: Commit clean repaired harness
+        run: |
+          rm .github/workflows/p11-g9-fix-raw-probe.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add bench/request-id-timeout/p11-g9-zero-unused-worker.mts .github/workflows/p11-g9-fix-raw-probe.yml
+          git commit -m "fix(bench): accept headerless raw Response in G9 probe"
+          git push origin HEAD:work/p11-g9-zero-unused-acceptance
