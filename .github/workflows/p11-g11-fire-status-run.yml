@@ -1,11 +1,7 @@
 name: P11-G11 fire status repair runner
 
 on:
-  push:
-    branches:
-      - work/p11-g11-timeout-enabled-acceptance
-    paths:
-      - .github/workflows/p11-g11-fire-status-run.yml
+  workflow_dispatch:
 
 permissions:
   contents: write
