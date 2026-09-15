@@ -70,8 +70,7 @@ async function runRequestId(args: ParsedArgs): Promise<WorkerResult> {
       ? await createGelisBenchmark(candidateRoot, scenario)
       : createHonoBenchmark(scenario);
 
-  const request = createScenarioRequest(scenario);
-  const verification = await benchmark.dispatch(request);
+  const verification = await benchmark.dispatch(createScenarioRequest(scenario));
   assertEquivalentResult(
     framework,
     scenario,
@@ -80,7 +79,7 @@ async function runRequestId(args: ParsedArgs): Promise<WorkerResult> {
   );
 
   let sink = 0;
-  const operation = async () => {
+  const operation = async (request: Request) => {
     const response = await benchmark.dispatch(request);
     const observed = benchmark.observed();
     const propagated = response.headers.get(HEADER_NAME);
@@ -97,12 +96,14 @@ async function runRequestId(args: ParsedArgs): Promise<WorkerResult> {
     sink ^= response.status + observed.length;
   };
 
-  for (let index = 0; index < WARMUP_ASYNC; index++) {
-    await operation();
+  const warmupRequests = createScenarioRequests(scenario, WARMUP_ASYNC);
+  for (let index = 0; index < warmupRequests.length; index++) {
+    await operation(warmupRequests[index]!);
   }
 
-  const iterations = await calibrateAsync(operation);
-  const elapsed = await measureAsync(operation, iterations);
+  const iterations = await calibrateAsync(operation, scenario);
+  const measuredRequests = createScenarioRequests(scenario, iterations);
+  const elapsed = await measureAsync(operation, measuredRequests);
 
   return {
     mode: "request-id",
@@ -214,6 +215,19 @@ function createScenarioRequest(scenario: RequestIdScenario): Request {
   return new Request("http://gelis.test/resource");
 }
 
+function createScenarioRequests(
+  scenario: RequestIdScenario,
+  count: number,
+): Request[] {
+  const requests = new Array<Request>(count);
+
+  for (let index = 0; index < count; index++) {
+    requests[index] = createScenarioRequest(scenario);
+  }
+
+  return requests;
+}
+
 function assertEquivalentResult(
   framework: Framework,
   scenario: RequestIdScenario,
@@ -322,11 +336,15 @@ async function waitForLaunchGate(path: string): Promise<void> {
   throw new Error(`P11-G10 launch gate timeout: ${path}`);
 }
 
-async function calibrateAsync(operation: () => Promise<void>): Promise<number> {
+async function calibrateAsync(
+  operation: (request: Request) => Promise<void>,
+  scenario: RequestIdScenario,
+): Promise<number> {
   let iterations = 100;
 
   while (true) {
-    const elapsed = await measureAsync(operation, iterations);
+    const requests = createScenarioRequests(scenario, iterations);
+    const elapsed = await measureAsync(operation, requests);
 
     if (elapsed >= MIN_CALIBRATION_MS) {
       return Math.max(
@@ -340,13 +358,13 @@ async function calibrateAsync(operation: () => Promise<void>): Promise<number> {
 }
 
 async function measureAsync(
-  operation: () => Promise<void>,
-  iterations: number,
+  operation: (request: Request) => Promise<void>,
+  requests: readonly Request[],
 ): Promise<number> {
   const start = performance.now();
 
-  for (let index = 0; index < iterations; index++) {
-    await operation();
+  for (let index = 0; index < requests.length; index++) {
+    await operation(requests[index]!);
   }
 
   return performance.now() - start;
