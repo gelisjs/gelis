@@ -57,11 +57,7 @@ describe("P11-G7 timeout owner consistency", () => {
     app.get("/existing", { timeout: first.route(50) }, () => "existing");
 
     const module = defineModule("/batch", (route) => ({
-      sameOwner: route.get(
-        "/same",
-        { timeout: first.route(50) },
-        () => "same",
-      ),
+      sameOwner: route.get("/same", { timeout: first.route(50) }, () => "same"),
       foreignOwner: route.get(
         "/foreign",
         { timeout: second.route(50) },

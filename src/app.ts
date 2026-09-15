@@ -260,6 +260,13 @@ interface AppRuntimeState {
 
   routeIdentityKeys: Set<string> | undefined;
 
+  /*
+   * Execution-boundary ownership is configuration metadata only.
+   * Allocate its registry lazily so applications without route boundaries
+   * pay no per-request cost and no per-route sidecar allocation.
+   */
+  routeBoundaryOwners: Map<symbol, object> | undefined;
+
   localBeforeHooks: (RuntimeBeforeHandle | undefined)[] | undefined;
 
   localAfterHooks: (RuntimeAfterHandle | undefined)[] | undefined;
@@ -419,6 +426,8 @@ export class Gelis extends RouteBuilder<""> {
 
       routeIdentityKeys: undefined,
 
+      routeBoundaryOwners: undefined,
+
       localBeforeHooks: undefined,
 
       localAfterHooks: undefined,
@@ -535,12 +544,14 @@ export class Gelis extends RouteBuilder<""> {
         }
 
         applyRouteSpecializersToRoutes(state, routes);
+        validateRouteExecutionBoundaryOwners(state, routes);
 
         state.router = router;
 
         state.routes = routes;
 
         state.routeIdentityKeys = undefined;
+        commitRouteExecutionBoundaryOwners(state, routes);
       },
     };
   }
@@ -1376,6 +1387,8 @@ function commitModuleRuntimeRoutesAtomic(
   if (state.routeSpecializers !== undefined) {
     validatePluginCompositionRoutes(state, routes);
     applyRouteSpecializersToRoutes(state, routes);
+  } else {
+    validateRouteExecutionBoundaryOwners(state, routes);
   }
 
   const localBeforeHooks = state.localBeforeHooks;
@@ -1391,6 +1404,7 @@ function commitModuleRuntimeRoutesAtomic(
    */
   if (localBeforeHooks === undefined || localAfterHooks === undefined) {
     registerBatchAtomic.call(state.router, routes);
+    commitRouteExecutionBoundaryOwners(state, routes);
 
     activateAllFallbackForRoutes(state, routes);
 
@@ -1437,6 +1451,7 @@ function commitModuleRuntimeRoutesAtomic(
   }
 
   registerBatchAtomic.call(state.router, routes);
+  commitRouteExecutionBoundaryOwners(state, routes);
 
   activateAllFallbackForRoutes(state, routes);
 
@@ -1497,6 +1512,71 @@ function validatePluginCompositionRoutes(
 
     pending.add(key);
   }
+
+  validateRouteExecutionBoundaryOwners(state, routes);
+}
+
+function validateRouteExecutionBoundaryOwners(
+  state: AppRuntimeState,
+  routes: readonly RuntimeRouteRecord[],
+): void {
+  if (routes.length === 0) {
+    return;
+  }
+
+  const existing = state.routeBoundaryOwners;
+  let pending: Map<symbol, object> | undefined;
+
+  for (let index = 0; index < routes.length; index++) {
+    const boundary = routes[index]!.executionBoundary;
+
+    if (boundary === undefined) {
+      continue;
+    }
+
+    const existingOwner = existing?.get(boundary.family);
+
+    if (existingOwner !== undefined && existingOwner !== boundary.owner) {
+      throw new Error(
+        "Gelis application cannot mix distinct route execution boundary owners",
+      );
+    }
+
+    const pendingOwner = pending?.get(boundary.family);
+
+    if (pendingOwner !== undefined && pendingOwner !== boundary.owner) {
+      throw new Error(
+        "Gelis application cannot mix distinct route execution boundary owners",
+      );
+    }
+
+    if (existingOwner === undefined && pendingOwner === undefined) {
+      pending ??= new Map<symbol, object>();
+      pending.set(boundary.family, boundary.owner);
+    }
+  }
+}
+
+function commitRouteExecutionBoundaryOwners(
+  state: AppRuntimeState,
+  routes: readonly RuntimeRouteRecord[],
+): void {
+  let owners = state.routeBoundaryOwners;
+
+  for (let index = 0; index < routes.length; index++) {
+    const boundary = routes[index]!.executionBoundary;
+
+    if (boundary === undefined) {
+      continue;
+    }
+
+    if (owners === undefined) {
+      owners = new Map<symbol, object>();
+      state.routeBoundaryOwners = owners;
+    }
+
+    owners.set(boundary.family, boundary.owner);
+  }
 }
 
 function ensureRouteIdentityKeys(state: AppRuntimeState): Set<string> {
@@ -1545,6 +1625,7 @@ function registerAppRuntimeRoute(
   route: RuntimeRouteRecord,
 ): void {
   applyRouteSpecializers(state, route);
+  validateRouteExecutionBoundaryOwners(state, [route]);
 
   /*
    * Router registration happens before mutating
@@ -1554,6 +1635,7 @@ function registerAppRuntimeRoute(
    * unchanged.
    */
   state.router.register(route);
+  commitRouteExecutionBoundaryOwners(state, [route]);
 
   if (route.method === ALL_ROUTE_METHOD && state.router instanceof Router) {
     activateAllFallback(state.router);
