@@ -1,0 +1,45 @@
+name: P11-G10 fix acceptIncoming harness option
+
+on:
+  push:
+    branches:
+      - work/p11-g10-request-id-enabled-acceptance
+    paths:
+      - .github/workflows/p11-g10-fix-accept-incoming.yml
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: work/p11-g10-request-id-enabled-acceptance
+          fetch-depth: 0
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.0
+      - run: bun install --frozen-lockfile
+      - name: Repair Gelis inbound request-ID option
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('bench/request-id-timeout/p11-g10-request-id-worker.mts')
+          text = path.read_text()
+          old = 'return { trustIncoming: true };'
+          count = text.count(old)
+          if count != 2:
+              raise SystemExit(f'expected two trustIncoming anchors, got {count}')
+          path.write_text(text.replace(old, 'return { acceptIncoming: true };'))
+          PY
+          bunx prettier@3.9.6 --write bench/request-id-timeout/p11-g10-request-id-worker.mts
+      - name: Commit repaired worker
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add bench/request-id-timeout/p11-g10-request-id-worker.mts
+          git commit -m "fix(bench): use Gelis acceptIncoming in P11-G10"
+          git push origin HEAD:work/p11-g10-request-id-enabled-acceptance
