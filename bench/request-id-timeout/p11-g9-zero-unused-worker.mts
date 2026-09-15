@@ -10,10 +10,7 @@ const MIN_CALIBRATION_MS = 20;
 const CYCLES = 8;
 
 type ZeroScenario =
-  | "static-raw"
-  | "dynamic-raw"
-  | "static-json"
-  | "dynamic-json";
+  "static-raw" | "dynamic-raw" | "static-json" | "dynamic-json";
 
 type Operation = () => number;
 
@@ -163,9 +160,7 @@ if (probeOnly) {
 
     controlMetrics.push(control1, control2);
     candidateMetrics.push(candidate1, candidate2);
-    const ratio = Math.sqrt(
-      (candidate1 * candidate2) / (control1 * control2),
-    );
+    const ratio = Math.sqrt((candidate1 * candidate2) / (control1 * control2));
     cycleRatios.push(ratio);
     (controlFirst ? abbaRatios : baabRatios).push(ratio);
   }
@@ -238,7 +233,9 @@ function prepareScenario(
     operation: () => {
       const response = app.fetch(request);
       assertSync(response, scenario);
-      return response.status + (response.headers.get("content-type")?.length ?? 0);
+      return (
+        response.status + (response.headers.get("content-type")?.length ?? 0)
+      );
     },
     assertCorrectness: async () => {
       const response = await app.fetch(request);
@@ -261,7 +258,10 @@ function prepareScenario(
         if (mediaType !== "application/json") {
           throw new Error(`${scenario} media type mismatch: ${mediaType}`);
         }
-      } else if (contentType !== "text/plain;charset=UTF-8" && contentType !== "text/plain; charset=utf-8") {
+      } else if (
+        contentType !== "text/plain;charset=UTF-8" &&
+        contentType !== "text/plain; charset=utf-8"
+      ) {
         throw new Error(`${scenario} content type mismatch: ${contentType}`);
       }
     },

@@ -22,10 +22,7 @@ const WORKER = resolve(HERE, "p11-g9-zero-unused-worker.mts");
 const RUN_TOKEN = `${process.pid}-${Date.now()}`;
 
 type ZeroScenario =
-  | "static-raw"
-  | "dynamic-raw"
-  | "static-json"
-  | "dynamic-json";
+  "static-raw" | "dynamic-raw" | "static-json" | "dynamic-json";
 
 interface WorkerResult {
   readonly mode: "zero-unused";
@@ -125,7 +122,9 @@ function printHeader(): void {
   console.log(`Control A:       ${CONTROL_SHA}`);
   console.log(`Candidate B:     ${CANDIDATE_SHA}`);
   console.log(`Worker blob:     ${workerBlob}`);
-  console.log(`Routes:          ${ROUTES.toLocaleString("en-US")} mixed routes`);
+  console.log(
+    `Routes:          ${ROUTES.toLocaleString("en-US")} mixed routes`,
+  );
 
   if (probeOnly) {
     console.log("Mode:            correctness probe only");
@@ -136,8 +135,12 @@ function printHeader(): void {
     console.log(`Cycles/worker:   ${CYCLES_PER_WORKER}`);
     console.log("Cycle order:     balanced ABBA / BAAB within each process");
     console.log("Timed legs:      32 per worker (4 legs × 8 cycles)");
-    console.log(`Case gate:       candidate/control median <= ${CASE_GATE.toFixed(3)}x`);
-    console.log(`Geomean gate:    four-case geomean <= ${GEOMEAN_GATE.toFixed(3)}x`);
+    console.log(
+      `Case gate:       candidate/control median <= ${CASE_GATE.toFixed(3)}x`,
+    );
+    console.log(
+      `Geomean gate:    four-case geomean <= ${GEOMEAN_GATE.toFixed(3)}x`,
+    );
     console.log(
       `Windows affinity: logical CPU ${affinityLogicalCpu} (0x${affinityMaskHex})`,
     );
@@ -166,7 +169,11 @@ function runProbe(): void {
 function runTiming(): void {
   const diagnostics = new Map<ZeroScenario, CellDiagnostics>();
 
-  for (let scenarioIndex = 0; scenarioIndex < SCENARIOS.length; scenarioIndex++) {
+  for (
+    let scenarioIndex = 0;
+    scenarioIndex < SCENARIOS.length;
+    scenarioIndex++
+  ) {
     const scenario = SCENARIOS[scenarioIndex]!;
     const results: WorkerResult[] = [];
 
@@ -222,7 +229,9 @@ function validateTimedResult(
     result.routes !== ROUTES ||
     result.unit !== "ns/op"
   ) {
-    throw new Error(`P11-G9 worker identity mismatch for ${scenario} #${workerIndex}`);
+    throw new Error(
+      `P11-G9 worker identity mismatch for ${scenario} #${workerIndex}`,
+    );
   }
 
   if (
@@ -304,13 +313,11 @@ function runWorker(
     );
   }
 
-  const line = result.stdout
-    .trim()
-    .split(/\r?\n/u)
-    .filter(Boolean)
-    .at(-1);
+  const line = result.stdout.trim().split(/\r?\n/u).filter(Boolean).at(-1);
   if (line === undefined) {
-    throw new Error(`P11-G9 worker emitted no result for ${scenario} #${workerIndex}`);
+    throw new Error(
+      `P11-G9 worker emitted no result for ${scenario} #${workerIndex}`,
+    );
   }
 
   return JSON.parse(line) as WorkerResult;
@@ -397,7 +404,9 @@ function preflight(): void {
 
   if (!probeOnly) {
     if (process.platform !== "win32") {
-      throw new Error("P11-G9 timed acceptance is authoritative only on Windows");
+      throw new Error(
+        "P11-G9 timed acceptance is authoritative only on Windows",
+      );
     }
     if (logicalCpuCount !== EXPECTED_LOCAL_LOGICAL_CPUS) {
       throw new Error(
