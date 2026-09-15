@@ -373,7 +373,7 @@ async function runPinnedWindowsWorker(
   const errorFile = `${resultFile}.err`;
   const gateFile = `${resultFile}.gate`;
   const bunPath = quotePowerShell(process.execPath);
-  const argumentList = [...args, `--launch-gate=${gateFile}`]
+  const argumentList = [WORKER, ...args, `--launch-gate=${gateFile}`]
     .map(quotePowerShell)
     .join(", ");
   const command = [
