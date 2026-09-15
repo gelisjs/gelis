@@ -208,9 +208,10 @@ async function runFire(args: ParsedArgs): Promise<FireWorkerResult> {
   const response = await benchmark.dispatch(request);
   const elapsedMs = performance.now() - started;
 
-  if (response.status !== 504) {
+  const expectedStatus = framework === "gelis" ? 503 : 504;
+  if (response.status !== expectedStatus) {
     throw new Error(
-      `${framework} timeout-fire diagnostic returned ${response.status}`,
+      `${framework} timeout-fire diagnostic returned ${response.status}, expected ${expectedStatus}`,
     );
   }
 
