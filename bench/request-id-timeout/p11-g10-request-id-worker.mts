@@ -70,7 +70,9 @@ async function runRequestId(args: ParsedArgs): Promise<WorkerResult> {
       ? await createGelisBenchmark(candidateRoot, scenario)
       : createHonoBenchmark(scenario);
 
-  const verification = await benchmark.dispatch(createScenarioRequest(scenario));
+  const verification = await benchmark.dispatch(
+    createScenarioRequest(scenario),
+  );
   assertEquivalentResult(
     framework,
     scenario,
